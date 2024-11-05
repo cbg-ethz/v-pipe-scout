@@ -3,10 +3,41 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
+import yaml
+import boto3
+
+# Access AWS credentials from secrets management
+AWS_ACCESS_KEY_ID = st.secrets["aws"]["AWS_ACCESS_KEY_ID"]
+AWS_SECRET_ACCESS_KEY = st.secrets["aws"]["AWS_SECRET_ACCESS_KEY"]
+AWS_DEFAULT_REGION = st.secrets["aws"]["AWS_DEFAULT_REGION"]
+
+
+# Create an S3 client
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    region_name=AWS_DEFAULT_REGION, 
+
+)
+
+# import boto3
+# s3 = boto3.client('s3')
+bucket_name = 'vpipe-output'
+object_key = 'mut_def/kp.3_mutations_full.yaml'
+response = s3.get_object(Bucket=bucket_name, Key=object_key)
+content = response['Body'].read().decode('utf-8')
+data = yaml.safe_load(content)
+
+
 
 # Streamlit title and description
 st.title('Mutation Frequency Over Time')
 st.write('This application displays a heatmap of mutation frequencies over time.')
+
+# just pinrt the yaml data
+st.write(data)
+
 
 # 1. Data Generation
 mutations = [
