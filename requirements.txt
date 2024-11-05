@@ -6,3 +6,5 @@ pyyaml
 boto3
 s3fs
 st-files-connection
+seaborn
+matplotlib
