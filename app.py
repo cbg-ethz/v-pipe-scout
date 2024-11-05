@@ -25,18 +25,34 @@ s3 = boto3.client(
 # s3 = boto3.client('s3')
 bucket_name = 'vpipe-output'
 object_key = 'mut_def/kp.3_mutations_full.yaml'
-response = s3.get_object(Bucket=bucket_name, Key=object_key)
-content = response['Body'].read().decode('utf-8')
-data = yaml.safe_load(content)
+#response = s3.get_object(Bucket=bucket_name, Key=object_key)
+#content = response['Body'].read().decode('utf-8')
+#data = yaml.safe_load(content)
+
+@st.cache_data  # Cache the data for better performance
+def load_yaml_from_s3(bucket_name, file_name):
+    """Loads YAML data from an S3 bucket."""
+    try:
+        obj = s3.get_object(Bucket=bucket_name, Key=file_name)
+        data = yaml.safe_load(obj["Body"])
+        return data
+    except Exception as e:
+        st.error(f"Error loading YAML from S3: {e}")
+        return None
+
+
+
+yaml_data = load_yaml_from_s3(bucket_name, object_key)
+
+if yaml_data:
+    st.write("YAML data loaded successfully:")
+    st.write(yaml_data)
 
 
 
 # Streamlit title and description
 st.title('Mutation Frequency Over Time')
 st.write('This application displays a heatmap of mutation frequencies over time.')
-
-# just pinrt the yaml data
-st.write(data)
 
 
 # 1. Data Generation
