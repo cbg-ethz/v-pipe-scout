@@ -94,7 +94,7 @@ xec_df = pd.DataFrame(xec_mutations_data)
 st.title('Identifing New Variants')
 st.write('Visualizing new variants emerging, by mutations')
 
-
+@st.cache_data  # Cache the data for better performance
 def filter_for_variant(tally, variant):
         # Extract the positions and mutations from kp3_df
         kp3_positions = variant.index
@@ -115,6 +115,7 @@ xec_filtered_df = filter_for_variant(tallymut, xec_df)
 # Dataset selection
 selected_dataset = st.selectbox('Select Dataset', ['kp3/kp2', 'xec'])  # Replace with your dataset names
 
+@st.cache_data  # Cache the data for better performance
 def plot_heatmap(data, title='Heatmap of Fractions by Date and Position', xlabel='Date', ylabel='Position', figsize=(20, 10), num_labels=20):
     # Pivot the dataframe to get the desired format for the heatmap 
     heatmap_data = data.pivot_table(index='pos', columns='date', values='frac')
