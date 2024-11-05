@@ -21,17 +21,20 @@ s3 = boto3.client(
 
 )
 
-# import boto3
-# s3 = boto3.client('s3')
 bucket_name = 'vpipe-output'
-object_key = 'mut_def/kp.3_mutations_full.yaml'
-#response = s3.get_object(Bucket=bucket_name, Key=object_key)
-#content = response['Body'].read().decode('utf-8')
-#data = yaml.safe_load(content)
+kp3_mutations = 'mut_def/kp.3_mutations_full.yaml'
+xec_mutations = "mut_def/xec_mutations_full.yaml"
+
 
 @st.cache_data  # Cache the data for better performance
 def load_yaml_from_s3(bucket_name, file_name):
-    """Loads YAML data from an S3 bucket."""
+    """Loads YAML data from an S3 bucket.
+    
+    Args:
+        bucket_name (str): The name of the S3 bucket.
+        file_name (str): The name of the file to load, including the path.
+                         also called object key.
+    """
     try:
         obj = s3.get_object(Bucket=bucket_name, Key=file_name)
         data = yaml.safe_load(obj["Body"])
@@ -39,15 +42,43 @@ def load_yaml_from_s3(bucket_name, file_name):
     except Exception as e:
         st.error(f"Error loading YAML from S3: {e}")
         return None
+    
+
+@st.cache_data  # Cache the data for better performance
+def load_tsv_from_s3(bucket_name, file_name):
+    """Loads tsv data from an S3 bucket.
+    
+    Args:
+        bucket_name (str): The name of the S3 bucket.
+        file_name (str): The name of the file to load, including the path.
+                         also called object key.
+    """
+    try:
+        obj = s3.get_object(Bucket=bucket_name, Key=file_name)
+        data = pd.read_csv(obj['Body'], sep='\t')
+        return data
+    except Exception as e:
+        st.error(f"Error loading tsv from S3: {e}")
+        return None
 
 
 
-yaml_data = load_yaml_from_s3(bucket_name, object_key)
+# Load the YAML data from S3
+kp3_mutations_data = load_yaml_from_s3(bucket_name, kp3_mutations)
+xec_mutations_data = load_yaml_from_s3(bucket_name, xec_mutations)
+# Load the selected mutations tally
+tallymut = load_tsv_from_s3(bucket_name, 'selected_columns_tallymut.tsv')
 
-if yaml_data:
-    st.write("YAML data loaded successfully:")
-    st.write(yaml_data)
 
+# Display the data
+st.write("KP3 Mutations:")
+st.write(kp3_mutations_data)
+
+st.write("XEC Mutations:")
+st.write(xec_mutations_data)
+
+st.write("Selected Mutations Tally:")
+st.write(tallymut)
 
 
 # Streamlit title and description
