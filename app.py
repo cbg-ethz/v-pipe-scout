@@ -24,8 +24,8 @@ s3 = boto3.client(
 )
 
 bucket_name = 'vpipe-output'
-kp3_mutations = 'mut_def/kp.3_mutations_full.yaml'
-xec_mutations = "mut_def/xec_mutations_full.yaml"
+kp3_mutations = 'mut_def/kp23.yaml'
+xec_mutations = "mut_def/xec.yaml"
 
 
 @st.cache_data  # Cache the data for better performance
@@ -57,7 +57,10 @@ def load_tsv_from_s3(bucket_name, file_name):
     """
     try:
         obj = s3.get_object(Bucket=bucket_name, Key=file_name)
-        data = pd.read_csv(obj['Body'], sep='\t')
+        if file_name.endswith('.gz'):
+            data = pd.read_csv(obj['Body'], sep='\t', compression='gzip')
+        else:
+            data = pd.read_csv(obj['Body'], sep='\t')
         return data
     except Exception as e:
         st.error(f"Error loading tsv from S3: {e}")
@@ -68,33 +71,28 @@ def load_tsv_from_s3(bucket_name, file_name):
 kp3_mutations_data = load_yaml_from_s3(bucket_name, kp3_mutations)
 xec_mutations_data = load_yaml_from_s3(bucket_name, xec_mutations)
 # Load the selected mutations tally
-tallymut = load_tsv_from_s3(bucket_name, 'selected_columns_tallymut.tsv')
+tallymut = load_tsv_from_s3(bucket_name, 'subset_tallymut.tsv.gz')
+
+# only keep columns we need
 
 # lets convert these dictionaries to dataframes
 kp3_df = pd.DataFrame(kp3_mutations_data)
 xec_df = pd.DataFrame(xec_mutations_data)
 
-def filter_for_variant(tally, variant):
-        # Extract the positions and mutations from kp3_df
-        kp3_positions = variant.index
-        kp3_mutations = variant['mut'].str[-1]
+# subset the dataframes for the positions that only exist in one of the dataframes
+#kp3_pos = set(kp3_mutations_data['mut'].keys())
+#xec_pos =set(xec_mutations_data['mut'].keys())
+#kp3_only = kp3_pos - xec_pos
+#xec_only = xec_pos - kp3_pos
 
-        # Filter new_df based on the positions and mutations in kp3_df
-        filtered_df = tally[tally.apply(lambda row: row['pos'] in kp3_positions and row['base'] == kp3_mutations.get(row['pos']), axis=1)]
-
-        return filtered_df
-
-
-# Filter new_df for the KP3 variant
-kp3_filtered_df = filter_for_variant(tallymut, kp3_df)
-
-# Filter new_df for the XEC variant
-xec_filtered_df = filter_for_variant(tallymut, xec_df)
+# subset the dataframes for the positions that only exist in one of the dataframes
+#kp3_df = kp3_df[kp3_df['mut'].isin(kp3_only)]
+#xec_df = xec_df[xec_df['mut'].isin(xec_only)]
 
 
 # Streamlit title and description
-st.title('Mutation Frequency Over Time')
-st.write('This application displays a heatmap of mutation frequencies over time.')
+st.title('Identifing New Variants')
+st.write('Visualizing new variants emerging, by mutations')
 
 
 def filter_for_variant(tally, variant):
@@ -113,8 +111,9 @@ kp3_filtered_df = filter_for_variant(tallymut, kp3_df)
 # Filter tallymut for the XEC variant
 xec_filtered_df = filter_for_variant(tallymut, xec_df)
 
+
 # Dataset selection
-selected_dataset = st.selectbox('Select Dataset', ['kp3', 'xec'])  # Replace with your dataset names
+selected_dataset = st.selectbox('Select Dataset', ['kp3/kp2', 'xec'])  # Replace with your dataset names
 
 def plot_heatmap(data, title='Heatmap of Fractions by Date and Position', xlabel='Date', ylabel='Position', figsize=(20, 10), num_labels=10):
     # Pivot the dataframe to get the desired format for the heatmap 
@@ -138,70 +137,14 @@ def plot_heatmap(data, title='Heatmap of Fractions by Date and Position', xlabel
     plt.xticks(ticks=xticks[0][::len(xticks[0]) // num_labels], labels=[xticks[1][i] for i in range(0, len(xticks[1]), len(xticks[1]) // num_labels)], rotation=60)
 
     plt.yticks(rotation=0)
-    plt.show()
+    plt.tight_layout()
+
+    # Display the plot in Streamlit
+    st.pyplot(plt)
 
 # Plot button
 if st.button('Plot Heatmap'):
-    if selected_dataset == 'kp3':
-        plot_heatmap(kp3_filtered_df, title='kp3 Heatmap')  # Replace df1 with your actual DataFrame variable
-    elif selected_dataset == 'Dataset 2':
-        plot_heatmap(xec_filtered_df, title='xec Heatmap')  # Replace df2 with your actual DataFrame variable
-
-# 1. Data Generation
-mutations = [
-    "V166A",
-    "V166L",
-    "N198S",
-    "R285C",
-    "A376V",
-    "A449V",
-    "F480L",
-    "D484Y",
-    "A526V",
-    "V557L",
-    "G671S",
-    "S759A",
-    "V792I",
-    "E796G",
-    "C799F",
-    "C799R",
-    "E802A",
-    "E802D",
-    "M924R"
-]
-start_date = datetime(2024, 4, 23)
-end_date = datetime(2024, 10, 7)
-
-# Generate dates three times per week
-current_date = start_date
-dates = [current_date]
-while current_date < end_date:
-    current_date += timedelta(days=2)
-    dates.append(current_date)
-dates.sort()
-
-# Generate random data (skewed towards 0)
-data = {}
-for mutation in mutations:
-    data[mutation] = np.random.choice(np.arange(7), size=len(dates), p=[0.99, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0])
-
-df = pd.DataFrame(data, index=dates)
-
-# 2. Heatmap Construction
-fig, ax = plt.subplots(figsize=(12, 8))
-im = ax.imshow(df.values.T, cmap='Blues')  # Use a blue colormap
-
-# Set axis labels
-ax.set_xticks([0, len(dates) // 2, len(dates) - 1])
-ax.set_xticklabels([dates[0].strftime('%Y-%m-%d'), dates[len(dates) // 2].strftime('%Y-%m-%d'), dates[-1].strftime('%Y-%m-%d')], rotation=45)
-ax.set_yticks(np.arange(len(mutations)))
-ax.set_yticklabels(mutations, fontsize=8)
-
-# Add colorbar
-cbar = ax.figure.colorbar(im, ax=ax)
-cbar.ax.set_ylabel("Occurrence Frequency", rotation=-90, va="bottom")
-
-plt.tight_layout()
-
-# Display the plot in Streamlit
-st.pyplot(fig)
+    if selected_dataset == 'kp3/kp2':
+        plot_heatmap(kp3_filtered_df, title='kp3/kp2 Heatmap')  
+    elif selected_dataset == 'xec':
+        plot_heatmap(xec_filtered_df, title='xec Heatmap') 
