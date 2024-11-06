@@ -5,13 +5,24 @@ from PIL import Image
 from io import BytesIO
 import base64
 
+
+@st.cache_data
+def fetch_plot(yaml_data, location):
+    try:
+        response = requests.post('http://68.221.168.92:8000/run_lollipop', json={'yaml': yaml_data, 'location': location})
+        if response.status_code == 200:
+            plot_url = response.json()['plot_url']
+            image_data = base64.b64decode(plot_url.split(',')[1])
+            image = Image.open(BytesIO(image_data))
+            return image, None
+        else:
+            return None, f"Error: {response.status_code}"
+    except requests.exceptions.RequestException as e:
+        return None, f"An error occurred: {e}"
+
 def app():
     st.title("Variant Deconvolution")
 
-    import requests
-    from PIL import Image
-    from io import BytesIO
-    import base64
     # Prebuilt YAML configurations
     yaml_option_1 = """
     var_dates:
@@ -87,17 +98,11 @@ def app():
     if st.button('Run Lollipop'):
         with st.spinner('Processing...'):
             start_time = time.time()
-            try:
-                response = requests.post('http://68.221.168.92:8000/run_lollipop', json={'yaml': yaml_data, 'location': selected_location})
-                elapsed_time = time.time() - start_time
-                st.success(f'Request completed in {elapsed_time:.2f} seconds')
-                
-                if response.status_code == 200:
-                    plot_url = response.json()['plot_url']
-                    image_data = base64.b64decode(plot_url.split(',')[1])
-                    image = Image.open(BytesIO(image_data))
-                    st.image(image)
-            except requests.exceptions.RequestException as e:
-                # This exception is raised for network-related errors, such as connection issues, timeouts, or invalid responses.
-                # It handles any request-related errors and displays an appropriate error message to the user.
-                st.error(f'An error occurred: {e}')
+            image, error = fetch_plot(yaml_data, selected_location)
+            elapsed_time = time.time() - start_time
+            st.success(f'Request completed in {elapsed_time:.2f} seconds')
+            
+            if error:
+                st.error(error)
+            else:
+                st.image(image)
