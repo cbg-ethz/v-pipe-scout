@@ -1,4 +1,5 @@
 import streamlit as st
+import time
 
 def app():
     st.title("Variant Deconvolution")
@@ -85,12 +86,13 @@ def app():
     selected_location = st.selectbox('Select a location', locations)
 
     selected_option = st.selectbox('Variant YAML configuration', list(yaml_options.keys()))
+    yaml_data = yaml_options[selected_option]
 
 
     if st.button('Run Lollipop'):
         start_time = time.time()
         try:
-            response = requests.post('http://<your-container-ip>:8000/run_lollipop', json={'yaml': yaml_data, 'location': selected_location}, timeout=10)
+            response = requests.post('http://68.221.168.92:8000/run_lollipop', json={'yaml': yaml_data, 'location': selected_location})
             elapsed_time = time.time() - start_time
             st.success(f'Request completed in {elapsed_time:.2f} seconds')
             
@@ -100,7 +102,5 @@ def app():
                 st.image(image)
             else:
                 st.error('Failed to execute Lollipop command')
-        except requests.exceptions.Timeout:
-            st.error('The request timed out. Please try again later.')
         except requests.exceptions.RequestException as e:
             st.error(f'An error occurred: {e}')
