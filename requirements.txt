@@ -8,3 +8,4 @@ s3fs
 st-files-connection
 seaborn
 matplotlib
+pillow
