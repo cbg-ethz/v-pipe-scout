@@ -1,23 +1,17 @@
 import streamlit as st
 import time
+import requests
+from PIL import Image
+from io import BytesIO
+import base64
 
 def app():
     st.title("Variant Deconvolution")
 
-    st.image("images/lollipop.svg", width=140)
-    st.write("Identify new variants emerging, by mutations")
-    st.write("powered by Lollipop")
-
     import requests
     from PIL import Image
     from io import BytesIO
     import base64
-
-    import requests
-    from PIL import Image
-    from io import BytesIO
-    import base64
-
     # Prebuilt YAML configurations
     yaml_option_1 = """
     var_dates:
@@ -65,7 +59,7 @@ def app():
     # Dropdown to select prebuilt YAML configurations
     yaml_options = {
         'No XEC': yaml_option_1,
-        'With XEC 2': yaml_option_2,
+        'With XEC': yaml_option_2,
         'Custom': ''
     }
 
@@ -100,9 +94,10 @@ def app():
                 
                 if response.status_code == 200:
                     plot_url = response.json()['plot_url']
-                    image = Image.open(BytesIO(base64.b64decode(plot_url.split(',')[1])))
+                    image_data = base64.b64decode(plot_url.split(',')[1])
+                    image = Image.open(BytesIO(image_data))
                     st.image(image)
-                else:
-                    st.error('Failed to execute Lollipop command')
             except requests.exceptions.RequestException as e:
+                # This exception is raised for network-related errors, such as connection issues, timeouts, or invalid responses.
+                # It handles any request-related errors and displays an appropriate error message to the user.
                 st.error(f'An error occurred: {e}')

@@ -3,8 +3,6 @@ import index
 import mutation_freq
 import variant_deconv
 
-# No need for PIL now
-
 PAGES = {
     "Home": {"module": index}, 
     "Mutation Frequency": {"module": mutation_freq},
