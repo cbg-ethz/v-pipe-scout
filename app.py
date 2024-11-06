@@ -17,6 +17,7 @@ def sidebar():
     return selection
 
 if __name__ == "__main__":
+    # TODO: change page icon.
     st.set_page_config(page_title="V-Pipe Cloud", page_icon=":smiley:") 
     selection = sidebar()
     page = PAGES[selection]["module"]

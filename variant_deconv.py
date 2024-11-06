@@ -13,8 +13,6 @@ def app():
     from io import BytesIO
     import base64
 
-    st.title('Generate Plot')
-
     import requests
     from PIL import Image
     from io import BytesIO
@@ -64,8 +62,6 @@ def app():
         - XEC
     """
 
-    st.title('Generate Plot from YAML')
-
     # Dropdown to select prebuilt YAML configurations
     yaml_options = {
         'No XEC': yaml_option_1,
@@ -95,17 +91,18 @@ def app():
         yaml_data = st.text_area('YAML configuration', yaml_options[selected_option], height=300)
 
     if st.button('Run Lollipop'):
-        start_time = time.time()
-        try:
-            response = requests.post('http://68.221.168.92:8000/run_lollipop', json={'yaml': yaml_data, 'location': selected_location})
-            elapsed_time = time.time() - start_time
-            st.success(f'Request completed in {elapsed_time:.2f} seconds')
-            
-            if response.status_code == 200:
-                plot_url = response.json()['plot_url']
-                image = Image.open(BytesIO(base64.b64decode(plot_url.split(',')[1])))
-                st.image(image)
-            else:
-                st.error('Failed to execute Lollipop command')
-        except requests.exceptions.RequestException as e:
-            st.error(f'An error occurred: {e}')
+        with st.spinner('Processing...'):
+            start_time = time.time()
+            try:
+                response = requests.post('http://68.221.168.92:8000/run_lollipop', json={'yaml': yaml_data, 'location': selected_location})
+                elapsed_time = time.time() - start_time
+                st.success(f'Request completed in {elapsed_time:.2f} seconds')
+                
+                if response.status_code == 200:
+                    plot_url = response.json()['plot_url']
+                    image = Image.open(BytesIO(base64.b64decode(plot_url.split(',')[1])))
+                    st.image(image)
+                else:
+                    st.error('Failed to execute Lollipop command')
+            except requests.exceptions.RequestException as e:
+                st.error(f'An error occurred: {e}')
