@@ -17,8 +17,7 @@ def sidebar():
     return selection
 
 if __name__ == "__main__":
-    # TODO: change page icon.
-    st.set_page_config(page_title="V-Pipe Cloud", page_icon=":smiley:") 
+    st.set_page_config(page_title="V-Pipe Cloud", page_icon="https://cbg-ethz.github.io/V-pipe/favicon-32x32.png")
     selection = sidebar()
     page = PAGES[selection]["module"]
     page.app()
