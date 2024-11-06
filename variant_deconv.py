@@ -22,44 +22,46 @@ def app():
 
     # Prebuilt YAML configurations
     yaml_option_1 = """
-    '2024-01-01':
-    - BA.4
-    - BA.5
-    - BA.2.75
-    - BA.2.86
-    - BQ.1.1
-    - XBB.1.5
-    - XBB.1.9
-    - XBB.1.16
-    - XBB.2.3
-    - EG.5
-    - JN.1
-    - BA.2.87.1
-    - BA.1
-    - BA.2
-    - KP.2
-    - KP.3
+    var_dates:
+        '2024-01-01':
+        - BA.4
+        - BA.5
+        - BA.2.75
+        - BA.2.86
+        - BQ.1.1
+        - XBB.1.5
+        - XBB.1.9
+        - XBB.1.16
+        - XBB.2.3
+        - EG.5
+        - JN.1
+        - BA.2.87.1
+        - BA.1
+        - BA.2
+        - KP.2
+        - KP.3
     """
 
     yaml_option_2 = """
-    '2024-01-01':
-    - BA.4
-    - BA.5
-    - BA.2.75
-    - BA.2.86
-    - BQ.1.1
-    - XBB.1.5
-    - XBB.1.9
-    - XBB.1.16
-    - XBB.2.3
-    - EG.5
-    - JN.1
-    - BA.2.87.1
-    - BA.1
-    - BA.2
-    - KP.2
-    - KP.3
-    - XEC
+    var_dates:
+        '2024-01-01':
+        - BA.4
+        - BA.5
+        - BA.2.75
+        - BA.2.86
+        - BQ.1.1
+        - XBB.1.5
+        - XBB.1.9
+        - XBB.1.16
+        - XBB.2.3
+        - EG.5
+        - JN.1
+        - BA.2.87.1
+        - BA.1
+        - BA.2
+        - KP.2
+        - KP.3
+        - XEC
     """
 
     st.title('Generate Plot from YAML')
@@ -86,8 +88,11 @@ def app():
     selected_location = st.selectbox('Select a location', locations)
 
     selected_option = st.selectbox('Variant YAML configuration', list(yaml_options.keys()))
-    yaml_data = yaml_options[selected_option]
 
+    if selected_option == 'Custom':
+        yaml_data = st.text_area('Edit YAML configuration', height=300)
+    else:
+        yaml_data = st.text_area('YAML configuration', yaml_options[selected_option], height=300)
 
     if st.button('Run Lollipop'):
         start_time = time.time()
