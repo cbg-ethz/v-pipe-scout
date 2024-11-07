@@ -10,8 +10,7 @@ import yaml
 with open('config.yaml', 'r') as file:
     config = yaml.safe_load(file)
 
-server_ip = config['server']['ip_address']
-
+server_ip = config.get('server', {}).get('ip_address', 'http://default_ip:8000')
 
 @st.cache_data
 def fetch_plot(yaml_data, location):

@@ -4,10 +4,9 @@ import yaml
 import boto3
 import seaborn as sns
 import matplotlib.pyplot as plt
-
+import streamlit as st
 
 def app():
-    import streamlit as st
     # Streamlit title and description
     st.title('Identifing Mutations Arising')
     st.write('Visualizing the frequency of mutations arising')
@@ -75,13 +74,9 @@ def app():
     # Load the YAML data from S3
     kp3_mutations_data = load_yaml_from_s3(bucket_name, kp3_mutations)
     xec_mutations_data = load_yaml_from_s3(bucket_name, xec_mutations)
+
     # Load the selected mutations tally
     tallymut = load_tsv_from_s3(bucket_name, 'subset_tallymut.tsv.gz')
-
-
-    # lets convert these dictionaries to dataframes
-    kp3_df = pd.DataFrame(kp3_mutations_data)
-    xec_df = pd.DataFrame(xec_mutations_data)
 
 
     @st.cache_data  # Cache the data for better performance
@@ -95,18 +90,9 @@ def app():
 
             return filtered_df
 
-    # Filter tallymut for the KP3 variant
-    kp3_filtered_df = filter_for_variant(tallymut, kp3_df)
-
-    # Filter tallymut for the XEC variant
-    xec_filtered_df = filter_for_variant(tallymut, xec_df)
-
-
-    # Dataset selection
-    selected_dataset = st.selectbox('Select Dataset', ['kp3/kp2', 'xec'])  # Replace with your dataset names
-
     @st.cache_data  # Cache the data for better performance
-    def plot_heatmap(data, title='Heatmap of Fractions by Date and Position', xlabel='Date', ylabel='Position', figsize=(20, 10), num_labels=20):
+    def plot_heatmap(data, title='Heatmap of Fractions by Date and Position', xlabel='Date', ylabel='Position', figsize=(20, 10), num_labels=20, location=''):
+        
         # Pivot the dataframe to get the desired format for the heatmap 
         heatmap_data = data.pivot_table(index='pos', columns='date', values='frac')
 
@@ -133,9 +119,49 @@ def app():
         # Display the plot in Streamlit
         st.pyplot(plt)
 
-    # Plot button
+
+    def filter_by_location(data, location):
+        return data[data['location'] == location]
+
+    # Dropdown to select a location
+    locations = [
+        'Lugano (TI)',
+        'Zürich (ZH)',
+        'Chur (GR)',
+        'Altenrhein (SG)',
+        'Laupen (BE)',
+        'Genève (GE)',
+        'Basel (BS)',
+        'Luzern (LU)'
+    ]
+
+    selected_location = st.selectbox('Select a location', locations)
+
+    # Dataset selection
+    selected_dataset = st.selectbox('Select Dataset', ['kp3/kp2', 'xec'])  # Replace with your dataset names
+
+
     if st.button('Plot Heatmap'):
         if selected_dataset == 'kp3/kp2':
-            plot_heatmap(kp3_filtered_df, title='kp3/kp2 Heatmap')  
+            plot_heatmap(
+                filter_by_location(
+                     filter_for_variant(
+                                tallymut,
+                                pd.DataFrame(kp3_mutations_data)
+                                ),
+                    location=selected_location
+                    ),
+                title='kp3/kp2 Heatmap',
+                location=selected_location
+                )
         elif selected_dataset == 'xec':
-            plot_heatmap(xec_filtered_df, title='xec Heatmap') 
+                plot_heatmap(
+                    filter_by_location(
+                         filter_for_variant(
+                                tallymut, pd.DataFrame(xec_mutations_data)
+                            ),  
+                        location=selected_location
+                        ),
+                    title='xec Heatmap',
+                    location=selected_location
+                    ) 
