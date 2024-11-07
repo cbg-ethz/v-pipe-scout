@@ -72,22 +72,28 @@ def app():
 
 
     # Load the YAML data from S3
-    kp3_mutations_data = load_yaml_from_s3(bucket_name, kp3_mutations)
-    xec_mutations_data = load_yaml_from_s3(bucket_name, xec_mutations)
+    kp3_mutations_yaml = load_yaml_from_s3(bucket_name, kp3_mutations)
+    xec_mutations_yaml = load_yaml_from_s3(bucket_name, xec_mutations)
+    # discard all fileds but 'mut'
+    kp3_mutations_yaml = kp3_mutations_yaml['mut']
+    xec_mutations_yaml = xec_mutations_yaml['mut']
+    # format the yamls with line breaks
+    kp3_mutations_yaml = yaml.dump(kp3_mutations_yaml, default_flow_style=False)
+    xec_mutations_yaml = yaml.dump(xec_mutations_yaml, default_flow_style=False)
 
     # Load the selected mutations tally
     tallymut = load_tsv_from_s3(bucket_name, 'subset_tallymut.tsv.gz')
 
 
     @st.cache_data  # Cache the data for better performance
-    def filter_for_variant(tally, variant):
+    def filter_for_variant(tally, mutation_data):
             # Extract the positions and mutations from kp3_df
-            kp3_positions = variant.index
-            kp3_mutations = variant['mut'].str[-1]
+            variant_positions = list(mutation_data.keys())
+            variant_basechange = [v.split('>')[1] for v in mutation_data.values()]
 
-            # Filter new_df based on the positions and mutations in kp3_df
-            filtered_df = tally[tally.apply(lambda row: row['pos'] in kp3_positions and row['base'] == kp3_mutations.get(row['pos']), axis=1)]
-
+            # Filter the tally DataFrame based on the positions and mutations in the variant data
+            filtered_df = tally[tally.apply(lambda row: row['pos'] in variant_positions and row['base'] == variant_basechange[variant_positions.index(row['pos'])], axis=1)]
+   
             return filtered_df
 
     @st.cache_data  # Cache the data for better performance
@@ -137,31 +143,27 @@ def app():
 
     selected_location = st.selectbox('Select a location', locations)
 
-    # Dataset selection
-    selected_dataset = st.selectbox('Select Dataset', ['kp3/kp2', 'xec'])  # Replace with your dataset names
+    # Dropdown to select prebuilt YAML configurations
+    yaml_options = {
+        'KP3': kp3_mutations_yaml,
+        'XEC': xec_mutations_yaml,
+        'Custom': ''
+    }
 
+    selected_option = st.selectbox('Select Mutation Configuration', list(yaml_options.keys()))
 
-    if st.button('Plot Heatmap'):
-        if selected_dataset == 'kp3/kp2':
-            plot_heatmap(
-                filter_by_location(
-                     filter_for_variant(
-                                tallymut,
-                                pd.DataFrame(kp3_mutations_data)
-                                ),
-                    location=selected_location
-                    ),
-                title='kp3/kp2 Heatmap',
-                location=selected_location
-                )
-        elif selected_dataset == 'xec':
-                plot_heatmap(
-                    filter_by_location(
-                         filter_for_variant(
-                                tallymut, pd.DataFrame(xec_mutations_data)
-                            ),  
-                        location=selected_location
-                        ),
-                    title='xec Heatmap',
-                    location=selected_location
-                    ) 
+    # Populate the text area based on the dropdown selection
+    if selected_option == 'Custom':
+        mutation_config = st.text_area("Edit Mutation Configuration", height=300)
+    else:
+        mutation_config = st.text_area("Edit Mutation Configuration", yaml_options[selected_option], height=300)
+
+    if st.button("Plot Heatmap"):
+        # Read the data from the text field
+        try:
+            mutation_data = yaml.safe_load(mutation_config)
+            filtered_data = filter_for_variant(tallymut, mutation_data)
+            filtered_data = filter_by_location(filtered_data, selected_location)
+            plot_heatmap(filtered_data, location=selected_location)
+        except yaml.YAMLError as e:
+            st.error(f"Error parsing YAML: {e}")
