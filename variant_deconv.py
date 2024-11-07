@@ -98,12 +98,12 @@ def app():
 
     selected_location = st.selectbox('Select a location', locations)
 
-    selected_option = st.selectbox('Variant YAML configuration', list(yaml_options.keys()))
+    selected_option = st.selectbox('Select variant definition - mutation set, for a daterange', list(yaml_options.keys()))
 
     if selected_option == 'Custom':
-        yaml_data = st.text_area('Edit YAML configuration', height=300)
+        yaml_data = st.text_area('Edit the variant definition', height=300)
     else:
-        yaml_data = st.text_area('YAML configuration', yaml_options[selected_option], height=300)
+        yaml_data = st.text_area('Edit the variant definition', yaml_options[selected_option], height=300)
 
     if st.button('Run Lollipop'):
             start_time = time.time()
