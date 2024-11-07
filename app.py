@@ -10,6 +10,24 @@ PAGES = {
 }
 
 def sidebar():
+    # Add the logo and "powered by" text
+    st.sidebar.markdown(
+        """
+        <div style="text-align: center;">
+            <picture>
+                <source
+                    media="(prefers-color-scheme: light)"  
+                    srcset="https://cbg-ethz.github.io/V-pipe/assets/img/logo-vpipe.svg">
+                <source
+                    media="(prefers-color-scheme: dark)"  
+                    srcset="https://cbg-ethz.github.io/V-pipe/assets/img/logo-vpipe-dark.svg">
+                <img alt="Logo" src="https://cbg-ethz.github.io/V-pipe/assets/img/logo-vpipe.svg" width="50%" />
+            </picture>
+            <p>on cloud</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     st.sidebar.title("Navigation")
     selection = st.sidebar.radio("Go to", list(PAGES.keys()))  # Changed to selectbox
     return selection
