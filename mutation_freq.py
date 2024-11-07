@@ -131,6 +131,7 @@ def app():
 
     # Dropdown to select a location
     locations = [
+        'Aggregate (All Locations)',
         'Lugano (TI)',
         'Zürich (ZH)',
         'Chur (GR)',
@@ -163,7 +164,8 @@ def app():
         try:
             mutation_data = yaml.safe_load(mutation_config)
             filtered_data = filter_for_variant(tallymut, mutation_data)
-            filtered_data = filter_by_location(filtered_data, selected_location)
+            if selected_location != 'Aggregate (All Locations)':
+                filtered_data = filter_by_location(filtered_data, selected_location)
             plot_heatmap(filtered_data, location=selected_location)
         except yaml.YAMLError as e:
             st.error(f"Error parsing YAML: {e}")
