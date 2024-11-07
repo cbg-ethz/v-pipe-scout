@@ -1,17 +1,17 @@
+import matplotlib.pyplot as plt
+import pandas as pd
+import yaml
+import boto3
+import seaborn as sns
+import matplotlib.pyplot as plt
+
 
 def app():
     import streamlit as st
     # Streamlit title and description
-    st.title('Identifing New Variants')
-    st.write('Visualizing new variants emerging, by mutations')
-    st.write('powered by V-pipe')
+    st.title('Identifing Mutations Arising')
+    st.write('Visualizing the frequency of mutations arising')
     
-    import matplotlib.pyplot as plt
-    import pandas as pd
-    import yaml
-    import boto3
-    import seaborn as sns
-    import matplotlib.pyplot as plt
 
     # Access AWS credentials from secrets management
     AWS_ACCESS_KEY_ID = st.secrets["aws"]["AWS_ACCESS_KEY_ID"]
@@ -78,21 +78,11 @@ def app():
     # Load the selected mutations tally
     tallymut = load_tsv_from_s3(bucket_name, 'subset_tallymut.tsv.gz')
 
-    # only keep columns we need
 
     # lets convert these dictionaries to dataframes
     kp3_df = pd.DataFrame(kp3_mutations_data)
     xec_df = pd.DataFrame(xec_mutations_data)
 
-    # subset the dataframes for the positions that only exist in one of the dataframes
-    #kp3_pos = set(kp3_mutations_data['mut'].keys())
-    #xec_pos =set(xec_mutations_data['mut'].keys())
-    #kp3_only = kp3_pos - xec_pos
-    #xec_only = xec_pos - kp3_pos
-
-    # subset the dataframes for the positions that only exist in one of the dataframes
-    #kp3_df = kp3_df[kp3_df['mut'].isin(kp3_only)]
-    #xec_df = xec_df[xec_df['mut'].isin(xec_only)]
 
     @st.cache_data  # Cache the data for better performance
     def filter_for_variant(tally, variant):

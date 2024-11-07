@@ -4,12 +4,19 @@ import requests
 from PIL import Image
 from io import BytesIO
 import base64
+import yaml
+
+# Load configuration from config.yaml
+with open('config.yaml', 'r') as file:
+    config = yaml.safe_load(file)
+
+server_ip = config['server']['ip_address']
 
 
 @st.cache_data
 def fetch_plot(yaml_data, location):
     try:
-        response = requests.post('http://68.221.168.92:8000/run_lollipop', json={'yaml': yaml_data, 'location': location})
+        response = requests.post(f'{server_ip}/run_lollipop', json={'yaml': yaml_data, 'location': location})
         if response.status_code == 200:
             plot_url = response.json()['plot_url']
             image_data = base64.b64decode(plot_url.split(',')[1])
@@ -22,6 +29,10 @@ def fetch_plot(yaml_data, location):
 
 def app():
     st.title("Variant Deconvolution")
+    # make a subtitel powered by lollipop
+    st.markdown("## Powered by **Lollipop**")
+
+    st.write("This page allows you to run the Lollipop variant deconvolution tool with a custom variant definitions.")
 
     # Prebuilt YAML configurations
     yaml_option_1 = """
@@ -96,9 +107,11 @@ def app():
         yaml_data = st.text_area('YAML configuration', yaml_options[selected_option], height=300)
 
     if st.button('Run Lollipop'):
-        with st.spinner('Processing...'):
             start_time = time.time()
-            image, error = fetch_plot(yaml_data, selected_location)
+            st.write("For demonstration purposes, we run the tool at 1/10 of the confidence used in production. (bootstraps=10)")
+            st.write("Calculation takes up to 90 seconds.")
+            with st.spinner('Processing...'):
+                image, error = fetch_plot(yaml_data, selected_location)
             elapsed_time = time.time() - start_time
             st.success(f'Request completed in {elapsed_time:.2f} seconds')
             
