@@ -31,14 +31,18 @@ def app():
     selected_option = st.selectbox("Select a resistance mutation set:", options.keys())
 
     df = pd.read_csv(options[selected_option])
+    
+    # allow the user to chose a date range
+    st.write("Select a date range:")
+    date_range = st.date_input("Select a date range:", [pd.to_datetime("2022-01-01"), pd.to_datetime("2024-01-01")])
 
     st.write(df)
 
     # Define the POST request payload
     payload = {
         "aminoAcidMutations": ["S:144L"],
-        "dateFrom": ["2022-02-18"],
-        "dateTo": ["2024-11-01"],
+        "dateFrom": date_range[0].strftime("%Y-%m-%d"),
+        "dateTo": date_range[1].strftime("%Y-%m-%d"),
         "fields": ["date"]
     }
 
