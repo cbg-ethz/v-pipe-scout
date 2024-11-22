@@ -18,21 +18,46 @@ def app():
 
     st.write("This page allows you to run the Lollipop variant deconvolution tool with a custom variant definitions.")
 
-    # have three buttons for the three sets of mutaitons 
-    # data/3CLpro_inhibitors_datasheet.csv
-    # data/RdRP_inhibitors_datasheet.csv
-    # data/spike_mAbs_datasheet.csv
+    # have three buttons for the three sets of mutations
     st.write("Select from the following resistance mutation sets:")
 
-    options = ["3CLpro Inhibitors", "RdRP Inhibitors", "Spike mAbs"]
-    selected_option = st.selectbox("Select a resistance mutation set:", options)
+    # TODO: currently hardcoded, should be fetched from the server
+    options = {
+        "3CLpro Inhibitors": 'data/3CLpro_inhibitors_datasheet.csv',
+        "RdRP Inhibitors": 'data/RdRP_inhibitors_datasheet.csv',
+        "Spike mAbs": 'data/spike_mAbs_datasheet.csv'
+    }
 
+    selected_option = st.selectbox("Select a resistance mutation set:", options.keys())
 
-    if selected_option == "3CLpro Inhibitors":
-        df = pd.read_csv('data/3CLpro_inhibitors_datasheet.csv')
-    elif selected_option == "RdRP Inhibitors":
-        df = pd.read_csv('data/RdRP_inhibitors_datasheet.csv')
-    elif selected_option == "Spike mAbs":
-        df = pd.read_csv('data/spike_mAbs_datasheet.csv')
+    df = pd.read_csv(options[selected_option])
 
     st.write(df)
+
+    # Define the POST request payload
+    payload = {
+        "aminoAcidMutations": ["S:144L"],
+        "dateFrom": ["2022-02-18"],
+        "dateTo": ["2024-11-01"],
+        "fields": ["date"]
+    }
+
+    # Make the POST request
+    response = requests.post(
+        'https://lapis.cov-spectrum.org/open/v2/sample/aggregated',
+        headers={
+            'accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        json=payload
+    )
+
+    # Check if the request was successful
+    if response.status_code == 200:
+        data = response.json()
+        st.write("Data fetched from the server:")
+        st.write(data)
+    else:
+        st.write("Failed to fetch data from the server.")
+        st.write(f"Status code: {response.status_code}")
+        st.write(response.text)
