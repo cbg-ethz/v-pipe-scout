@@ -67,21 +67,17 @@ def app():
     date_range = st.date_input("Select a date range:", [pd.to_datetime("2022-01-01"), pd.to_datetime("2024-01-01")])
 
     if st.button("Fetch Data"):
-        all_data = []
+        all_data = {}
         successful_fetches = 0
         for mutation in formatted_mutations:
             data = fetch_data(mutation, date_range)
             if data:
-                all_data.append(data)
+                all_data[mutation] = data
                 successful_fetches += 1
+        
+        st.write(all_data)
 
-        # Display all collected data
-        if all_data:
-            st.write(f"{successful_fetches} Mutations of {len(formatted_mutations)} found on Cov-Spectrum")
-            for data in all_data:
-                st.write(data)
-        else:
-            st.write("No data found for the given mutations.")
+        # next make df out of it / catch the case where change was found but no data was returned
 
 if __name__ == "__main__":
     app()
