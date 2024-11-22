@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import yaml
 import pandas as pd
+import logging
 
 # Load configuration from config.yaml
 with open('config.yaml', 'r') as file:
@@ -29,9 +30,9 @@ def fetch_data(mutation, date_range):
     if response.status_code == 200:
         return response.json()
     else:
-        st.write(f"Failed to fetch data for mutation {mutation}.")
-        st.write(f"Status code: {response.status_code}")
-        st.write(response.text)
+        logging.error(f"Failed to fetch data for mutation {mutation}.")
+        logging.error(f"Status code: {response.status_code}")
+        logging.error(response.text)
         return None
 
 def app():
@@ -67,14 +68,16 @@ def app():
 
     if st.button("Fetch Data"):
         all_data = []
+        successful_fetches = 0
         for mutation in formatted_mutations:
             data = fetch_data(mutation, date_range)
             if data:
                 all_data.append(data)
+                successful_fetches += 1
 
         # Display all collected data
         if all_data:
-            st.write("Data fetched from the server:")
+            st.write(f"{successful_fetches} Mutations of {len(formatted_mutations)} found on Cov-Spectrum")
             for data in all_data:
                 st.write(data)
         else:
