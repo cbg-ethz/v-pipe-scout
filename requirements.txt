@@ -9,3 +9,4 @@ st-files-connection
 seaborn
 matplotlib
 pillow
+aiohttp

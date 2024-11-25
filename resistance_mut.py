@@ -3,6 +3,8 @@ import requests
 import yaml
 import pandas as pd
 import logging
+import aiohttp
+import asyncio
 
 # Load configuration from config.yaml
 with open('config.yaml', 'r') as file:
@@ -10,7 +12,7 @@ with open('config.yaml', 'r') as file:
 
 server_ip = config.get('server', {}).get('ip_address', 'http://default_ip:8000')
 
-def fetch_data(mutation, date_range):
+async def fetch_data(session, mutation, date_range):
     payload = {
         "aminoAcidMutations": [mutation],
         "dateFrom": date_range[0].strftime('%Y-%m-%d'),
@@ -18,22 +20,26 @@ def fetch_data(mutation, date_range):
         "fields": ["date"]
     }
 
-    response = requests.post(
+    async with session.post(
         'https://lapis.cov-spectrum.org/open/v2/sample/aggregated',
         headers={
             'accept': 'application/json',
             'Content-Type': 'application/json'
         },
         json=payload
-    )
+    ) as response:
+        if response.status == 200:
+            return await response.json()
+        else:
+            logging.error(f"Failed to fetch data for mutation {mutation}.")
+            logging.error(f"Status code: {response.status}")
+            logging.error(await response.text())
+            return None
 
-    if response.status_code == 200:
-        return response.json()
-    else:
-        logging.error(f"Failed to fetch data for mutation {mutation}.")
-        logging.error(f"Status code: {response.status_code}")
-        logging.error(response.text)
-        return None
+async def fetch_all_data(mutations, date_range):
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch_data(session, mutation, date_range) for mutation in mutations]
+        return await asyncio.gather(*tasks)
 
 def app():
     st.title("Resistance Mutations")
@@ -67,17 +73,18 @@ def app():
     date_range = st.date_input("Select a date range:", [pd.to_datetime("2022-01-01"), pd.to_datetime("2024-01-01")])
 
     if st.button("Fetch Data"):
-        all_data = {}
-        successful_fetches = 0
-        for mutation in formatted_mutations:
-            data = fetch_data(mutation, date_range)
-            if data:
-                all_data[mutation] = data
-                successful_fetches += 1
-        
-        st.write(all_data)
+        all_data = asyncio.run(fetch_all_data(formatted_mutations, date_range))
 
-        # next make df out of it / catch the case where change was found but no data was returned
+        # Filter out None values (failed fetches)
+        all_data = [data for data in all_data if data]
+
+        # Display all collected data
+        if all_data:
+            st.write("Data fetched from the server:")
+            for data in all_data:
+                st.write(data)
+        else:
+            st.write("No data found for the given mutations.")
 
 if __name__ == "__main__":
     app()
