@@ -48,6 +48,27 @@ async def fetch_all_data(mutations, date_range):
         tasks = [fetch_data(session, mutation, date_range) for mutation in mutations]
         return await asyncio.gather(*tasks)
     
+def fetch_reformat_data(formatted_mutations, date_range):
+    all_data = asyncio.run(fetch_all_data(formatted_mutations, date_range))
+
+        # filter out mutations with no data
+    all_data = [data for data in all_data if data['data']]
+
+        # build a dataframe from the collected data
+        # for each mutation make a row 
+        # iterate through the data and add a column for each date with the number of samples
+    mutation_data = []
+    for data in all_data:
+        mutation = data['mutation']
+        mutation_data.append([mutation] + [d['count'] for d in data['data']])
+        
+    st.write("Data fetched from the server:")
+    df = pd.DataFrame(mutation_data, columns=['Mutation'] + [d['date'] for d in all_data[0]['data']])
+        # Set the first column as the index
+    df.set_index(df.columns[0], inplace=True)
+    return df
+
+
 def plot_heatmap(df):
 
     # get the dates from the columns
@@ -113,26 +134,7 @@ def app():
     date_range = st.date_input("Select a date range:", [pd.to_datetime("2022-01-01"), pd.to_datetime("2024-01-01")])
 
     if st.button("Fetch Data"):
-        all_data = asyncio.run(fetch_all_data(formatted_mutations, date_range))
-
-        # filter out mutations with no data
-        all_data = [data for data in all_data if data['data']]
-
-        # build a dataframe from the collected data
-        # for each mutation make a row 
-        # iterate through the data and add a column for each date with the number of samples
-        mutation_data = []
-        for data in all_data:
-            mutation = data['mutation']
-            mutation_data.append([mutation] + [d['count'] for d in data['data']])
-        
-        st.write("Data fetched from the server:")
-        df = pd.DataFrame(mutation_data, columns=['Mutation'] + [d['date'] for d in all_data[0]['data']])
-        # Set the first column as the index
-        df.set_index(df.columns[0], inplace=True)
-        st.write(df)
-
-        st.write("df.values:", df.values)
+        df = fetch_reformat_data(formatted_mutations, date_range)
 
         # Plot the heatmap
         fig = plot_heatmap(df)
