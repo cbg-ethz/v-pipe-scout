@@ -81,7 +81,7 @@ def plot_heatmap(df):
 
     # Create a colormap with a custom color for NaN values
     cmap = sns.color_palette("Blues", as_cmap=True)
-    cmap.set_bad(color='lightcoral')  # Set NaN values to light rose color
+    cmap.set_bad(color='#FFCCCC')  # Set NaN values to a fainter red color
 
     # Adjust the plot size based on the number of rows in the dataframe
     height = max(8, len(df) * 0.3)  # Minimum height of 8, with 0.5 units per row
@@ -90,7 +90,7 @@ def plot_heatmap(df):
     annot = True if df.shape[0] * df.shape[1] <= 100 else False  # Annotate only if the plot is small enough
     sns.heatmap(df, cmap=cmap, ax=ax, cbar_kws={'label': 'Occurrence Frequency', 'orientation': 'horizontal'}, 
                 linewidths=.5, linecolor='lightgrey', annot=annot, fmt=".1f", 
-                annot_kws={"size": 10}, mask=df.isnull(), cbar=True, cbar_ax=fig.add_axes([0.15, 0.89, 0.7, 0.02]))
+                annot_kws={"size": 10}, mask=df.isnull(), cbar=True, cbar_ax=fig.add_axes([0.15, 0.90, 0.7, 0.02]))
 
     # Set axis labels
     ax.set_xticks([0, len(df.columns) // 2, len(df.columns) - 1])
@@ -135,9 +135,14 @@ def app():
     if st.button("Fetch Data"):
         st.write("Fetching data...")
         df = fetch_reformat_data(formatted_mutations, date_range)
-        # Plot the heatmap
-        fig = plot_heatmap(df)
-        st.pyplot(fig)
+        
+        # Check if the dataframe is all NaN
+        if df.isnull().all().all():
+            st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
+        else:
+            # Plot the heatmap
+            fig = plot_heatmap(df)
+            st.pyplot(fig)
 
 if __name__ == "__main__":
     app()
