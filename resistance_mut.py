@@ -102,7 +102,15 @@ def plot_heatmap(df):
 def app():
     st.title("Resistance Mutations")
 
-    st.write("This page allows you to run the Lollipop variant deconvolution tool with custom variant definitions.")
+    st.write("This page allows you to visualize the numer of observed resistance mutations over time.")
+    st.write("The data is fetched from the COV-Spectrum API and currently used clinical data.")
+
+    st.write("The sets of resistance mutations are provide from Stanfords Coronavirus Antivirial & Reistance Database. Last updated 05//14/2024")
+
+    st.write("This is a demo frontend to later make the first queries to SILO for wastewater data.")
+
+    # make a horizontal line
+    st.markdown("---")
 
     st.write("Select from the following resistance mutation sets:")
 
