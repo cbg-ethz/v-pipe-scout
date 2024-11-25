@@ -52,21 +52,26 @@ async def fetch_all_data(mutations, date_range):
 def fetch_reformat_data(formatted_mutations, date_range):
     all_data = asyncio.run(fetch_all_data(formatted_mutations, date_range))
 
-        # filter out mutations with no data
-    all_data = [data for data in all_data if data['data']]
-
-        # build a dataframe from the collected data
-        # for each mutation make a row 
-        # iterate through the data and add a column for each date with the number of samples
-    mutation_data = []
+    # get all unique dates
+    dates = set()
     for data in all_data:
-        mutation = data['mutation']
-        mutation_data.append([mutation] + [d['count'] for d in data['data']])
-        
-    st.write("Data fetched from the server:")
-    df = pd.DataFrame(mutation_data, columns=['Mutation'] + [d['date'] for d in all_data[0]['data']])
-        # Set the first column as the index
-    df.set_index(df.columns[0], inplace=True)
+        if data['data']:
+            for d in data['data']:
+                dates.add(d['date'])
+
+    print(dates)
+    print(len(dates))
+
+    # make a dataframe with the dates as columns and the mutations as rows
+    df = pd.DataFrame(index=formatted_mutations, columns=list(dates))
+
+    # fill the dataframe with the data
+    for data in all_data:
+        if data['data']:
+            for d in data['data']:
+                df.at[data['mutation'], d['date']] = d['count']
+                print(data['mutation'], d['date'], d['count'])
+
     return df
 
 
@@ -79,16 +84,16 @@ def plot_heatmap(df):
     cmap.set_bad(color='lightcoral')  # Set NaN values to light rose color
 
     # Plot the heatmap
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(15, 8))
     annot = True if df.shape[0] * df.shape[1] <= 100 else False  # Annotate only if the plot is small enough
     sns.heatmap(df, cmap=cmap, ax=ax, cbar_kws={'label': 'Occurrence Frequency'}, 
                 linewidths=.5, linecolor='lightgrey', annot=annot, fmt=".1f", 
-                annot_kws={"size": 8}, mask=df.isnull(), cbar=True)
+                annot_kws={"size": 10}, mask=df.isnull(), cbar=True)
 
     # Set axis labels
     ax.set_xticks([0, len(df.columns) // 2, len(df.columns) - 1])
     ax.set_xticklabels([df.columns[0], df.columns[len(df.columns) // 2], df.columns[-1]], rotation=45)
-    ax.set_yticklabels(df.index.tolist(), fontsize=10, rotation=0)  # Rotate mutation labels to be horizontal
+    ax.set_yticklabels(df.index.tolist(), fontsize=12, rotation=0)  # Rotate mutation labels to be horizontal
 
     return fig
 
@@ -127,7 +132,7 @@ def app():
 
     if st.button("Fetch Data"):
         df = fetch_reformat_data(formatted_mutations, date_range)
-
+        st.write(df)
         # Plot the heatmap
         fig = plot_heatmap(df)
         st.pyplot(fig)
