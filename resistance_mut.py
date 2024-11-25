@@ -1,4 +1,6 @@
 import json
+from matplotlib import pyplot as plt
+import numpy as np
 import streamlit as st
 import requests
 import yaml
@@ -6,6 +8,7 @@ import pandas as pd
 import logging
 import aiohttp
 import asyncio
+
 
 # Load configuration from config.yaml
 with open('config.yaml', 'r') as file:
@@ -44,6 +47,39 @@ async def fetch_all_data(mutations, date_range):
     async with aiohttp.ClientSession() as session:
         tasks = [fetch_data(session, mutation, date_range) for mutation in mutations]
         return await asyncio.gather(*tasks)
+    
+def plot_heatmap(df):
+
+    # get the dates from the columns
+    dates = df.columns
+
+    # get the mutations from the index
+    mutations = df.index.tolist()
+
+    # 2. Heatmap Construction
+    fig, ax = plt.subplots(figsize=(12, 8))
+    # Replace None with np.nan and remove commas from numbers
+    df = df.replace({None: np.nan, ',': ''}, regex=True).astype(float)
+    
+    # Create a colormap with a custom color for NaN values
+    cmap = plt.cm.Blues
+    cmap.set_bad(color='lightcoral')  # Set NaN values to light rose color
+
+    im = ax.imshow(df.values, cmap=cmap)  # Use the custom colormap
+
+    # Set axis labels
+    ax.set_xticks([0, len(dates) // 2, len(dates) - 1])
+    ax.set_xticklabels([dates[0], dates[len(dates) // 2], dates[-1]], rotation=45)
+    ax.set_yticks(np.arange(len(mutations)))
+    ax.set_yticklabels(mutations, fontsize=8)
+
+    # Add colorbar
+    cbar = ax.figure.colorbar(im, ax=ax)
+    cbar.ax.set_ylabel("Occurrence Frequency", rotation=-90, va="bottom")
+
+    return fig
+
+
 
 def app():
     st.title("Resistance Mutations")
@@ -92,7 +128,15 @@ def app():
         
         st.write("Data fetched from the server:")
         df = pd.DataFrame(mutation_data, columns=['Mutation'] + [d['date'] for d in all_data[0]['data']])
+        # Set the first column as the index
+        df.set_index(df.columns[0], inplace=True)
         st.write(df)
+
+        st.write("df.values:", df.values)
+
+        # Plot the heatmap
+        fig = plot_heatmap(df)
+        st.pyplot(fig)
 
 if __name__ == "__main__":
     app()
