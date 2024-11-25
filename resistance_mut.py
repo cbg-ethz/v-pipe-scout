@@ -8,6 +8,7 @@ import pandas as pd
 import logging
 import aiohttp
 import asyncio
+import seaborn as sns
 
 
 # Load configuration from config.yaml
@@ -70,33 +71,24 @@ def fetch_reformat_data(formatted_mutations, date_range):
 
 
 def plot_heatmap(df):
-
-    # get the dates from the columns
-    dates = df.columns
-
-    # get the mutations from the index
-    mutations = df.index.tolist()
-
-    # 2. Heatmap Construction
-    fig, ax = plt.subplots(figsize=(12, 8))
     # Replace None with np.nan and remove commas from numbers
     df = df.replace({None: np.nan, ',': ''}, regex=True).astype(float)
-    
+
     # Create a colormap with a custom color for NaN values
-    cmap = plt.cm.Blues
+    cmap = sns.color_palette("Blues", as_cmap=True)
     cmap.set_bad(color='lightcoral')  # Set NaN values to light rose color
 
-    im = ax.imshow(df.values, cmap=cmap)  # Use the custom colormap
+    # Plot the heatmap
+    fig, ax = plt.subplots(figsize=(12, 8))
+    annot = True if df.shape[0] * df.shape[1] <= 100 else False  # Annotate only if the plot is small enough
+    sns.heatmap(df, cmap=cmap, ax=ax, cbar_kws={'label': 'Occurrence Frequency'}, 
+                linewidths=.5, linecolor='lightgrey', annot=annot, fmt=".1f", 
+                annot_kws={"size": 8}, mask=df.isnull(), cbar=True)
 
     # Set axis labels
-    ax.set_xticks([0, len(dates) // 2, len(dates) - 1])
-    ax.set_xticklabels([dates[0], dates[len(dates) // 2], dates[-1]], rotation=45)
-    ax.set_yticks(np.arange(len(mutations)))
-    ax.set_yticklabels(mutations, fontsize=8)
-
-    # Add colorbar
-    cbar = ax.figure.colorbar(im, ax=ax)
-    cbar.ax.set_ylabel("Occurrence Frequency", rotation=-90, va="bottom")
+    ax.set_xticks([0, len(df.columns) // 2, len(df.columns) - 1])
+    ax.set_xticklabels([df.columns[0], df.columns[len(df.columns) // 2], df.columns[-1]], rotation=45)
+    ax.set_yticklabels(df.index.tolist(), fontsize=10, rotation=0)  # Rotate mutation labels to be horizontal
 
     return fig
 
