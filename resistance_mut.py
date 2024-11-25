@@ -82,13 +82,17 @@ def app():
         # filter out mutations with no data
         all_data = [data for data in all_data if data['data']]
 
-        # Display all collected data
-        if all_data:
-            st.write("Data fetched from the server:")
-            for data in all_data:
-                st.write(data)
-        else:
-            st.write("No data found for the given mutations.") 
+        # build a dataframe from the collected data
+        # for each mutation make a row 
+        # iterate through the data and add a column for each date with the number of samples
+        mutation_data = []
+        for data in all_data:
+            mutation = data['mutation']
+            mutation_data.append([mutation] + [d['count'] for d in data['data']])
+        
+        st.write("Data fetched from the server:")
+        df = pd.DataFrame(mutation_data, columns=['Mutation'] + [d['date'] for d in all_data[0]['data']])
+        st.write(df)
 
 if __name__ == "__main__":
     app()
