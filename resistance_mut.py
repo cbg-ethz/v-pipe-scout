@@ -1,3 +1,4 @@
+import json
 import streamlit as st
 import requests
 import yaml
@@ -29,12 +30,15 @@ async def fetch_data(session, mutation, date_range):
         json=payload
     ) as response:
         if response.status == 200:
-            return await response.json()
+            data = await response.json()
+            return {"mutation": mutation,
+                    "data": data.get('data', [])}
         else:
             logging.error(f"Failed to fetch data for mutation {mutation}.")
             logging.error(f"Status code: {response.status}")
             logging.error(await response.text())
-            return None
+            return {"mutation": mutation,
+                    "data": None}
 
 async def fetch_all_data(mutations, date_range):
     async with aiohttp.ClientSession() as session:
@@ -75,8 +79,8 @@ def app():
     if st.button("Fetch Data"):
         all_data = asyncio.run(fetch_all_data(formatted_mutations, date_range))
 
-        # Filter out None values (failed fetches)
-        all_data = [data for data in all_data if data]
+        # filter out mutations with no data
+        all_data = [data for data in all_data if data['data']]
 
         # Display all collected data
         if all_data:
@@ -84,7 +88,7 @@ def app():
             for data in all_data:
                 st.write(data)
         else:
-            st.write("No data found for the given mutations.")
+            st.write("No data found for the given mutations.") 
 
 if __name__ == "__main__":
     app()
