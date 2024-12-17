@@ -10,7 +10,7 @@ This project provides a front-end interface for two primary use cases:
 - On-demand heatmaps of mutations to identify new variants emerging, based on V-Pipe outputs.
 - On-demand variant deconvolution powered by LolliPop.
 - On-demand heatmaps of resistance mutation – querying LAPIS of clincial data.
-- On-demand heatmaps of reistance mutations - querying LAPS of wastewater data. 
+- On-demand heatmaps of resistance mutations - querying LAPS of wastewater data. 
 
 ## Overview
 
