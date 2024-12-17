@@ -7,8 +7,10 @@
 ![AWS S3](https://img.shields.io/badge/AWS%20S3-Cloud-orange)
 
 This project provides a front-end interface for two primary use cases:
-- On-demand heatmaps of mutations to identify new variants emerging.
-- On-demand variant deconvolution powered by Lollipop.
+- On-demand heatmaps of mutations to identify new variants emerging, based on V-Pipe outputs.
+- On-demand variant deconvolution powered by LolliPop.
+- On-demand heatmaps of resistance mutation – querying LAPIS of clincial data.
+- On-demand heatmaps of reistance mutations - querying LAPS of wastewater data. 
 
 ## Overview
 
