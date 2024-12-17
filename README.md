@@ -60,7 +60,7 @@ The current deployment of this project can be accessed at [biohack24.g15n.net](h
     S3_BUCKET_NAME=your_s3_bucket_name
     ```
 
-3. Configure the server IP addresses to LAPIS API for clinical and wastewater data in `confi.yaml` including ports:
+3. Configure the server IP addresses to LAPIS API for clinical and wastewater data in `config.yaml` including ports:
     ```env
     server:
         ip_address: "http://3.71.80.16:8000"
