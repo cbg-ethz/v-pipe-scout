@@ -33,5 +33,23 @@ def app():
         height=600,
     )
 
+
+    ## Allow for user input by Gene
+
+    ### Let user select a Data Range
+
+    ### Allow for user input by Proportions
+
+    ### Allow for Choice of Nucliotides // Amino Acids
+
+    ### Make Query for list of mutations wiht Such proportions
+    ### Ensure this list is not to large to be displayed
+
+    ### For each mutation in the list get the counts of the mutation over time
+
+    ### Display the counts of the mutation over time
+
+
+
 if __name__ == "__main__":
     app()
