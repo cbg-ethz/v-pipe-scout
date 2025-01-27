@@ -52,64 +52,24 @@ def app():
         </head>
             <body>
             <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
-            <gs-app lapis="https://lapis.cov-spectrum.org/open/v2">
+            <gs-app lapis="http://localhost:8080">
                 <gs-mutations-over-time
-                lapisFilter='{"region":"Europe","country":"Switzerland","dateFrom":"2024-01-23","nextcladePangoLineage":"JN.1*"}'
+                lapisFilter='{"sampling_dateFrom":"2024-09-25", "sampling_dateTo": "2024-10-23"}'
                 sequenceType='amino acid'
                 views='["grid"]'
                 width='100%'
                 height='100%'
-                granularity='week'
-                lapisDateField='date'
-                />
-            </gs-app>
-                        <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
-            <gs-app lapis="http://localhost:8080/2">
-                <gs-mutations-over-time
-                lapisFilter='{"sampling_dateFrom":"2024-08-23", "sampling_dateTo": "2024-10-23"}'
-                sequenceType='amino acid'
-                views='["grid"]'
-                width='100%'
-                height='100%'
-                granularity='week'
+                granularity='day'
                 lapisDateField='sampling_date'
                 />
             </gs-app>
-
             </head>
             <body>
             </body>
         </html>
     """,
-        height=600,
+        height=3000,
     )
-
-    ## Allow for user input by Gene
-
-    ### Let user select a Data Range
-
-    ### Allow for user input by Proportions
-
-    ### Allow for Choice of Nucliotides // Amino Acids
-
-    ### Make Query for list of mutations wiht Such proportions
-    ### Ensure this list is not to large to be displayed
-
-    date_range = [pd.to_datetime("2024-09-30"), pd.to_datetime("2024-10-16")]
-    gene = ["ORF1a"]
-    proportions = [0.05, 0.5]
-    sequence_type = "amino acid"
-
-    data = asyncio.run(fetch_data())
-
-    # Display the data
-    st.write(data)
-
-
-### For each mutation in the list get the counts of the mutation over time
-
-### Display the counts of the mutation over time
-
 
 
 if __name__ == "__main__":
