@@ -4,7 +4,7 @@ import mutation_freq
 import variant_deconv
 import resistance_mut
 import resistance_mut_silo
-import genspectrum
+import web_explorer
 
 PAGES = {
     "Home": {"module": index}, 
@@ -12,7 +12,7 @@ PAGES = {
     "Variant Deconvolution": {"module": variant_deconv},
     "Resistance Mutations (clinical)": {"module": resistance_mut},
     "Resistance Mutations (ww)": {"module": resistance_mut_silo},
-    "Genspectrum": {"module": genspectrum}
+    "Web Explore": {"module": web_explorer}
 }
 
 def sidebar():
