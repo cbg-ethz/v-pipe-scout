@@ -142,8 +142,9 @@ def app():
     # Apply the lambda function to each element in the mutations list
     formatted_mutations = [format_mutation(mutation) for mutation in mutations]
 
-    st.write(f"Selected mutations:")
-    st.write(formatted_mutations)
+    if st.button("Show Mutations"):
+        st.write(f"Selected mutations:")
+        st.write(formatted_mutations)
      
 
     # Allow the user to choose a date range
