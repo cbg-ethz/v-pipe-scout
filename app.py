@@ -6,7 +6,8 @@ import web_explorer
 PAGES = {
     "Home": {"module": index}, 
     "Resistance Mutations": {"module": resistance_mut_silo},
-    "Dynamic Mutaitonal Heatmaps": {"module": web_explorer}
+    "Dynamic Mutation Heatmap": {"module": web_explorer},
+    
 }
 
 def sidebar():

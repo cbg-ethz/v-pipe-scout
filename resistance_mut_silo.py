@@ -149,7 +149,7 @@ def app():
 
     # Allow the user to choose a date range
     st.write("Select a date range:")
-    date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-09"), pd.to_datetime("2025-03-10")])
+    date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08")])
 
     if st.button("Fetch Data"):
         st.write("Fetching data...")
