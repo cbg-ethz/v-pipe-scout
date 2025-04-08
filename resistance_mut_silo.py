@@ -103,7 +103,7 @@ def app():
     st.title("Resistance Mutations from Wastewater Data")
 
     st.write("This page allows you to visualize the numer of observed resistance mutations over time.")
-    st.write("The data is fetched from the WISE-CovSpectrum API and currently cointains demo data for Sep-Oct 2024.")
+    st.write("The data is fetched from the WISE-CovSpectrum API and currently cointains demo data for Feb-Mar 2025.")
 
     st.write("The sets of resistance mutations are provide from Stanfords Coronavirus Antivirial & Reistance Database. Last updated 05/14/2024")
 
@@ -145,12 +145,11 @@ def app():
     if st.button("Show Mutations"):
         st.write(f"Selected mutations:")
         st.write(formatted_mutations)
-     
-    st.write (f"Using Server IP {server_ip}")
+    
 
     # Allow the user to choose a date range
     st.write("Select a date range:")
-    date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-01"), pd.to_datetime("2024-03-30")])
+    date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-09"), pd.to_datetime("2025-03-10")])
 
     if st.button("Fetch Data"):
         st.write("Fetching data...")
