@@ -1,11 +1,13 @@
 import streamlit as st
 
 def app():
-    st.title("V-Pipe @ BioHack24 !")
+    st.title("POC: Fast Short Read Querying 1-Month")
     
-    st.write("Welcome to V-Pipe, the pipeline processing viral next-generation sequencing data and analyzing mixed virus populations.")
-    st.write("Identify emerging viral mutations and variants in Swiss wastewater samples.")
-    st.write("Identify the emergence of new variants on the fly!")
+    st.write("This ")
+
+    # show the image images/1Month
+
+    st.image("images/1Month_POC_FastQueryReads.png", caption="1-Month Image")
 
     # Leave some space
     st.write("")

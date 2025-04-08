@@ -146,10 +146,11 @@ def app():
         st.write(f"Selected mutations:")
         st.write(formatted_mutations)
      
+    st.write (f"Using Server IP {server_ip}")
 
     # Allow the user to choose a date range
     st.write("Select a date range:")
-    date_range = st.date_input("Select a date range:", [pd.to_datetime("2024-09-30"), pd.to_datetime("2024-10-16")])
+    date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-01"), pd.to_datetime("2024-03-30")])
 
     if st.button("Fetch Data"):
         st.write("Fetching data...")

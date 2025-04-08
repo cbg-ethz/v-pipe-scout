@@ -1,8 +1,14 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
+import yaml
 
-LAPIS_URL = "http://localhost:8080"
+
+# Load configuration from config.yaml
+with open('config.yaml', 'r') as file:
+    config = yaml.safe_load(file)
+
+server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
 
 
 def app():
@@ -18,7 +24,7 @@ def app():
     
     ## select dat range
     st.write("Select a date range:")
-    date_range = st.date_input("Select a date range:", [pd.to_datetime("2024-09-30"), pd.to_datetime("2024-10-16")])
+    date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-01"), pd.to_datetime("2024-03-30")])
 
     ## Add a horizontal line
     st.markdown("---")
@@ -35,7 +41,7 @@ def app():
         </head>
             <body>
             <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
-            <gs-app lapis="{LAPIS_URL}">
+            <gs-app lapis="{server_ip}">
                 <gs-mutations-over-time
                 lapisFilter='{{"sampling_dateFrom":"{start_date}", "sampling_dateTo": "{end_date}"}}'
                 sequenceType='amino acid'

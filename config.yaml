@@ -1,3 +1,3 @@
 server:
   ip_address: "http://68.221.168.92:8000"
-  lapis_address: "http://localhost:8080"
+  lapis_address: "http://88.198.54.174:80"
