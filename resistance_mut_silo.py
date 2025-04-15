@@ -1,14 +1,13 @@
-import json
 from matplotlib import pyplot as plt
 import numpy as np
 import streamlit as st
-import requests
 import yaml
 import pandas as pd
 import logging
 import aiohttp
 import asyncio
 import seaborn as sns
+import streamlit.components.v1 as components
 
 
 # Load configuration from config.yaml
@@ -162,6 +161,49 @@ def app():
             # Plot the heatmap
             fig = plot_heatmap(df)
             st.pyplot(fig)
+
+    start_date = date_range[0].strftime('%Y-%m-%d')
+    end_date = date_range[1].strftime('%Y-%m-%d')
+
+    location = "Zürich (ZH)"
+    sequence_type_value = "amino acid"
+
+    formatted_mutations_str = str(formatted_mutations).replace("'", '"')
+
+    # strip of the part before the ":"
+    formatted_mutations_no_gene_str = str([mut.split(':')[1] for mut in formatted_mutations][1]).replace("'",'"')
+
+    st.write(formatted_mutations_no_gene_str)
+
+    components.html(
+        f"""
+        <html>
+        <head>
+        <script type="module" src="https://unpkg.com/@genspectrum/dashboard-components@latest/standalone-bundle/dashboard-components.js"></script>
+        <link rel="stylesheet" href="https://unpkg.com/@genspectrum/dashboard-components@latest/dist/style.css" />
+        </head>
+            <body>
+            <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
+            <gs-app lapis="{server_ip}">
+                <gs-mutations-over-time
+                lapisFilter='{{"sampling_dateFrom":"{start_date}", "sampling_dateTo": "{end_date}", "location_name": "{location}"}}'
+                sequenceType='{sequence_type_value}'
+                views='["grid"]'
+                width='100%'
+                height='100%'
+                granularity='day'
+                lapisDateField='sampling_date'
+                displayMutations='{formatted_mutations_no_gene_str}'
+                pageSizes='[50, 30, 20, 10]'
+                />
+            </gs-app>
+            </head>
+            <body>
+            </body>
+        </html>
+    """,
+        height=4000,
+    )
 
 if __name__ == "__main__":
     app()
