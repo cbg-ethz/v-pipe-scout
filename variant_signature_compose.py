@@ -52,10 +52,6 @@ async def fetch_all_data(mutations, date_range):
         return await asyncio.gather(*tasks)
     
 
-
-
-
-
 def app():
     st.title("Variant Signature Composer")
 
@@ -96,8 +92,7 @@ def app():
             st.error(f"Failed to fetch mutations. Please check your query and try again.\nError details: {e}")
 
     # --- UI controls ---
-    variantQuery = st.text_input("Enter your variant query (e.g., LP.8, B.1.617.2):", "B.1.1.7", key='variantQuery')
-    st.text("(advanced queries e.g.: 'BA.5* | nextcladePangoLineage:BA.5* | nextstrainClade:22B' are also supported)")
+    variantQuery = st.text_input("Enter your variant query (e.g., LP.8, B.1.617.2):", "LP.8", key='variantQuery')
     sequence_type = st.selectbox("Select Sequence Type:", ["Nucleotides"])
     sequence_type_value = "amino acid" if sequence_type == "Amino Acids" else "nucleotide"
     min_abundance = st.slider("Select the minimal abundance % of substitutions:", 0.0, 1.0, 0.8, key='min_abundance')
@@ -133,6 +128,7 @@ def app():
     )
 
     # --- Data editor for mutation selection ---
+    selected_mutations = None
     if not st.session_state['mutation_df'].empty:
         st.info(f"{len(st.session_state['mutation_df'])} signature mutations found.")
         edited_df = st.data_editor(
@@ -153,6 +149,8 @@ def app():
 
     st.subheader("Dynamic Mutations-over-time of Signature Mutations")
     st.markdown("#### on Read Level")
+    st.write("Are these global signatures, already observed in the wastewater data? - Check the plot below.")
+    st.write("The data is fetched from the WISE-CovSpectrum API and currently contains demo data for Feb-Mar 2025.")
 
     #### #3) Select the date range
     date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08")])
@@ -167,68 +165,48 @@ def app():
     locations = fetch_locations(location_url, default_locations)
     location = st.selectbox("Select Location:", locations)
 
-    # location = "Zürich (ZH)"
-    # sequence_type_value = "amino acid"
+   
+    # Check if all necessary parameters are available
+    if selected_mutations and date_range and len(date_range) == 2 and location:
+        # Use the dynamically generated list of mutations string
+        # The formatted_mutations_str variable already contains the string representation
+        # of the list with double quotes, e.g., '["ORF1a:T103L", "ORF1a:N126K"]'
+        # The lapisFilter uses double curly braces {{ and }} to escape the literal
+        # curly braces needed for the JSON object within the f-string.
+        display_mutations = str(st.session_state['mutations']).replace("'", '"')
+        components.html(
+            f"""
+            <html>
+            <head>
+            <script type="module" src="https://unpkg.com/@genspectrum/dashboard-components@latest/standalone-bundle/dashboard-components.js"></script>
+            <link rel="stylesheet" href="https://unpkg.com/@genspectrum/dashboard-components@latest/dist/style.css" />
+            </head>
+                <body>
+                <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
+                <gs-app lapis="{server_ip}">
+                    <gs-mutations-over-time
+                    lapisFilter='{{"sampling_dateFrom":"{start_date}", "sampling_dateTo": "{end_date}", "location_name": "{location}"}}'
+                    sequenceType='{sequence_type_value}'
+                    views='["grid"]'
+                    width='100%'
+                    height='100%'
+                    granularity='day'
+                    displayMutations='{display_mutations}'
+                    lapisDateField='sampling_date'
+                    initialMeanProportionInterval='{{"min":0.00,"max":1.0}}'
+                    pageSizes='[50, 30, 20, 10]'
+                    />
+                </gs-app>
+                </head>
+                <body>
+                </body>
+            </html>
+        """,
+            height=2000,
+        )
+    else:
+        st.warning("Please select mutations, a valid date range, and a location to display the plot.")
 
-    # formatted_mutations_str = str(formatted_mutations).replace("'", '"')
 
-    # # strip of the part before the ":"
-    # formatted_mutations_no_gene_str = str(list([mut.split(':')[1] for mut in formatted_mutations])).replace("'",'"')
-
-    # st.write(formatted_mutations_no_gene_str)
-    # st.write(start_date)
-    # st.write(end_date)
-    
-    # ll = ["ORF1a:T103L", "ORF1a:N126K", "ORF1a:P252L", "ORF1a:R3561V", "S:E990A", "ORF1a:G143S"]
-    # ll_str = str(ll).replace("'", '"')
-    # st.write(ll_str)
-
-    # # fetch the counts for SE990A
-    # async def fetch_single_mutation(mutation, date_range):
-    #     async with aiohttp.ClientSession() as session:
-    #         return await fetch_data(session, mutation, date_range)
-
-    # data_mut = asyncio.run(fetch_single_mutation("ORF1a:G143S", date_range)) # Assuming S gene based on context, adjust if needed
-
-    # st.write("Data for ORF1a:G143S:")
-    # st.write(data_mut)
-
-    # # Use the dynamically generated list of mutations string
-    # # The formatted_mutations_str variable already contains the string representation
-    # # of the list with double quotes, e.g., '["ORF1a:T103L", "ORF1a:N126K"]'
-    # # The lapisFilter uses double curly braces {{ and }} to escape the literal
-    # # curly braces needed for the JSON object within the f-string.
-    # components.html(
-    #     f"""
-    #     <html>
-    #     <head>
-    #     <script type="module" src="https://unpkg.com/@genspectrum/dashboard-components@latest/standalone-bundle/dashboard-components.js"></script>
-    #     <link rel="stylesheet" href="https://unpkg.com/@genspectrum/dashboard-components@latest/dist/style.css" />
-    #     </head>
-    #         <body>
-    #         <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
-    #         <gs-app lapis="{server_ip}">
-    #             <gs-mutations-over-time
-    #             lapisFilter='{{"sampling_dateFrom":"{start_date}", "sampling_dateTo": "{end_date}", "location_name": "{location}"}}'
-    #             sequenceType='{sequence_type_value}'
-    #             views='["grid"]'
-    #             width='100%'
-    #             height='100%'
-    #             granularity='day'
-    #             displayMutations='{formatted_mutations_str}'
-    #             lapisDateField='sampling_date'
-    #             initialMeanProportionInterval='{{"min":0.00,"max":1.0}}'
-    #             pageSizes='[50, 30, 20, 10]'
-    #             />
-    #         </gs-app>
-    #         </head>
-    #         <body>
-    #         </body>
-    #     </html>
-    # """,
-    #     height=1000,
-    # )
-
-    #  displayMutations='{formatted_mutations_str}'
 if __name__ == "__main__":
     app()
