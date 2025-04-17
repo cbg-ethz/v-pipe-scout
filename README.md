@@ -6,10 +6,9 @@
 ![Docker](https://img.shields.io/badge/docker-19.03.12-blue)
 ![AWS S3](https://img.shields.io/badge/AWS%20S3-Cloud-orange)
 
-This project provides a front-end interface for two primary use cases:
+This project provides a front-end interface for three primary use cases:
 - On-demand heatmaps of mutations to identify new variants emerging, based on V-Pipe outputs.
 - On-demand variant deconvolution powered by LolliPop.
-- On-demand heatmaps of resistance mutation – querying LAPIS of clincial data.
 - On-demand heatmaps of resistance mutations - querying LAPS of wastewater data. 
 
 ## Overview
