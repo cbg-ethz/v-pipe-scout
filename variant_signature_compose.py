@@ -10,6 +10,8 @@ import seaborn as sns
 import streamlit.components.v1 as components
 from cojac.sig_generate import listfilteredmutations
 
+from common import fetch_locations, parse_url_hostname
+
 
 # Load configuration from config.yaml
 with open('config.yaml', 'r') as file:
@@ -149,32 +151,21 @@ def app():
 
     ## Add a subheader: Make dynamic plot of this
 
+    st.subheader("Dynamic Mutations-over-time of Signature Mutations")
+    st.markdown("#### on Read Level")
+
     #### #3) Select the date range
+    date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08")])
 
+    start_date = date_range[0].strftime('%Y-%m-%d')
+    end_date = date_range[1].strftime('%Y-%m-%d')
     #### #4) Select the location
-
-
-
-    ###########################################
-
-    # # get the gene name
-    # gene = gene_name[selected_option]
-
-    # # Get the list of mutations for the selected set
-    # mutations = df['Mutation'].tolist()
-    # # Lambda function to format the mutation list, from S24L to S:24L
-    # format_mutation = lambda x: f"{gene}:{x[0]}{x[1:]}"
-    # #format_mutation = lambda x: f"{x[0]}:{x[1:]}"
-    # # Apply the lambda function to each element in the mutations list
-    # formatted_mutations = [format_mutation(mutation) for mutation in mutations]
-
-
-    # # Allow the user to choose a date range
-    # st.write("Select a date range:")
-    # date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08")])
-
-    # start_date = date_range[0].strftime('%Y-%m-%d')
-    # end_date = date_range[1].strftime('%Y-%m-%d')
+    default_locations = ["Zürich (ZH)"]  # Define default locations
+    # TODO: remove the next two lines
+    address_no_port = parse_url_hostname(server_ip)
+    location_url = f'{address_no_port}/sample/aggregated?fields=location_name&limit=100&dataFormat=JSON&downloadAsFile=false'
+    locations = fetch_locations(location_url, default_locations)
+    location = st.selectbox("Select Location:", locations)
 
     # location = "Zürich (ZH)"
     # sequence_type_value = "amino acid"

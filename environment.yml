@@ -1,0 +1,21 @@
+name: vpipe-frontend
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.9
+  - streamlit
+  - matplotlib
+  - numpy
+  - pandas
+  - pyyaml
+  - boto3
+  - s3fs
+  - seaborn
+  - pillow
+  - aiohttp
+  - requests
+  - cojac>=0.9.3
+  - pip
+  - pip:
+      - st-files-connection

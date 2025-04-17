@@ -2,9 +2,9 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import yaml
-import requests # Add requests import
 import logging # Import the logging module
-from urllib.parse import urlparse # Import urlparse
+
+from common import fetch_locations, parse_url_hostname
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,33 +31,6 @@ def parse_url_hostname(url_string):
         logging.error(f"Error parsing URL {url_string}: {e}", exc_info=True)
         return url_string # Fallback in case of any parsing error
 
-
-def fetch_locations(location_url, default_locations):
-    """Fetches locations from the API endpoint."""
-    try:
-        logging.info(f"Attempting to fetch locations from: {location_url}")
-        st.info("Attempting to fetch locations from API...") # User-facing info
-        response = requests.get(location_url, headers={'accept': 'application/json'})
-        response.raise_for_status() # Raise an exception for bad status codes
-        location_data = response.json()
-        fetched_locations = [item['location_name'] for item in location_data.get('data', []) if 'location_name' in item]
-
-        if fetched_locations:
-            logging.info(f"Successfully fetched locations: {fetched_locations}")
-            st.success("Successfully fetched locations from API.") # User-facing success
-            return fetched_locations
-        else:
-            logging.warning("API call successful but returned no locations. Using default values.")
-            st.warning("Could not fetch locations from API (empty list returned), using default values.") # User-facing warning
-            return default_locations
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error fetching locations: {e}", exc_info=True)
-        st.error(f"Error fetching locations: {e}. Using default values.") # User-facing error
-        return default_locations
-    except Exception as e: # Catch potential JSON decoding errors or other issues
-        logging.error(f"An unexpected error occurred during location fetching: {e}", exc_info=True)
-        st.error(f"An unexpected error occurred: {e}. Using default values.") # User-facing error
-        return default_locations
 
 
 def app():
