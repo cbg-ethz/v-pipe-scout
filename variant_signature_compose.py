@@ -55,7 +55,7 @@ async def fetch_all_data(mutations, date_range):
 
 
 def app():
-    st.title("Variant Signature Composer – View Variants Mutations Over Time")
+    st.title("Variant Signature Composer")
 
     st.write("This page allows you to visualize signature mutations for different variants over time.")
     st.write("We query CovSpectrum for the defining mutations of the variants.")
@@ -74,17 +74,28 @@ def app():
         st.session_state['mutation_df'] = pd.DataFrame()
 
     def fetch_mutations():
-        muts = listfilteredmutations(variantQuery, min_abundance, min_coverage, min_abundance_del)
-        if isinstance(muts, set):
-            muts = list(muts)
-        st.session_state['mutations'] = muts
-        st.session_state['mutation_df'] = pd.DataFrame({
-            'Mutation': muts,
-            'Selected': [True]*len(muts)
-        })
+        try:
+            muts = listfilteredmutations(variantQuery, min_abundance, min_coverage, min_abundance_del)
+            if not muts:
+                st.session_state['mutations'] = []
+                st.session_state['mutation_df'] = pd.DataFrame()
+                st.error("No mutations found. This may be due to an invalid query or a server error. Please check your query and try again.\nIf you see errors in the console, please review the details or contact support.")
+                return
+            if isinstance(muts, set):
+                muts = list(muts)
+            st.session_state['mutations'] = muts
+            st.session_state['mutation_df'] = pd.DataFrame({
+                'Mutation': muts,
+                'Selected': [True]*len(muts)
+            })
+        except Exception as e:
+            st.session_state['mutations'] = []
+            st.session_state['mutation_df'] = pd.DataFrame()
+            st.error(f"Failed to fetch mutations. Please check your query and try again.\nError details: {e}")
 
     # --- UI controls ---
-    variantQuery = st.text_input("Enter your variant query (e.g., B.1.1.7, B.1.617.2):", "B.1.1.7", key='variantQuery')
+    variantQuery = st.text_input("Enter your variant query (e.g., LP.8, B.1.617.2):", "B.1.1.7", key='variantQuery')
+    st.text("(advanced queries e.g.: 'BA.5* | nextcladePangoLineage:BA.5* | nextstrainClade:22B' are also supported)")
     sequence_type = st.selectbox("Select Sequence Type:", ["Nucleotides"])
     sequence_type_value = "amino acid" if sequence_type == "Amino Acids" else "nucleotide"
     min_abundance = st.slider("Select the minimal abundance % of substitutions:", 0.0, 1.0, 0.8, key='min_abundance')
@@ -121,6 +132,7 @@ def app():
 
     # --- Data editor for mutation selection ---
     if not st.session_state['mutation_df'].empty:
+        st.info(f"{len(st.session_state['mutation_df'])} signature mutations found.")
         edited_df = st.data_editor(
             st.session_state['mutation_df'],
             num_rows="dynamic",
