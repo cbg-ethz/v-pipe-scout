@@ -61,42 +61,77 @@ def app():
     st.write("We query CovSpectrum for the defining mutations of the variants.")
 
     st.write("The user may adjust the choices of how variants signatures are defined.")
-
-    # make a horizontal line
     st.markdown("---")
-
-    ## Add a subheader: Variant Signature Composer
     st.markdown("### Variant Signature Composer")
 
-    #### #1) CovSpectrum Query - Select your Variant
-    # query the CovSpectrum API by `variantQuery` 
-    # a free text field here 
-    variantQuery = st.text_input("Enter your variant query (e.g., B.1.1.7, B.1.617.2):", "B.1.1.7")
+    # --- Debounce logic using session state ---
+    import time
+    if 'last_change' not in st.session_state:
+        st.session_state['last_change'] = time.time()
+    if 'mutations' not in st.session_state:
+        st.session_state['mutations'] = []
+    if 'mutation_df' not in st.session_state:
+        st.session_state['mutation_df'] = pd.DataFrame()
 
-    #### #2) Set your filters
-    st.text("Set your filters:")
-    ###  #2.0) Select Sequence type - default nuclieotide / amino acid
-    sequence_type = st.selectbox("Select Sequence Type:", ["Nucleotides"]) # currently only nucleotides are supported
+    def fetch_mutations():
+        muts = listfilteredmutations(variantQuery, min_abundance, min_coverage, min_abundance_del)
+        if isinstance(muts, set):
+            muts = list(muts)
+        st.session_state['mutations'] = muts
+        st.session_state['mutation_df'] = pd.DataFrame({
+            'Mutation': muts,
+            'Selected': [True]*len(muts)
+        })
+
+    # --- UI controls ---
+    variantQuery = st.text_input("Enter your variant query (e.g., B.1.1.7, B.1.617.2):", "B.1.1.7", key='variantQuery')
+    sequence_type = st.selectbox("Select Sequence Type:", ["Nucleotides"])
     sequence_type_value = "amino acid" if sequence_type == "Amino Acids" else "nucleotide"
-    ###  #2.1) Select the minimal abundance of substitutions - default 0.8 
-    min_abundance = st.slider("Select the minimal abundance % of substitutions:", 0.0, 1.0, 0.8)
+    min_abundance = st.slider("Select the minimal abundance % of substitutions:", 0.0, 1.0, 0.8, key='min_abundance')
+    min_abundance_del = st.slider("Select the minimal abundance % of deletions:", 0.0, 1.0, 0.8, key='min_abundance_del')
+    min_coverage = st.slider("Select the minimal coverage of mutation – no of seqeunces:", 0, 1000, 100, key='min_coverage')
 
-    ###  #2.2) Select the minimal abundance of deletions - default 0.8 
-    min_abundance_del = st.slider("Select the minimal abundance % of deletions:", 0.0, 1.0, 0.8)
+    # --- Debounce: update last_change on any input change ---
+    changed = False
+    for k in ['variantQuery', 'min_abundance', 'min_abundance_del', 'min_coverage']:
+        if st.session_state.get(k) != st.session_state.get(f'_prev_{k}'):
+            st.session_state[f'_prev_{k}'] = st.session_state.get(k)
+            st.session_state['last_change'] = time.time()
+            changed = True
 
+    # --- Debounce logic: fetch after 500ms idle ---
+    if changed:
+        st.session_state['debounce_triggered'] = False
+    if not st.session_state.get('debounce_triggered', False):
+        if time.time() - st.session_state['last_change'] > 0.5:
+            fetch_mutations()
+            st.session_state['debounce_triggered'] = True
 
-    ###  #2.3) Select the minimal coverage – number of seqeunces with that indel
-    min_coverage = st.slider("Select the minimal coverage of mutation – no of seqeunces:", 0, 1000, 100)
+    # --- Manual fetch button ---
+    if st.button("Fetch Mutations"):
+        fetch_mutations()
+        st.session_state['debounce_triggered'] = True
 
+    st.markdown(
+        """
+        Below are the mutations found for your selected variant and filters.\
+        You can deselect mutations you don’t want to include, or add extra ones by adding a new row in the table below.
+        """
+    )
 
-    # caually use cojac to do this query in the first instance
-    # get the list of mutations for the selected set
-    mutations = listfilteredmutations(variantQuery, min_abundance, min_coverage, min_abundance_del)
-
-    #### #5) provide funcitonality to edit the list of mutaitons
-    st.write("The following mutations were found:")
-    st.write(mutations)
-
+    # --- Data editor for mutation selection ---
+    if not st.session_state['mutation_df'].empty:
+        edited_df = st.data_editor(
+            st.session_state['mutation_df'],
+            num_rows="dynamic",
+            use_container_width=True,
+            key='mutation_editor',
+            disabled=["Mutation"],
+        )
+        st.session_state['mutation_df'] = edited_df
+        selected_mutations = edited_df[edited_df['Selected']]['Mutation'].tolist()
+    else:
+        st.info("No mutations found. Adjust your filters or add mutations manually.")
 
     st.markdown("---")
 
