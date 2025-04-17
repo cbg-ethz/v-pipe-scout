@@ -1,19 +1,20 @@
-# Use the official Python image from the Docker Hub
-FROM python:3.9-slim
-
-# Install dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# Use Miniconda3 as the base image
+FROM continuumio/miniconda3:latest
 
 # Set the working directory
 WORKDIR /app
 
-# Copy the requirements file
-COPY requirements.txt .
+# Copy environment.yml first to leverage Docker cache
+COPY environment.yml .
 
-# Install the required packages
-RUN pip install --no-cache-dir -r requirements.txt
+# Create the conda environment
+RUN conda env create -f environment.yml
+
+# Make sure conda environment is activated by default
+SHELL ["/bin/bash", "-c"]
+
+# Activate the environment and ensure it's used for subsequent commands
+ENV PATH=/opt/conda/envs/vpipe-frontend/bin:$PATH
 
 # Copy the rest of the application code
 COPY . .
@@ -22,4 +23,4 @@ COPY . .
 EXPOSE 8000
 
 # Run the Streamlit application
-CMD ["streamlit", "run", "app.py", "--server.port=8000", "--server.address=0.0.0.0"]
+CMD ["conda", "run", "-n", "vpipe-frontend", "streamlit", "run", "app.py", "--server.port=8000", "--server.address=0.0.0.0"]

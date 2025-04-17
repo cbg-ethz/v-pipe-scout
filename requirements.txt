@@ -11,3 +11,4 @@ matplotlib
 pillow
 aiohttp
 requests
+cojac>=0.9.3
