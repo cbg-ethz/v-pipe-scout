@@ -171,10 +171,31 @@ def app():
     formatted_mutations_str = str(formatted_mutations).replace("'", '"')
 
     # strip of the part before the ":"
-    formatted_mutations_no_gene_str = str([mut.split(':')[1] for mut in formatted_mutations][1]).replace("'",'"')
+    formatted_mutations_no_gene_str = str(list([mut.split(':')[1] for mut in formatted_mutations])).replace("'",'"')
 
     st.write(formatted_mutations_no_gene_str)
+    st.write(start_date)
+    st.write(end_date)
+    
+    ll = ["ORF1a:T103L", "ORF1a:N126K", "ORF1a:P252L", "ORF1a:R3561V", "S:E990A", "ORF1a:G143S"]
+    ll_str = str(ll).replace("'", '"')
+    st.write(ll_str)
 
+    # fetch the counts for SE990A
+    async def fetch_single_mutation(mutation, date_range):
+        async with aiohttp.ClientSession() as session:
+            return await fetch_data(session, mutation, date_range)
+
+    data_mut = asyncio.run(fetch_single_mutation("ORF1a:G143S", date_range)) # Assuming S gene based on context, adjust if needed
+
+    st.write("Data for ORF1a:G143S:")
+    st.write(data_mut)
+
+    # Use the dynamically generated list of mutations string
+    # The formatted_mutations_str variable already contains the string representation
+    # of the list with double quotes, e.g., '["ORF1a:T103L", "ORF1a:N126K"]'
+    # The lapisFilter uses double curly braces {{ and }} to escape the literal
+    # curly braces needed for the JSON object within the f-string.
     components.html(
         f"""
         <html>
@@ -192,8 +213,9 @@ def app():
                 width='100%'
                 height='100%'
                 granularity='day'
+                displayMutations='{formatted_mutations_str}'
                 lapisDateField='sampling_date'
-                displayMutations='{formatted_mutations_no_gene_str}'
+                initialMeanProportionInterval='{{"min":0.00,"max":1.0}}'
                 pageSizes='[50, 30, 20, 10]'
                 />
             </gs-app>
@@ -202,8 +224,9 @@ def app():
             </body>
         </html>
     """,
-        height=4000,
+        height=1000,
     )
 
+    #  displayMutations='{formatted_mutations_str}'
 if __name__ == "__main__":
     app()
