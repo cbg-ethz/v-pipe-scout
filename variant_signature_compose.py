@@ -1,16 +1,11 @@
-from matplotlib import pyplot as plt
-import numpy as np
 import streamlit as st
 import yaml
 import pandas as pd
 import logging
-import aiohttp
-import asyncio
-import seaborn as sns
 import streamlit.components.v1 as components
-from cojac.sig_generate import listfilteredmutations
 
 from common import fetch_locations, parse_url_hostname
+import requests
 
 
 # Load configuration from config.yaml
@@ -18,38 +13,7 @@ with open('config.yaml', 'r') as file:
     config = yaml.safe_load(file)
 
 server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
-
-async def fetch_data(session, mutation, date_range):
-    payload = {
-        "aminoAcidMutations": [mutation],
-        "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
-        "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
-        "fields": ["sampling_date"]
-    }
-
-    async with session.post(
-        f'{server_ip}/sample/aggregated',
-        headers={
-            'accept': 'application/json',
-            'Content-Type': 'application/json'
-        },
-        json=payload
-    ) as response:
-        if response.status == 200:
-            data = await response.json()
-            return {"mutation": mutation,
-                    "data": data.get('data', [])}
-        else:
-            logging.error(f"Failed to fetch data for mutation {mutation}.")
-            logging.error(f"Status code: {response.status}")
-            logging.error(await response.text())
-            return {"mutation": mutation,
-                    "data": None}
-
-async def fetch_all_data(mutations, date_range):
-    async with aiohttp.ClientSession() as session:
-        tasks = [fetch_data(session, mutation, date_range) for mutation in mutations]
-        return await asyncio.gather(*tasks)
+cov_sprectrum_api = config.get('server', {}).get('cov_spectrum_api', 'https://lapis.cov-spectrum.org')
     
 
 def app():
@@ -71,16 +35,37 @@ def app():
     if 'mutation_df' not in st.session_state:
         st.session_state['mutation_df'] = pd.DataFrame()
 
+    def fetch_mutations_api(variantQuery, sequence_type, min_abundance):
+        base_url = f"{cov_sprectrum_api}/open/v2/sample/"
+        params = (
+            f"variantQuery={variantQuery}"
+            f"&minProportion={min_abundance}"
+            f"&limit=1000"
+            f"&downloadAsFile=false"
+        )
+        if sequence_type == "Nucleotides":
+            url = f"{base_url}nucleotideMutations?{params}"
+        else:
+            url = f"{base_url}aminoAcidMutations?{params}"
+        resp = requests.get(url)
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("data", [])
+
+    # Save the last fetched DataFrame for plotting
     def fetch_mutations():
         try:
-            muts = listfilteredmutations(variantQuery, min_abundance, min_coverage, min_abundance_del)
-            if not muts:
+            mutation_data = fetch_mutations_api(variantQuery, sequence_type, min_abundance)
+            df = pd.DataFrame(mutation_data)
+            st.session_state['last_fetched_df'] = df.copy()
+            if df.empty:
                 st.session_state['mutations'] = []
                 st.session_state['mutation_df'] = pd.DataFrame()
                 st.error("No mutations found. This may be due to an invalid query or a server error. Please check your query and try again.\nIf you see errors in the console, please review the details or contact support.")
                 return
-            if isinstance(muts, set):
-                muts = list(muts)
+            # Filter by min_coverage
+            df = df[df['coverage'] >= min_coverage]
+            muts = df['mutation'].tolist()
             st.session_state['mutations'] = muts
             st.session_state['mutation_df'] = pd.DataFrame({
                 'Mutation': muts,
@@ -92,16 +77,20 @@ def app():
             st.error(f"Failed to fetch mutations. Please check your query and try again.\nError details: {e}")
 
     # --- UI controls ---
-    variantQuery = st.text_input("Enter your variant query (e.g., LP.8, B.1.617.2):", "LP.8", key='variantQuery')
-    sequence_type = st.selectbox("Select Sequence Type:", ["Nucleotides"])
+    variantQuery = st.text_input(
+        "Enter your variant query (e.g., LP.8, B.1.617.2):", "LP.8", key='variantQuery')
+    sequence_type = st.selectbox("Select Sequence Type:", ["Nucleotides", "Amino Acids"])
     sequence_type_value = "amino acid" if sequence_type == "Amino Acids" else "nucleotide"
-    min_abundance = st.slider("Select the minimal abundance % of substitutions:", 0.0, 1.0, 0.8, key='min_abundance')
-    min_abundance_del = st.slider("Select the minimal abundance % of deletions:", 0.0, 1.0, 0.8, key='min_abundance_del')
-    min_coverage = st.slider("Select the minimal coverage of mutation – no of seqeunces:", 0, 1000, 100, key='min_coverage')
+    min_abundance = st.slider(
+        "Minimal Proportion (fraction of clinical sequences with this mutation in this variant):",
+        0.0, 1.0, 0.8, key='min_abundance',
+        help="This is the minimal fraction of clinical sequences assigned to this variant that must have the mutation for it to be included."
+    )
+    min_coverage = st.slider("Select the minimal coverage of mutation – no of sequences:", 0, 1000, 100, key='min_coverage')
 
     # --- Debounce: update last_change on any input change ---
     changed = False
-    for k in ['variantQuery', 'min_abundance', 'min_abundance_del', 'min_coverage']:
+    for k in ['variantQuery', 'min_abundance', 'min_coverage']:
         if st.session_state.get(k) != st.session_state.get(f'_prev_{k}'):
             st.session_state[f'_prev_{k}'] = st.session_state.get(k)
             st.session_state['last_change'] = time.time()
@@ -142,6 +131,54 @@ def app():
         selected_mutations = edited_df[edited_df['Selected']]['Mutation'].tolist()
     else:
         st.info("No mutations found. Adjust your filters or add mutations manually.")
+
+    # --- Only show coverage/proportion plots after first query ---
+    if 'last_fetched_df' in st.session_state:
+        st.markdown('---')
+        st.subheader('Coverage and Proportion Distributions')
+        import matplotlib.pyplot as plt
+        import numpy as np
+        # Try to use the last mutation DataFrame if available
+        mutation_df = st.session_state.get('mutation_df', pd.DataFrame())
+        # Use the original DataFrame if available (for coverage/proportion columns)
+        if 'mutation_data_df' in st.session_state:
+            df = st.session_state['mutation_data_df']
+        else:
+            df = None
+        # Try to get the DataFrame from the last fetch
+        if df is None or df.empty:
+            if 'last_fetched_df' in st.session_state:
+                df = st.session_state['last_fetched_df']
+        if df is None or df.empty:
+            df = mutation_df
+        fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+        plotted = False
+        if not df.empty:
+            if 'coverage' in df.columns:
+                axes[0].hist(df['coverage'].dropna(), bins=20, color='skyblue', edgecolor='black')
+                axes[0].set_title('Coverage Distribution')
+                axes[0].set_xlabel('Coverage')
+                axes[0].set_ylabel('Count')
+                plotted = True
+            else:
+                axes[0].set_visible(False)
+            if 'proportion' in df.columns:
+                axes[1].hist(df['proportion'].dropna(), bins=20, color='orange', edgecolor='black')
+                axes[1].set_title('Proportion Distribution')
+                axes[1].set_xlabel('Proportion (fraction of clinical sequences with this mutation in this variant)')
+                axes[1].set_ylabel('Count')
+                plotted = True
+            else:
+                axes[1].set_visible(False)
+        if not plotted:
+            fig.delaxes(axes[1])
+            fig.delaxes(axes[0])
+            fig, ax = plt.subplots(figsize=(5, 2))
+            ax.text(0.5, 0.5, 'No coverage or proportion data available.', ha='center', va='center')
+            ax.axis('off')
+            st.pyplot(fig)
+        else:
+            st.pyplot(fig)
 
     st.markdown("---")
 
