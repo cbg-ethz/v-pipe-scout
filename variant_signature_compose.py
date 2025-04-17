@@ -202,6 +202,25 @@ def app():
             st.pyplot(fig)
         else:
             st.pyplot(fig)
+        
+
+        st.markdown("---")
+
+            
+        # --- Option to download mutation signature as YAML ---
+        if not st.session_state['mutation_df'].empty and selected_mutations:
+            import io
+            import yaml as pyyaml
+            # Prepare YAML content
+            yaml_dict = {variantQuery: selected_mutations}
+            yaml_str = pyyaml.dump(yaml_dict, sort_keys=False, allow_unicode=True)
+            yaml_bytes = io.BytesIO(yaml_str.encode('utf-8'))
+            st.download_button(
+                label="Download mutation signature as YAML",
+                data=yaml_bytes,
+                file_name=f"{variantQuery}_signature.yaml",
+                mime="application/x-yaml"
+            )
 
     st.markdown("---")
 
@@ -262,7 +281,7 @@ def app():
                 </body>
             </html>
         """,
-            height=2000,
+            height=1500,
         )
     else:
         st.warning("Please select mutations, a valid date range, and a location to display the plot.")
