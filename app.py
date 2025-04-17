@@ -2,11 +2,13 @@ import streamlit as st
 import index
 import resistance_mut_silo
 import web_explorer
+import variant_signature_compose
 
 PAGES = {
     "Home": {"module": index}, 
     "Resistance Mutations": {"module": resistance_mut_silo},
     "Dynamic Mutation Heatmap": {"module": web_explorer},
+    "Variant Signature Composer": {"module": variant_signature_compose},
     
 }
 
