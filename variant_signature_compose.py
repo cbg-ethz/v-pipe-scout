@@ -86,7 +86,7 @@ def app():
         0.0, 1.0, 0.8, key='min_abundance',
         help="This is the minimal fraction of clinical sequences assigned to this variant that must have the mutation for it to be included."
     )
-    min_coverage = st.slider("Select the minimal coverage of mutation – no of sequences:", 0, 1000, 100, key='min_coverage')
+    min_coverage = st.slider("Select the minimal coverage of mutation – no of sequences:", 0, 250, 15, key='min_coverage')
 
     # --- Debounce: update last_change on any input change ---
     changed = False
@@ -119,15 +119,38 @@ def app():
     # --- Data editor for mutation selection ---
     selected_mutations = None
     if not st.session_state['mutation_df'].empty:
-        st.info(f"{len(st.session_state['mutation_df'])} signature mutations found.")
+        # Try to get the last fetched DataFrame for extra columns
+        df = st.session_state.get('last_fetched_df', pd.DataFrame())
+        # Merge coverage and proportion columns if available
+        mutation_df = st.session_state['mutation_df']
+        if not df.empty and 'mutation' in df.columns:
+            # Only keep relevant columns
+            cols = ['mutation']
+            if 'coverage' in df.columns:
+                cols.append('coverage')
+            if 'proportion' in df.columns:
+                cols.append('proportion')
+            extra = df[cols].rename(columns={'mutation': 'Mutation'})
+            # Merge on Mutation
+            merged = pd.merge(mutation_df, extra, on='Mutation', how='left')
+            # Reorder columns for display
+            display_cols = ['Mutation', 'Selected']
+            if 'coverage' in merged.columns:
+                display_cols.append('coverage')
+            if 'proportion' in merged.columns:
+                display_cols.append('proportion')
+            merged = merged[display_cols]
+        else:
+            merged = mutation_df
+        st.info(f"{len(merged)} signature mutations found.")
         edited_df = st.data_editor(
-            st.session_state['mutation_df'],
+            merged,
             num_rows="dynamic",
             use_container_width=True,
             key='mutation_editor',
-            disabled=["Mutation"],
+            disabled=["Mutation", "coverage", "proportion"] if 'coverage' in merged.columns or 'proportion' in merged.columns else ["Mutation"],
         )
-        st.session_state['mutation_df'] = edited_df
+        st.session_state['mutation_df'] = edited_df[[c for c in edited_df.columns if c in ['Mutation', 'Selected']]]
         selected_mutations = edited_df[edited_df['Selected']]['Mutation'].tolist()
     else:
         st.info("No mutations found. Adjust your filters or add mutations manually.")
