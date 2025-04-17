@@ -8,6 +8,7 @@ import aiohttp
 import asyncio
 import seaborn as sns
 import streamlit.components.v1 as components
+from cojac.sig_generate import listfilteredmutations
 
 
 # Load configuration from config.yaml
@@ -65,28 +66,47 @@ def app():
     st.markdown("---")
 
     ## Add a subheader: Variant Signature Composer
+    st.markdown("### Variant Signature Composer")
 
     #### #1) CovSpectrum Query - Select your Variant
+    # query the CovSpectrum API by `variantQuery` 
+    # a free text field here 
+    variantQuery = st.text_input("Enter your variant query (e.g., B.1.1.7, B.1.617.2):", "B.1.1.7")
 
     #### #2) Set your filters
-
+    st.text("Set your filters:")
+    ###  #2.0) Select Sequence type - default nuclieotide / amino acid
+    sequence_type = st.selectbox("Select Sequence Type:", ["Nucleotides"]) # currently only nucleotides are supported
+    sequence_type_value = "amino acid" if sequence_type == "Amino Acids" else "nucleotide"
     ###  #2.1) Select the minimal abundance of substitutions - default 0.8 
+    min_abundance = st.slider("Select the minimal abundance % of substitutions:", 0.0, 1.0, 0.8)
 
     ###  #2.2) Select the minimal abundance of deletions - default 0.8 
+    min_abundance_del = st.slider("Select the minimal abundance % of deletions:", 0.0, 1.0, 0.8)
+
 
     ###  #2.3) Select the minimal coverage – number of seqeunces with that indel
+    min_coverage = st.slider("Select the minimal coverage of mutation – no of seqeunces:", 0, 1000, 100)
 
-    #### #4) show the mutations as a df with abundance and read no
+
+    # caually use cojac to do this query in the first instance
+    # get the list of mutations for the selected set
+    mutations = listfilteredmutations(variantQuery, min_abundance, min_coverage, min_abundance_del)
 
     #### #5) provide funcitonality to edit the list of mutaitons
+    st.write("The following mutations were found:")
+    st.write(mutations)
 
 
     st.markdown("---")
 
-     ## Add a subheader: Make dynamic plot of this
+    ## Add a subheader: Make dynamic plot of this
+
+    #### #3) Select the date range
+
+    #### #4) Select the location
 
 
-  #### #3) Select the date range
 
     ###########################################
 
