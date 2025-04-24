@@ -115,31 +115,20 @@ def app():
 
     # TODO: currently hardcoded, should be fetched from the server
     options = {
-        "3CLpro Inhibitors": 'data/3CLpro_inhibitors_datasheet.csv',
-        "RdRP Inhibitors": 'data/RdRP_inhibitors_datasheet.csv',
-        "Spike mAbs": 'data/spike_mAbs_datasheet.csv'
+        "3CLpro Inhibitors": 'data/translated_3CLpro_in_ORF1a_mutations.csv',
+        "RdRP Inhibitors": 'data/translated_RdRp_in_ORF1a_ORF1b_mutations.csv',
+        "Spike mAbs": 'data/translated_Spike_in_S_mutations.csv'
     }
 
     selected_option = st.selectbox("Select a resistance mutation set:", options.keys())
 
     df = pd.read_csv(options[selected_option])
 
-    gene_name =  {
-        "3CLpro Inhibitors": "ORF1a",
-        "RdRP Inhibitors": "ORF1b",
-        "Spike mAbs": "S"
-    }
-
-    # get the gene name
-    gene = gene_name[selected_option]
-
+    
     # Get the list of mutations for the selected set
     mutations = df['Mutation'].tolist()
-    # Lambda function to format the mutation list, from S24L to S:24L
-    format_mutation = lambda x: f"{gene}:{x[0]}{x[1:]}"
-    #format_mutation = lambda x: f"{x[0]}:{x[1:]}"
     # Apply the lambda function to each element in the mutations list
-    formatted_mutations = [format_mutation(mutation) for mutation in mutations]
+    formatted_mutations = mutations
 
     if st.button("Show Mutations"):
         st.write(f"Selected mutations:")
