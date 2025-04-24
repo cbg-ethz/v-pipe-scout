@@ -178,8 +178,8 @@ def app():
                 pageSizes='[50, 30, 20, 10]'
                 />
             </gs-app>
-            </head>
             <body>
+            
             </body>
         </html>
     """,
