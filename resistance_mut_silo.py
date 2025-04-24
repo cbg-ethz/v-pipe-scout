@@ -120,7 +120,11 @@ def app():
         "Spike mAbs": 'data/translated_Spike_in_S_mutations.csv'
     }
 
+
     selected_option = st.selectbox("Select a resistance mutation set:", options.keys())
+
+    st.write("Note that mutation sets `3CLpro` and `RdRP`refer to mature proteins, " \
+    "thus the mutations are in the ORF1a and ORF1b genes, respectively and translated here.")
 
     df = pd.read_csv(options[selected_option])
 
