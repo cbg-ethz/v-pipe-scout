@@ -159,26 +159,19 @@ def app():
 
     formatted_mutations_str = str(formatted_mutations).replace("'", '"')
 
-    # strip of the part before the ":"
-    formatted_mutations_no_gene_str = str(list([mut.split(':')[1] for mut in formatted_mutations])).replace("'",'"')
-
-    st.write(formatted_mutations_no_gene_str)
-    st.write(start_date)
-    st.write(end_date)
-    
-    ll = ["ORF1a:T103L", "ORF1a:N126K", "ORF1a:P252L", "ORF1a:R3561V", "S:E990A", "ORF1a:G143S"]
-    ll_str = str(ll).replace("'", '"')
-    st.write(ll_str)
-
     # fetch the counts for SE990A
     async def fetch_single_mutation(mutation, date_range):
         async with aiohttp.ClientSession() as session:
             return await fetch_data(session, mutation, date_range)
 
-    data_mut = asyncio.run(fetch_single_mutation("ORF1a:G143S", date_range)) # Assuming S gene based on context, adjust if needed
-
-    st.write("Data for ORF1a:G143S:")
+    data_mut = asyncio.run(fetch_single_mutation("ORF1b:D475Y", date_range)) # Assuming S gene based on context, adjust if needed
+    st.write("Data for ORF1b:D475Y:")
     st.write(data_mut)
+
+    data_mut = asyncio.run(fetch_single_mutation("ORF1b:E793A", date_range)) # Assuming S gene based on context, adjust if needed
+    st.write("Data for ORF1b:E793A:")
+    st.write(data_mut)
+
 
     # Use the dynamically generated list of mutations string
     # The formatted_mutations_str variable already contains the string representation
