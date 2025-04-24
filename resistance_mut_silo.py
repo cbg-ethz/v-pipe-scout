@@ -147,7 +147,7 @@ def app():
     ### GenSpectrum Dashboard Component ###
 
     st.write("### GenSpectrum Dashboard Dynamic Mutation Heatmap")
-    st.write("This component only shows mutatios above an unknown threshold.")
+    st.write("This component only shows mutations above an unknown threshold.")
     st.write("This is under investigation.")
 
     # Use the dynamically generated list of mutations string
