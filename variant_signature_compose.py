@@ -272,7 +272,7 @@ def app():
     # Check if all necessary parameters are available
     if selected_mutations and date_range and len(date_range) == 2 and location:
 
-        st.write("NOTE: currntly the below GenSpectrum Plot does not show mutations that have zero proporion in the selected date range.")
+        st.write("NOTE: currently the below GenSpectrum Plot does not show mutations that have zero proportion in the selected date range.")
         st.write("Absence of the mutation, does not mean no coverage – this ISSUE is currently being considered.")
 
         # Use the dynamically generated list of mutations string
