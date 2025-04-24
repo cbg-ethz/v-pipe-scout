@@ -193,7 +193,8 @@ def app():
                 df = st.session_state['last_fetched_df']
         if df is None or df.empty:
             df = mutation_df
-        fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+        # Use a reasonable max width for the figure
+        fig, axes = plt.subplots(1, 2, figsize=(8, 4))
         plotted = False
         if not df.empty:
             if 'coverage' in df.columns:
@@ -207,7 +208,7 @@ def app():
             if 'proportion' in df.columns:
                 axes[1].hist(df['proportion'].dropna(), bins=20, color='orange', edgecolor='black')
                 axes[1].set_title('Proportion Distribution')
-                axes[1].set_xlabel('Proportion (fraction of clinical sequences with this mutation in this variant)')
+                axes[1].set_xlabel('Proportion')
                 axes[1].set_ylabel('Count')
                 plotted = True
             else:
@@ -218,11 +219,15 @@ def app():
             fig, ax = plt.subplots(figsize=(5, 2))
             ax.text(0.5, 0.5, 'No coverage or proportion data available.', ha='center', va='center')
             ax.axis('off')
-            st.pyplot(fig)
+            # Center the plot
+            cols = st.columns([1,2,1])
+            with cols[1]:
+                st.pyplot(fig)
         else:
-            st.pyplot(fig)
-        
-
+            # Center the plot
+            cols = st.columns([1,2,1])
+            with cols[1]:
+                st.pyplot(fig)
         st.markdown("---")
 
             
