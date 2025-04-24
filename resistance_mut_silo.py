@@ -129,27 +129,12 @@ def app():
     mutations = df['Mutation'].tolist()
     # Apply the lambda function to each element in the mutations list
     formatted_mutations = mutations
-
-    if st.button("Show Mutations"):
-        st.write(f"Selected mutations:")
-        st.write(formatted_mutations)
     
 
     # Allow the user to choose a date range
     st.write("Select a date range:")
     date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08")])
 
-    if st.button("Fetch Data"):
-        st.write("Fetching data...")
-        df = fetch_reformat_data(formatted_mutations, date_range)
-        
-        # Check if the dataframe is all NaN
-        if df.isnull().all().all():
-            st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
-        else:
-            # Plot the heatmap
-            fig = plot_heatmap(df)
-            st.pyplot(fig)
 
     start_date = date_range[0].strftime('%Y-%m-%d')
     end_date = date_range[1].strftime('%Y-%m-%d')
@@ -159,19 +144,11 @@ def app():
 
     formatted_mutations_str = str(formatted_mutations).replace("'", '"')
 
-    # fetch the counts for SE990A
-    async def fetch_single_mutation(mutation, date_range):
-        async with aiohttp.ClientSession() as session:
-            return await fetch_data(session, mutation, date_range)
+    ### GenSpectrum Dashboard Component ###
 
-    data_mut = asyncio.run(fetch_single_mutation("ORF1b:D475Y", date_range)) # Assuming S gene based on context, adjust if needed
-    st.write("Data for ORF1b:D475Y:")
-    st.write(data_mut)
-
-    data_mut = asyncio.run(fetch_single_mutation("ORF1b:E793A", date_range)) # Assuming S gene based on context, adjust if needed
-    st.write("Data for ORF1b:E793A:")
-    st.write(data_mut)
-
+    st.write("### GenSpectrum Dashboard Dynamic Mutation Heatmap")
+    st.write("This component only shows mutatios above an unknown threshold.")
+    st.write("This is under investigation.")
 
     # Use the dynamically generated list of mutations string
     # The formatted_mutations_str variable already contains the string representation
@@ -206,9 +183,48 @@ def app():
             </body>
         </html>
     """,
-        height=1000,
+        height=500,
     )
 
-    #  displayMutations='{formatted_mutations_str}'
+    ### Python plot ###
+    st.write("### Python Plot")
+    st.write("This plot shows the mutations over time.")
+
+    if st.button("Making Python Plot - manual API calls"):
+        st.write("Fetching data...")
+        df = fetch_reformat_data(formatted_mutations, date_range)
+        
+        # Check if the dataframe is all NaN
+        if df.isnull().all().all():
+            st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
+        else:
+            # Plot the heatmap
+            fig = plot_heatmap(df)
+            st.pyplot(fig)
+    
+
+    # fetch the counts for SE990A
+    async def fetch_single_mutation(mutation, date_range):
+        async with aiohttp.ClientSession() as session:
+            return await fetch_data(session, mutation, date_range)
+
+    ### Debugging ###
+    st.write("### Debugging")
+    st.write("This section shows the raw data for the mutations.")
+    ## make textboxed top select two mutations
+    mutation1 = st.text_input("Mutation 1", "ORF1b:D475Y")
+    mutation2 = st.text_input("Mutation 2", "ORF1b:E793A")
+    st.write("Fetching data for mutations:")
+    st.write(mutation1)
+    st.write(mutation2)
+    data_mut1 = asyncio.run(fetch_single_mutation(mutation1, date_range))
+    data_mut2 = asyncio.run(fetch_single_mutation(mutation2, date_range))
+    st.write("Data for mutation 1:")
+    st.write(data_mut1)
+    st.write("Data for mutation 2:")
+    st.write(data_mut2)
+
+
+    st.write('making calls to `sample/aggregated` endpoint for each mutation filtering for `aminoAcidMutations`: ["ORF1b:D475Y"]')
 if __name__ == "__main__":
     app()
