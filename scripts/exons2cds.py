@@ -121,7 +121,7 @@ def check_mutation_consistency(mutations, gene):
             print(f"Invalid mutation format: {mutation}")
 
 def main():
-    # Load Data
+    # Load Data – as downloaded from the Stanford database
     options = {
         "3C-like proteinase": '../data/3CLpro_inhibitors_datasheet.csv',
         "RNA-dependent RNA polymerase": '../data/RdRP_inhibitors_datasheet.csv',
@@ -158,6 +158,13 @@ def main():
     translated_rdrp_df.to_csv("translated_RdRp_in_ORF1a_ORF1b_mutations.csv", index=False)
     translated_clpro_df.to_csv("translated_3CLpro_in_ORF1a_mutations.csv", index=False)
     print("\nResults saved to CSV files.")
+
+    # Also output Spike mutations as S:<mutation> (no mapping needed)
+    spike_mutations = dfs["spike glycoprotein"]["Mutation"].tolist()
+    formatted_spike = [f"S:{mut}" for mut in spike_mutations]
+    formatted_spike_df = pd.DataFrame(formatted_spike, columns=["Mutation"])
+    formatted_spike_df.to_csv("translated_Spike_in_S_mutations.csv", index=False)
+    print("\nSpike mutations formatted and saved to translated_Spike_in_S_mutations.csv.")
 
     # Fetch the reference genome from the API
     url = "https://lapis.cov-spectrum.org/open/v2/sample/referenceGenome?downloadAsFile=false"
