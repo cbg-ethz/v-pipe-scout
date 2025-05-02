@@ -1,7 +1,6 @@
 import streamlit as st
 import yaml
 import pandas as pd
-import logging
 import streamlit.components.v1 as components
 
 from common import fetch_locations, parse_url_hostname
