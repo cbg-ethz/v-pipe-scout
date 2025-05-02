@@ -1,8 +1,9 @@
 import streamlit as st
-import index
-import resistance_mut_silo
-import dynamic_mutations
-import variant_signature_compose
+import pages.index as index
+import pages.variant_deconv as variant_deconv
+import pages.resistance_mut_silo as resistance_mut_silo
+import pages.dynamic_mutations as dynamic_mutations
+import pages.variant_signature_compose as variant_signature_compose
 
 PAGES = {
     "Home": {"module": index}, 
