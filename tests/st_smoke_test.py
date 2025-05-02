@@ -12,7 +12,7 @@ pytestmark = pytest.mark.skipif(SKIP_SMOKE, reason="smoke test is disabled by co
 
 def get_file_paths() -> list[str]:
     """Get a list of file paths for the main page + each page in the pages folder."""
-    page_folder = Path(APP_PATH).parent / "pages"
+    page_folder = Path(APP_PATH).parent / "subpages"
     if not page_folder.exists():
         return [APP_PATH]
     page_files = page_folder.glob("*.py")
