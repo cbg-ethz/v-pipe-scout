@@ -9,6 +9,29 @@
 """
 
 import streamlit as st
+import streamlit_pydantic as sp
+from pydantic import BaseModel, Field
+from typing import Literal, Set
+
+# Define the Pydantic model for the variant 
+class Variant(BaseModel):
+    name: str
+    signature_mutations: list[str]
+
+# Define the Pydantic model for the variant list
+class VariantList(BaseModel):
+    variants: list[Variant]
+    def add_variant(self, variant: Variant):
+        self.variants.append(variant)
+    def remove_variant(self, variant: Variant):
+        self.variants.remove(variant)
+
+
+class ShowVariantList(BaseModel):
+
+    multi_selection_with_literal: Set[Literal["LP.8", "XEC"]] = Field(
+        ["LP.8", "XEC"], description="Allows multiple items from a set."
+    )
 
 def app():
     st.title("Multi Variant Signature Composer")
@@ -18,6 +41,11 @@ def app():
 
     st.markdown("---")
 
+    # let's add a mutli-select box with the variants - this should be a pydantic object of the variant-list
+
+    data = sp.pydantic_input(
+    key="my_showcase_input", model=ShowVariantList, group_optional_fields="no"
+)
 
 
 if __name__ == "__main__":
