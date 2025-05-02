@@ -15,6 +15,7 @@ dependencies:
   - pillow
   - aiohttp
   - requests
+  - pytest
   - cojac>=0.9.3
   - pip
   - pip:
