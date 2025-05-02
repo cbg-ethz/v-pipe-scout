@@ -9,14 +9,9 @@ dependencies:
   - numpy
   - pandas
   - pyyaml
-  - boto3
-  - s3fs
   - seaborn
-  - pillow
   - aiohttp
   - requests
   - pytest
+  - streamlit-pydantic
   - cojac>=0.9.3
-  - pip
-  - pip:
-      - st-files-connection
