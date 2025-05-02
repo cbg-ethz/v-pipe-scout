@@ -14,13 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: conda-incubator/setup-miniconda@v3
         with:
-          python-version: "3.11"
-      - uses: streamlit/streamlit-app-action@v0.0.3
-        with:
-          app-path: streamlit_app.py
-      - uses: streamlit/streamlit-app-action@v0.0.3
-        with:
-          app-path: streamlit_app.py
-          ruff: true
+          environment-file: environment.yml
+          activate-environment: vpipe-frontend
+          auto-activate-base: false
+      - name: Run Streamlit app
+        run: conda run -n vpipe-frontend streamlit run app.py
