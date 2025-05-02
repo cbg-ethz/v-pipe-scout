@@ -19,5 +19,5 @@ jobs:
           environment-file: environment.yml
           activate-environment: vpipe-frontend
           auto-activate-base: false
-      - name: Testing: Smoke & Unit Tests
+      - name: Testing – Smoke & Unit Tests
         run: conda run -n vpipe-frontend pytest
