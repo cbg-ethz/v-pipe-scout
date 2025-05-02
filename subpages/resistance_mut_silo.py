@@ -7,7 +7,7 @@ import seaborn as sns
 import yaml
 import streamlit.components.v1 as components
 
-from wiseloculus import fetch_all_data, fetch_single_mutation
+from api.wiseloculus import fetch_all_data, fetch_single_mutation
 
 # Load configuration from config.yaml
 with open('config.yaml', 'r') as file:

@@ -4,7 +4,7 @@ import pandas as pd
 import yaml
 import logging # Import the logging module
 
-from lapis import Lapis
+from api.lapis import Lapis
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

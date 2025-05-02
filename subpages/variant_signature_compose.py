@@ -3,8 +3,8 @@ import yaml
 import pandas as pd
 import streamlit.components.v1 as components
 
-from lapis import Lapis
-from covspectrum import fetch_mutations_api
+from api.lapis import Lapis
+from api.covspectrum import fetch_mutations_api
 
 
 
@@ -38,6 +38,9 @@ def app():
 
     # Save the last fetched DataFrame for plotting
     def fetch_mutations():
+        """
+        Fetch mutations from the API based on user input and update session state.
+        """
         try:
             mutation_data = fetch_mutations_api(variantQuery, sequence_type, min_abundance, cov_sprectrum_api)
             df = pd.DataFrame(mutation_data)
