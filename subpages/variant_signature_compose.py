@@ -3,8 +3,9 @@ import yaml
 import pandas as pd
 import streamlit.components.v1 as components
 
-from lapis import fetch_locations
+from lapis import Lapis
 from covspectrum import fetch_mutations_api
+
 
 
 # Load configuration from config.yaml
@@ -14,6 +15,7 @@ with open('config.yaml', 'r') as file:
 server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
 cov_sprectrum_api = config.get('server', {}).get('cov_spectrum_api', 'https://lapis.cov-spectrum.org')
     
+wiseLoculus = Lapis(server_ip)
 
 def app():
     st.title("Variant Signature Composer")
@@ -161,7 +163,6 @@ def app():
         st.markdown('---')
         st.subheader('Coverage and Proportion Distributions')
         import matplotlib.pyplot as plt
-        import numpy as np
         # Try to use the last mutation DataFrame if available
         mutation_df = st.session_state.get('mutation_df', pd.DataFrame())
         # Use the original DataFrame if available (for coverage/proportion columns)
@@ -244,7 +245,7 @@ def app():
     end_date = date_range[1].strftime('%Y-%m-%d')
     #### #4) Select the location
     default_locations = ["Zürich (ZH)"]  # Define default locations
-    locations = fetch_locations(server_ip, default_locations)
+    locations = wiseLoculus.fetch_locations(default_locations)
     location = st.selectbox("Select Location:", locations)
 
    
