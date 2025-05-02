@@ -16,23 +16,6 @@ with open('config.yaml', 'r') as file:
 
 server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
 
-def parse_url_hostname(url_string):
-    """Parses a URL string and returns the scheme and hostname."""
-    try:
-        parsed_url = urlparse(url_string)
-        if parsed_url.hostname:
-            address_no_port = f"{parsed_url.scheme}://{parsed_url.hostname}"
-            logging.info(f"Parsed URL: {url_string}, Address without port: {address_no_port}")
-            return address_no_port
-        else:
-            logging.warning(f"Could not parse hostname from {url_string}. Returning original.")
-            return url_string # Fallback to the original URL
-    except Exception as e:
-        logging.error(f"Error parsing URL {url_string}: {e}", exc_info=True)
-        return url_string # Fallback in case of any parsing error
-
-
-
 def app():
 
     ## Add a title
