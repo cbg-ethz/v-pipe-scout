@@ -19,5 +19,6 @@ jobs:
           environment-file: environment.yml
           activate-environment: vpipe-frontend
           auto-activate-base: false
-      - name: Run Streamlit app
-        run: conda run -n vpipe-frontend streamlit run app.py
+      - uses: streamlit/streamlit-app-action@v0.0.3
+        with:
+          app-path: streamlit_app.py
