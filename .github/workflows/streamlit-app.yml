@@ -21,3 +21,5 @@ jobs:
           auto-activate-base: false
       - name: Testing – Smoke & Unit Tests
         run: conda run -n vpipe-frontend pytest
+        env:
+          PYTHONPATH: ${{ github.workspace }}
