@@ -1,66 +1,27 @@
 from matplotlib import pyplot as plt
 import numpy as np
 import streamlit as st
-import yaml
 import pandas as pd
-import logging
-import aiohttp
 import asyncio
 import seaborn as sns
+import yaml
 import streamlit.components.v1 as components
 
+from wiseloculus import fetch_all_data, fetch_single_mutation
 
 # Load configuration from config.yaml
 with open('config.yaml', 'r') as file:
     config = yaml.safe_load(file)
 
+
 server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
 
-async def fetch_data(session, mutation, date_range):
-    payload = {
-        "aminoAcidMutations": [mutation],
-        "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
-        "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
-        "fields": ["sampling_date"]
-    }
 
-    async with session.post(
-        f'{server_ip}/sample/aggregated',
-        headers={
-            'accept': 'application/json',
-            'Content-Type': 'application/json'
-        },
-        json=payload
-    ) as response:
-        if response.status == 200:
-            data = await response.json()
-            return {"mutation": mutation,
-                    "data": data.get('data', [])}
-        else:
-            logging.error(f"Failed to fetch data for mutation {mutation}.")
-            logging.error(f"Status code: {response.status}")
-            logging.error(await response.text())
-            return {"mutation": mutation,
-                    "data": None}
-
-async def fetch_all_data(mutations, date_range):
-    async with aiohttp.ClientSession() as session:
-        tasks = [fetch_data(session, mutation, date_range) for mutation in mutations]
-        return await asyncio.gather(*tasks)
-    
 def fetch_reformat_data(formatted_mutations, date_range):
     all_data = asyncio.run(fetch_all_data(formatted_mutations, date_range))
 
     # get dates from date_range
     dates = pd.date_range(date_range[0], date_range[1]).strftime('%Y-%m-%d')
-
-    # get all unique dates
-    # dates = set()
-    # for data in all_data:
-    #     if data['data']:
-    #         for d in data['data']:
-    #             dates.add(d['date'])
-
 
     # make a dataframe with the dates as columns and the mutations as rows
     df = pd.DataFrame(index=formatted_mutations, columns=list(dates))
@@ -206,11 +167,6 @@ def app():
             fig = plot_heatmap(df)
             st.pyplot(fig)
     
-
-    # fetch the counts for SE990A
-    async def fetch_single_mutation(mutation, date_range):
-        async with aiohttp.ClientSession() as session:
-            return await fetch_data(session, mutation, date_range)
 
     ### Debugging ###
     st.write("### Debugging")

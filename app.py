@@ -1,6 +1,5 @@
 import streamlit as st
 import subpages.index as index
-import subpages.variant_deconv as variant_deconv
 import subpages.resistance_mut_silo as resistance_mut_silo
 import subpages.dynamic_mutations as dynamic_mutations
 import subpages.variant_signature_compose as variant_signature_compose
