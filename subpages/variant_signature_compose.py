@@ -3,7 +3,8 @@ import yaml
 import pandas as pd
 import streamlit.components.v1 as components
 
-from covspectrum_api import fetch_locations, fetch_mutations_api
+from lapis import fetch_locations
+from covspectrum_api import fetch_mutations_api
 
 
 # Load configuration from config.yaml

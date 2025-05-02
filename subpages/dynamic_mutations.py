@@ -4,7 +4,7 @@ import pandas as pd
 import yaml
 import logging # Import the logging module
 
-from covspectrum_api import fetch_locations
+from lapis import fetch_locations
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
