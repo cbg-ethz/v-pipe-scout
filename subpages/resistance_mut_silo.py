@@ -7,7 +7,7 @@ import seaborn as sns
 import yaml
 import streamlit.components.v1 as components
 
-from api.wiseloculus import fetch_all_data, fetch_single_mutation
+from api.wiseloculus import WiseLoculusLapis
 
 # Load configuration from config.yaml
 with open('config.yaml', 'r') as file:
@@ -15,10 +15,11 @@ with open('config.yaml', 'r') as file:
 
 
 server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
+wiseLoculus = WiseLoculusLapis(server_ip)
 
 
 def fetch_reformat_data(formatted_mutations, date_range):
-    all_data = asyncio.run(fetch_all_data(formatted_mutations, date_range))
+    all_data = asyncio.run(wiseLoculus.fetch_all_data(formatted_mutations, date_range))
 
     # get dates from date_range
     dates = pd.date_range(date_range[0], date_range[1]).strftime('%Y-%m-%d')
@@ -177,8 +178,8 @@ def app():
     st.write("Fetching data for mutations:")
     st.write(mutation1)
     st.write(mutation2)
-    data_mut1 = asyncio.run(fetch_single_mutation(mutation1, date_range))
-    data_mut2 = asyncio.run(fetch_single_mutation(mutation2, date_range))
+    data_mut1 = asyncio.run(wiseLoculus.fetch_single_mutation(mutation1, date_range))
+    data_mut2 = asyncio.run(wiseLoculus.fetch_single_mutation(mutation2, date_range))
     st.write("Data for mutation 1:")
     st.write(data_mut1)
     st.write("Data for mutation 2:")

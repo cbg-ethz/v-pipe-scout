@@ -3,9 +3,8 @@ import yaml
 import pandas as pd
 import streamlit.components.v1 as components
 
-from api.lapis import Lapis
-from api.covspectrum import fetch_mutations_api
-
+from api.wiseloculus import WiseLoculusLapis
+from api.covspectrum import CovSpectrumLapis
 
 
 # Load configuration from config.yaml
@@ -15,7 +14,8 @@ with open('config.yaml', 'r') as file:
 server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
 cov_sprectrum_api = config.get('server', {}).get('cov_spectrum_api', 'https://lapis.cov-spectrum.org')
     
-wiseLoculus = Lapis(server_ip)
+wiseLoculus = WiseLoculusLapis(server_ip)
+covSpectrum = CovSpectrumLapis(cov_sprectrum_api)
 
 def app():
     st.title("Variant Signature Composer")
@@ -42,7 +42,7 @@ def app():
         Fetch mutations from the API based on user input and update session state.
         """
         try:
-            mutation_data = fetch_mutations_api(variantQuery, sequence_type, min_abundance, cov_sprectrum_api)
+            mutation_data = covSpectrum.fetch_mutations(variantQuery, sequence_type, min_abundance, cov_sprectrum_api)
             df = pd.DataFrame(mutation_data)
             st.session_state['last_fetched_df'] = df.copy()
             st.session_state['has_fetched_mutations'] = True  # Set flag after first fetch
