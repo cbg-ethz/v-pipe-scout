@@ -29,8 +29,8 @@ class VariantList(BaseModel):
 
 class ShowVariantList(BaseModel):
 
-    multi_selection_with_literal: Set[Literal["LP.8", "XEC"]] = Field(
-        ["LP.8", "XEC"], description="Allows multiple items from a set."
+    variant_list: Set[Literal["LP.8", "XEC"]] = Field(
+        ["LP.8", "XEC"], description="Select Variants"
     )
 
 def app():
@@ -44,9 +44,9 @@ def app():
     # let's add a mutli-select box with the variants - this should be a pydantic object of the variant-list
 
     data = sp.pydantic_input(
-    key="my_showcase_input", model=ShowVariantList, group_optional_fields="no"
+    key="Variant List Input", model=ShowVariantList, group_optional_fields="no"
 )
-
+    st.write("Selected variants:", data["variant_list"])
 
 if __name__ == "__main__":
     app()
