@@ -4,7 +4,7 @@ import pandas as pd
 import yaml
 import logging # Import the logging module
 
-from common import fetch_locations, parse_url_hostname
+from covspectrum_api import fetch_locations
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -38,12 +38,8 @@ def app():
 
     ## Fetch locations from API
     default_locations = ["Zürich (ZH)", "Lugano (TI)", "Chur (GR)"] # Define default locations
-    # Use the function to parse the URL
-    address_no_port = parse_url_hostname(server_ip)
-    # Construct the location URL
-    location_url = f'{address_no_port}/sample/aggregated?fields=location_name&limit=100&dataFormat=JSON&downloadAsFile=false'
     # Fetch locations using the new function
-    locations = fetch_locations(location_url, default_locations)
+    locations = fetch_locations(server_ip, default_locations)
 
     location = st.selectbox("Select Location:", locations)
 

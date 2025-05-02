@@ -1,11 +1,17 @@
+"""Implements Queryies to CovSpectrum and Lapis API"""
+
 import logging
 import requests
-from urllib.parse import urlparse # Import urlparse
+from urllib.parse import urlparse 
 import streamlit as st
 
 
-def fetch_locations(location_url, default_locations):
+def fetch_locations(server_ip, default_locations):
     """Fetches locations from the API endpoint."""
+
+    address_no_port = parse_url_hostname(server_ip)
+    location_url = f'{address_no_port}/sample/aggregated?fields=location_name&limit=100&dataFormat=JSON&downloadAsFile=false'
+
     try:
         logging.info(f"Attempting to fetch locations from: {location_url}")
         st.toast("Attempting to fetch locations from API...", icon="🔄") # Temporary toast
@@ -47,3 +53,22 @@ def parse_url_hostname(url_string):
     except Exception as e:
         logging.error(f"Error parsing URL {url_string}: {e}", exc_info=True)
         return url_string # Fallback in case of any parsing error
+
+
+def fetch_mutations_api(variantQuery, sequence_type, min_abundance, cov_sprectrum_api):
+    """Fetches mutations from CovSpectrum API for a given variant query, sequence type, and minimal abundance."""
+    base_url = f"{cov_sprectrum_api}/open/v2/sample/"
+    params = (
+        f"variantQuery={variantQuery}"
+        f"&minProportion={min_abundance}"
+        f"&limit=1000"
+        f"&downloadAsFile=false"
+    )
+    if sequence_type == "Nucleotides":
+        url = f"{base_url}nucleotideMutations?{params}"
+    else:
+        url = f"{base_url}aminoAcidMutations?{params}"
+    resp = requests.get(url)
+    resp.raise_for_status()
+    data = resp.json()
+    return data.get("data", [])
