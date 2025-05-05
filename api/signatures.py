@@ -27,11 +27,18 @@ class Mutation(BaseModel):
 
 # Pydantic models that match the YAML structure
 class VariantInfo(BaseModel):
+    """ A variant information type to load from YAML."""
     short: str
     pangolin: str
     nextstrain: str = ""
 
 class VariantDefinition(BaseModel):
+    """A variant definition type to load from YAML.
+        VariantInfo: Contains variant information.
+        mut: Dictionary of mutations with position as key and change as value.
+        The mutation format is expected to be in the form of REF>ALT (e.g., C>T).
+        The mutation position is 1-based.
+    """
     variant: VariantInfo
     mut: Dict[int, str]
     
