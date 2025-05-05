@@ -3,10 +3,11 @@
 import requests
 import yaml
 import os
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Annotated
 from pathlib import Path
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, field_validator
 import logging
+from pydantic import BaseModel, constr
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -16,6 +17,13 @@ logger = logging.getLogger(__name__)
 GITHUB_API_URL = "https://api.github.com/repos/cbg-ethz/cowwid/contents/voc"
 RAW_CONTENT_URL = "https://raw.githubusercontent.com/cbg-ethz/cowwid/master/voc"
 LOCAL_CACHE_DIR = Path("data/known_variants")
+
+class Mutation(BaseModel): 
+    """A mutation in nucleotide format."""
+    position: int
+    ref: Annotated[str, constr(min_length=1, max_length=1)]
+    alt: Annotated[str, constr(min_length=1, max_length=1)]
+
 
 # Pydantic models that match the YAML structure
 class VariantInfo(BaseModel):
@@ -27,10 +35,67 @@ class VariantDefinition(BaseModel):
     variant: VariantInfo
     mut: Dict[int, str]
     
-    @validator('mut', pre=True)
+    @field_validator('mut', mode='before')
     def convert_string_keys_to_int(cls, v: Dict) -> Dict[int, str]:
         """Convert dictionary string keys to integers for mutation positions."""
         return {int(k): v for k, v in v.items()}
+    
+    def format_mutation(self, position: int, change: str) -> List[str]:
+        """
+        Format a mutation from position and change (e.g., 241: 'C>T') to the new format (e.g., 'C241T').
+        
+        If multiple mutations are concatenated:
+          28881: GGG>AAC
+          29734: '--'
+        They are split into separate mutations:
+            G28881A
+            G28882A
+            G28883C
+
+        Deletions are ignored.
+            
+        Args:
+            position: Position of the mutation
+            change: Change in format 'REF>ALT' or 'REF>-' for deletions
+            
+        Returns:
+            List of formatted mutation strings
+        """
+        mutations = []
+        
+        # Handle empty cases and deletions
+        if not change or change == '-' or all(c == '-' for c in change):
+            return mutations
+            
+        # Check if it's in the REF>ALT format
+        if '>' in change:
+            parts = change.split('>')
+            if len(parts) != 2:
+                logger.warning(f"Invalid mutation format at position {position}: {change}. Expected REF>ALT format. In variant {self.variant.pangolin}.")
+                return mutations
+                
+            ref, alt = parts
+            
+            # Check for deletions (REF>-)
+            if not alt or alt == '-':
+                return mutations
+                
+            # Handle multiple mutations (e.g., GGG>AAC)
+            if len(ref) > 1 and len(alt) > 1 and len(ref) == len(alt):
+                for i in range(len(ref)):
+                    if i < len(alt) and alt[i] != '-':  # Skip deletions and ensure index is valid
+                        mutations.append(f"{ref[i]}{position + i}{alt[i]}")
+            # Handle single ref multiple alt (e.g., G>AAC) or multiple ref single alt (e.g., GGG>A)
+            elif len(ref) != len(alt):
+                logger.warning(f"Complex mutation at position {position}: {change}. Skipping.")
+            # Handle single mutation (e.g., C>T)
+            elif ref and alt:
+                mutations.append(f"{ref}{position}{alt}")
+        else:
+            logger.warning(f"Unexpected mutation format at position {position}: {change}. Expected REF>ALT format. In variant {self.variant.pangolin}.")
+            
+        return mutations
+    
 
 # Enhanced models for the multi_variant_signatures.py
 class Variant(BaseModel):
@@ -42,8 +107,11 @@ class Variant(BaseModel):
     @classmethod
     def from_variant_definition(cls, variant_def: VariantDefinition) -> "Variant":
         """Create a Variant from a VariantDefinition."""
-        # Convert mutations from {position: change} format to list of strings
-        mutations = [f"{pos}{change}" for pos, change in variant_def.mut.items()]
+        # Convert mutations from {position: change} format to list of strings in new format
+        mutations = []
+        for pos, change in variant_def.mut.items():
+            mutations.extend(variant_def.format_mutation(pos, change))
+            
         return cls(
             name=variant_def.variant.pangolin,
             short_name=variant_def.variant.short,
@@ -172,12 +240,9 @@ if __name__ == "__main__":
     variant_list = get_variant_list()
     logger.info(f"Loaded {len(variant_list.variants)} variants")
     
-    for variant in variant_list.variants:
-        logger.info(f"Variant: {variant.name}, Signature mutations: {variant.signature_mutations}")
+    # Test the new mutation format
+    logger.info("Examples of reformatted mutations:")
+    for variant in variant_list.variants[:10]:  # Show first 3 variants as examples
+        logger.info(f"Variant: {variant.name}, Signature mutations (first 5): {variant.signature_mutations[:5]}")
     
-    # Example of getting a specific variant by name
-    test_variant = get_variant_by_name("JN.1")
-    if test_variant:
-        logger.info(f"Found variant: {test_variant.name}, Signature mutations: {test_variant.signature_mutations}")
-    else:
-        logger.info("Variant not found")
+        
