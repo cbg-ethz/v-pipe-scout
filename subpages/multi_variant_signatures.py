@@ -48,5 +48,15 @@ def app():
 )
     st.write("Selected variants:", data["variant_list"])
 
+
+    # based on the selected variants load the signature mutations
+
+
+    # make a matrix of selected variants and their signature mutations
+
+    # plot this as a heapmap
+
+    # add a download button to download the matrix as a csv file
+
 if __name__ == "__main__":
     app()
