@@ -144,9 +144,6 @@ def app():
         if len(filtered_variants.variants) > 1:
             import altair as alt
             
-            # 1. Variant-to-Variant Comparison Heatmap (for 2+ variants)
-            st.subheader("Variant-to-Variant Shared Mutations")
-            
             # Create a matrix to show shared mutations between variants
             variant_names = [variant.name for variant in filtered_variants.variants]
             variant_comparison = pd.DataFrame(index=variant_names, columns=variant_names)
@@ -174,99 +171,107 @@ def app():
             )
             variant_comparison_melted.columns = ["variant1", "variant2", "shared_mutations"]
             
+            # Create a section with two visualizations side by side
+            st.subheader("Variant Comparison Visualizations")
+            
+
             # Add a debug check to ensure we have valid data
             if not variant_comparison_melted.empty:
                 st.write(f"Comparing {len(filtered_variants.variants)} variants with {variant_comparison_melted['shared_mutations'].sum()} total shared mutations")
             
-            # Use Seaborn for the heatmap instead of Altair (more reliable)
-            import seaborn as sns
-            import matplotlib.pyplot as plt
-            import matplotlib
+            # Create two columns for the visualizations
+            col1, col2 = st.columns(2)
             
-            if not matplotlib.get_backend() == 'agg':
-                matplotlib.use('agg')  # Set non-interactive backend if not already set
+            with col1:
+                st.markdown("#### Shared Mutations Heatmap")
                 
-            # Create a figure for the heatmap
-            fig, ax = plt.subplots(figsize=(7, 5))
-            
-            # Create heatmap using the original square dataframe (not melted)
-            sns.heatmap(
-                variant_comparison, 
-                annot=True,            # Show values in cells
-                fmt="d",               # Display as integers
-                cmap="Blues",          # Use Blues colormap
-                linewidths=0.5,        # Add cell borders
-                ax=ax,                 # Use the axis we created
-                cbar_kws={'label': 'Shared Mutations'}  # Colorbar label
-            )
-            
-            # Rotate y-axis labels for better readability
-            plt.yticks(rotation=0)
-            
-            # Add title
-            plt.title("Shared Mutations Between Variants")
-            
-            # Adjust layout
-            plt.tight_layout()
-            
-            # Display using Streamlit
-            st.pyplot(fig)
-            
-            # 2. Venn Diagram (only for 2-3 variants)
-            if 2 <= len(filtered_variants.variants) <= 3:
-                st.subheader("Mutation Overlap - Venn Diagram")
+                # Use Seaborn for the heatmap
+                import seaborn as sns
+                import matplotlib.pyplot as plt
+                import matplotlib
                 
-                # Matplotlib is already imported at the top
-                matplotlib.use('agg')  # Use non-interactive backend
+                if not matplotlib.get_backend() == 'agg':
+                    matplotlib.use('agg')  # Set non-interactive backend if not already set
+                    
+                # Create a figure for the heatmap - adjust size for the column
+                fig_heatmap, ax_heatmap = plt.subplots(figsize=(5, 4))
                 
-                # Set a professional style for the plots
-                plt.style.use('seaborn-v0_8-whitegrid')  # Modern, clean style
+                # Create heatmap using the original square dataframe
+                sns.heatmap(
+                    variant_comparison, 
+                    annot=True,            # Show values in cells
+                    fmt="d",               # Display as integers
+                    cmap="Blues",          # Use Blues colormap
+                    linewidths=0.5,        # Add cell borders
+                    ax=ax_heatmap,         # Use the axis we created
+                    cbar_kws={'label': 'Shared Mutations'}  # Colorbar label
+                )
                 
-                if len(filtered_variants.variants) == 2:
-                    from matplotlib_venn import venn2
+                # Rotate y-axis labels for better readability
+                plt.yticks(rotation=0)
+                
+                # Adjust layout
+                plt.tight_layout(pad=1.0)
+                
+                # Display using Streamlit
+                st.pyplot(fig_heatmap)
+            
+            # Venn Diagram in the second column (only for 2-3 variants)
+            with col2:
+                if 2 <= len(filtered_variants.variants) <= 3:
+                    st.markdown("#### Mutation Overlap")
                     
-                    # Create sets of mutations for each variant
-                    sets = [set(variant.signature_mutations) for variant in filtered_variants.variants]
+                    # Matplotlib is already imported at the top
+                    matplotlib.use('agg')  # Set non-interactive backend
                     
-                    # Create a more compact figure with better proportions
-                    fig, ax = plt.subplots(figsize=(5, 3.5))
-                    venn = venn2(sets, [variant.name for variant in filtered_variants.variants], ax=ax)
+                    # Set a professional style for the plots
+                    plt.style.use('seaborn-v0_8-whitegrid')  # Modern, clean style
                     
-                    # Adjust layout to be more compact
-                    plt.tight_layout(pad=1.5)
-                    
-                    # Add a light gray border
-                    for spine in ax.spines.values():
-                        spine.set_visible(True)
-                        spine.set_color('#f0f0f0')
-                    
-                    # Display the venn diagram in a container with a fixed width
-                    col1, col2, col3 = st.columns([1, 3, 1])
-                    with col2:
-                        st.pyplot(fig)
-                    
-                elif len(filtered_variants.variants) == 3:
-                    from matplotlib_venn import venn3
-                    
-                    # Create sets of mutations for each variant
-                    sets = [set(variant.signature_mutations) for variant in filtered_variants.variants]
-                    
-                    # Create a more compact figure with better proportions
-                    fig, ax = plt.subplots(figsize=(5, 3.5))
-                    venn = venn3(sets, [variant.name for variant in filtered_variants.variants], ax=ax)
-                    
-                    # Adjust layout to be more compact
-                    plt.tight_layout(pad=1.5)
-                    
-                    # Add a light gray border
-                    for spine in ax.spines.values():
-                        spine.set_visible(True)
-                        spine.set_color('#f0f0f0')
-                    
-                    # Display the venn diagram in a container with a fixed width
-                    col1, col2, col3 = st.columns([1, 3, 1])
-                    with col2:
-                        st.pyplot(fig)
+                    if len(filtered_variants.variants) == 2:
+                        from matplotlib_venn import venn2
+                        
+                        # Create sets of mutations for each variant
+                        sets = [set(variant.signature_mutations) for variant in filtered_variants.variants]
+                        
+                        # Create a more compact figure with better proportions
+                        fig_venn, ax_venn = plt.subplots(figsize=(5, 4))
+                        venn = venn2(sets, [variant.name for variant in filtered_variants.variants], ax=ax_venn)
+                        
+                        # Adjust layout to be more compact
+                        plt.tight_layout(pad=1.0)
+                        
+                        # Add a light gray border
+                        for spine in ax_venn.spines.values():
+                            spine.set_visible(True)
+                            spine.set_color('#f0f0f0')
+                        
+                        # Display the venn diagram
+                        st.pyplot(fig_venn)
+                        
+                    elif len(filtered_variants.variants) == 3:
+                        from matplotlib_venn import venn3
+                        
+                        # Create sets of mutations for each variant
+                        sets = [set(variant.signature_mutations) for variant in filtered_variants.variants]
+                        
+                        # Create a more compact figure with better proportions
+                        fig_venn, ax_venn = plt.subplots(figsize=(5, 4))
+                        venn = venn3(sets, [variant.name for variant in filtered_variants.variants], ax=ax_venn)
+                        
+                        # Adjust layout to be more compact
+                        plt.tight_layout(pad=1.0)
+                        
+                        # Add a light gray border
+                        for spine in ax_venn.spines.values():
+                            spine.set_visible(True)
+                            spine.set_color('#f0f0f0')
+                        
+                        # Display the venn diagram
+                        st.pyplot(fig_venn)
+                else:
+                    st.markdown("#### Mutation Overlap")
+                    st.info("Venn diagram is only available for 2-3 variants")
+                    st.write("The heatmap shows the number of shared mutations between each pair of variants.")
             
 
             # 3. Mutation-Variant Matrix Visualization (heatmap)
