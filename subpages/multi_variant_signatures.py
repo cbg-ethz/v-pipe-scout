@@ -106,7 +106,6 @@ def app():
 
     # Build the mutation-variant matrix
     if filtered_variants.variants:
-        st.subheader("Mutation-Variant Matrix")
         
         # Collect all unique mutations across selected variants
         all_mutations = set()
@@ -135,15 +134,15 @@ def app():
         matrix_df = pd.DataFrame(matrix_data, columns=columns)
         
         # Display the matrix
-        st.dataframe(matrix_df)
+        # st.dataframe(matrix_df)
         
         # Visualize as heatmap
         if len(filtered_variants.variants) > 1:
-            st.subheader("Heatmap Visualization")
+            st.subheader("Variant-Signatures Bitmap Visualization")
             
             import altair as alt
             
-            # Prepare data for heatmap
+            # Prepare data for heatmap - binary values (0 = Not Present, 1 = Present)
             heatmap_data = pd.melt(
                 matrix_df, 
                 id_vars=["Mutation"], 
