@@ -176,37 +176,87 @@ def app():
             
             with col1:
                 st.markdown("#### Shared Mutations Heatmap")
+                # Calculate the shared mutations for hover text
+                shared_mutations_hover = {}
+                for i, variant1 in enumerate(filtered_variants.variants):
+                    for j, variant2 in enumerate(filtered_variants.variants):
+                        mutations1 = set(variant1.signature_mutations)
+                        mutations2 = set(variant2.signature_mutations)
+                        shared = mutations1.intersection(mutations2)
+                        shared_mutations_hover[(variant1.name, variant2.name)] = shared
+
+                # Create hover text with shared mutations
+                hover_text = []
+                for i, variant1 in enumerate([v.name for v in filtered_variants.variants]):
+                    hover_row = []
+                    for j, variant2 in enumerate([v.name for v in filtered_variants.variants]):
+                        count = variant_comparison.iloc[i, j]
+                        shared = shared_mutations_hover.get((variant1, variant2), set())
+                        
+                        if variant1 == variant2:
+                            text = f"<b>{variant1}</b><br>{count} signature mutations"
+                        else:
+                            text = f"<b>{variant1} ∩ {variant2}</b><br>{count} shared mutations"
+                            if shared:
+                                mutations_list = list(shared)
+                                if len(mutations_list) > 10:
+                                    text += f"<br>First 10 shared mutations:<br>• " + "<br>• ".join(mutations_list[:10]) + f"<br>...and {len(mutations_list)-10} more"
+                                else:
+                                    text += "<br>Shared mutations:<br>• " + "<br>• ".join(mutations_list)
+                        
+                        hover_row.append(text)
+                    hover_text.append(hover_row)
+
+                # Get min and max values for better color mapping
+                min_val = variant_comparison.values.min()
+                max_val = variant_comparison.values.max()
                 
-                # Use Seaborn for the heatmap
-                import seaborn as sns
-                import matplotlib.pyplot as plt
-                import matplotlib
-                
-                if not matplotlib.get_backend() == 'agg':
-                    matplotlib.use('agg')  # Set non-interactive backend if not already set
-                    
-                # Create a figure for the heatmap - adjust size for the column
-                fig_heatmap, ax_heatmap = plt.subplots(figsize=(5, 4))
-                
-                # Create heatmap using the original square dataframe
-                sns.heatmap(
-                    variant_comparison, 
-                    annot=True,            # Show values in cells
-                    fmt="d",               # Display as integers
-                    cmap="Blues",          # Use Blues colormap
-                    linewidths=0.5,        # Add cell borders
-                    ax=ax_heatmap,         # Use the axis we created
-                    cbar_kws={'label': 'Shared Mutations'}  # Colorbar label
+                # Create annotation text with adaptive text color
+                annotations = []
+                for i in range(len(variant_comparison.index)):
+                    for j in range(len(variant_comparison.columns)):
+                        value = variant_comparison.iloc[i, j]
+                        # Normalize value between 0 and 1
+                        normalized_val = (value - min_val) / (max_val - min_val) if max_val > min_val else 0
+                        # Adjust threshold based on the Blues colorscale - text is white above this normalized value
+                        text_color = "white" if normalized_val > 0.5 else "black"
+                        
+                        annotations.append(
+                            dict(
+                                x=j,
+                                y=i,
+                                text=str(value),
+                                showarrow=False,
+                                font=dict(color=text_color, size=14)
+                            )
+                        )
+
+                # Determine size based on number of variants (square plot)
+                size = max(350, min(500, 100 * len(filtered_variants.variants)))
+
+                # Create Plotly heatmap
+                fig = go.Figure(data=go.Heatmap(
+                    z=variant_comparison.values,
+                    x=variant_comparison.columns,
+                    y=variant_comparison.index,
+                    colorscale='Blues',
+                    text=hover_text,
+                    hoverinfo='text',
+                    showscale=False  # Remove colorbar/legend
+                ))
+
+                # Update layout
+                fig.update_layout(
+                    xaxis=dict(title='Variant', showgrid=False),
+                    yaxis=dict(title='Variant', showgrid=False),
+                    height=size,
+                    width=size,
+                    margin=dict(l=50, r=20, t=50, b=20),
+                    annotations=annotations
                 )
-                
-                # Rotate y-axis labels for better readability
-                plt.yticks(rotation=0)
-                
-                # Adjust layout
-                plt.tight_layout(pad=1.0)
-                
-                # Display using Streamlit
-                st.pyplot(fig_heatmap)
+
+                # Display the interactive Plotly chart in Streamlit
+                st.plotly_chart(fig)
             
             # Venn Diagram in the second column (only for 2-3 variants)
             with col2:
@@ -263,7 +313,6 @@ def app():
                 else:
                     st.markdown("#### Mutation Overlap")
                     st.info("Venn diagram is only available for 2-3 variants")
-                    st.write("The heatmap shows the number of shared mutations between each pair of variants.")
             
 
             # 3. Mutation-Variant Matrix Visualization (heatmap) - Collapsible
