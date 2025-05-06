@@ -9,10 +9,13 @@
 """
 
 import streamlit as st
+import yaml
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
 import seaborn as sns
+import plotly.express as px
+import plotly.graph_objects as go
 from pydantic import BaseModel, Field
 from typing import List
 from api.signatures import get_variant_list, get_variant_names
@@ -174,11 +177,6 @@ def app():
             # Create a section with two visualizations side by side
             st.subheader("Variant Comparison Visualizations")
             
-
-            # Add a debug check to ensure we have valid data
-            if not variant_comparison_melted.empty:
-                st.write(f"Comparing {len(filtered_variants.variants)} variants with {variant_comparison_melted['shared_mutations'].sum()} total shared mutations")
-            
             # Create two columns for the visualizations
             col1, col2 = st.columns(2)
             
@@ -274,29 +272,90 @@ def app():
                     st.write("The heatmap shows the number of shared mutations between each pair of variants.")
             
 
-            # 3. Mutation-Variant Matrix Visualization (heatmap)
-            st.subheader("Variant-Signatures Bitmap Visualization")
-            
-            # Prepare data for heatmap - binary values (0 = Not Present, 1 = Present)
-            heatmap_data = pd.melt(
-                matrix_df, 
-                id_vars=["Mutation"], 
-                value_vars=[variant.name for variant in filtered_variants.variants],
-                var_name="Variant", 
-                value_name="Present"
-            )
-            
-            # Create heatmap
-            heatmap = alt.Chart(heatmap_data).mark_rect().encode(
-                x=alt.X('Variant:N', title='Variant'),
-                y=alt.Y('Mutation:N', title='Mutation'),
-                color=alt.Color('Present:Q', scale=alt.Scale(domain=[0, 1], range=['#FFFFFF', '#1E88E5']))
-            ).properties(
-                width=500,
-                height=min(1000, 20 * len(all_mutations))  # Dynamic height based on number of mutations
-            )
-            
-            st.altair_chart(heatmap, use_container_width=True)
+            # 3. Mutation-Variant Matrix Visualization (heatmap) - Collapsible
+            with st.expander("Variant-Signatures Bitmap Visualization", expanded=False):
+                # Add debug information at the top of the expander
+                if not variant_comparison_melted.empty:
+                    st.write(f"Comparing {len(filtered_variants.variants)} variants with {variant_comparison_melted['shared_mutations'].sum()} total shared mutations")
+                
+                st.write("This heatmap shows which mutations (rows) are present in each variant (columns). Blue cells indicate the mutation is present.")
+                
+                # First prepare the data in a suitable format
+                binary_matrix = matrix_df.set_index("Mutation")
+                
+                # Check if Plotly is available
+                if go is not None:
+                    # Use Plotly for a more interactive visualization
+                    fig = go.Figure(data=go.Heatmap(
+                        z=binary_matrix.values,
+                        x=binary_matrix.columns,
+                        y=binary_matrix.index,
+                        colorscale=[[0, 'white'], [1, '#1E88E5']],  # Match the color scheme
+                        showscale=False,  # Hide color scale bar
+                        hoverongaps=False
+                    ))
+                    
+                    # Customize layout
+                    fig.update_layout(
+                        title='Mutation-Variant Matrix',
+                        xaxis=dict(
+                            title='Variant',
+                            side='top',  # Show x-axis on top
+                        ),
+                        yaxis=dict(
+                            title='Mutation',
+                        ),
+                        height=max(500, min(1200, 20 * len(all_mutations))),  # Dynamic height based on mutations
+                        width=max(600, 100 * len(filtered_variants.variants)),  # Dynamic width based on variants
+                        margin=dict(l=100, r=20, t=60, b=20),  # Adjust margins for labels
+                    )
+                    
+                    # Add custom hover text
+                    hover_text = []
+                    for i, mutation in enumerate(binary_matrix.index):
+                        row_hover = []
+                        for j, variant in enumerate(binary_matrix.columns):
+                            if binary_matrix.iloc[i, j] == 1:
+                                text = f"Mutation: {mutation}<br>Variant: {variant}<br>Status: Present"
+                            else:
+                                text = f"Mutation: {mutation}<br>Variant: {variant}<br>Status: Absent"
+                            row_hover.append(text)
+                        hover_text.append(row_hover)
+                    
+                    fig.update_traces(hoverinfo='text', text=hover_text)
+                    
+                    # Display the interactive Plotly chart in Streamlit
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    # Fallback to matplotlib/seaborn if Plotly is not available
+                    # Calculate a reasonable figure height based on the number of mutations
+                    fig_height = min(20, max(8, len(all_mutations) * 0.25))  # At least 8, at most 20, otherwise scale with mutations
+                    fig_width = max(6, len(filtered_variants.variants) * 0.8)  # Scale width based on variant count
+                    
+                    # Create a figure for the heatmap
+                    fig_bitmap, ax_bitmap = plt.subplots(figsize=(fig_width, fig_height))
+                    
+                    # Create heatmap using seaborn
+                    sns.heatmap(
+                        binary_matrix,
+                        cmap=["white", "#1E88E5"],  # Use white for 0 and blue for 1
+                        linewidths=0.5,
+                        linecolor='lightgray',
+                        ax=ax_bitmap,
+                        cbar=False,  # No need for a colorbar for binary data
+                        yticklabels=True  # Show mutation labels
+                    )
+                    
+                    # Adjust axis labels and ticks
+                    plt.xlabel("Variant")
+                    plt.ylabel("Mutation")
+                    plt.yticks(rotation=0)  # Make mutation labels horizontal
+                    
+                    # Adjust layout
+                    plt.tight_layout(pad=1.2)
+                    
+                    # Display using Streamlit
+                    st.pyplot(fig_bitmap)
         
         # Export functionality
         st.subheader("Export Data")
@@ -311,7 +370,6 @@ def app():
         )
         
         # Also prepare a YAML for var_dates
-        import yaml
         var_dates = {variant.name: "" for variant in filtered_variants.variants}
         yaml_str = yaml.dump(var_dates, default_flow_style=False)
         
