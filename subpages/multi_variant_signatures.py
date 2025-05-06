@@ -99,83 +99,79 @@ def app():
     st.subheader("Variant Selection")
     st.write("Select the variants of interest from either the curated list or compose new signature on the fly from CovSpectrum.")
     
-    # Create two columns for variant selection options
-    col1, col2 = st.columns(2)
-    
     # Initialize list to store all selected variants and their mutations
     combined_variants = VariantList()
     
-    with col1:
-        st.markdown("#### Curated Variant List")
-        # Get the available variant names from the signatures API (cached)
-        available_variants = cached_get_variant_names()
-        
-        # Create a multi-select box for variants
-        selected_curated_variants = st.multiselect(
-            "Select known variants of interest – curated by the V-Pipe team",
-            options=available_variants,
-            default=["LP.8"] if "LP.8" in available_variants else None,
-            help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team"
-        )
-        
-        # Add selected curated variants to the combined list
-        if selected_curated_variants:
-            # Load the full variant list (cached)
-            signature_variant_list = cached_get_variant_list()
-            
-            # Filter to only include selected variants
-            for variant in signature_variant_list.variants:
-                if variant.name in selected_curated_variants:
-                    combined_variants.add_variant(Variant.from_signature_variant(variant))
+
+    st.markdown("#### Curated Variant List")
+    # Get the available variant names from the signatures API (cached)
+    available_variants = cached_get_variant_names()
     
-    with col2:
-        st.markdown("#### Compose Custom Variant")
-        
-        # Configure the component with compact functionality
-        component_config = {
-            'show_nucleotides_only': True,
-            'slim_table': True,
-            'show_distributions': False,
-            'show_download': True,
-            'show_plot': False,
-            'title': "Custom Variant Composer",
-            'show_title': False,
-            'show_description': False,
-            'default_variant': None,
-            'default_min_abundance': 0.8,
-            'default_min_coverage': 15
-        }
-        
-        # Create a container for the component
-        custom_container = st.container()
-        
-        # Render the variant signature component
-        selected_mutations, _ = render_signature_composer(
-            covSpectrum,
-            cov_spectrum_api,
-            component_config,
-            session_prefix="custom_variant_",  # Use a prefix to avoid session state conflicts
-            container=custom_container
-        )
-        
-        # Add custom variant to the combined list if mutations were selected
-        if selected_mutations:
-            # Get the variant name from the input field
-            variant_query = st.session_state.get("custom_variant_variantQuery", "Custom Variant")
-            
-            # Create and add the custom variant
-            custom_variant = Variant(
-                name=variant_query,
-                signature_mutations=selected_mutations
-            )
-            combined_variants.add_variant(custom_variant)
-            
-            # Show confirmation
-            st.success(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations")
+    # Create a multi-select box for variants
+    selected_curated_variants = st.multiselect(
+        "Select known variants of interest – curated by the V-Pipe team",
+        options=available_variants,
+        default=["LP.8"] if "LP.8" in available_variants else None,
+        help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team"
+    )
     
+    # Add selected curated variants to the combined list
+    if selected_curated_variants:
+        # Load the full variant list (cached)
+        signature_variant_list = cached_get_variant_list()
+        
+        # Filter to only include selected variants
+        for variant in signature_variant_list.variants:
+            if variant.name in selected_curated_variants:
+                combined_variants.add_variant(Variant.from_signature_variant(variant))
+    
+    st.markdown("#### Compose Custom Variant")
+    
+    # Configure the component with compact functionality
+    component_config = {
+        'show_nucleotides_only': True,
+        'slim_table': True,
+        'show_distributions': False,
+        'show_download': True,
+        'show_plot': False,
+        'title': "Custom Variant Composer",
+        'show_title': False,
+        'show_description': False,
+        'default_variant': None,
+        'default_min_abundance': 0.8,
+        'default_min_coverage': 15
+    }
+    
+    # Create a container for the component
+    custom_container = st.container()
+    
+    # Render the variant signature component
+    selected_mutations, _ = render_signature_composer(
+        covSpectrum,
+        cov_spectrum_api,
+        component_config,
+        session_prefix="custom_variant_",  # Use a prefix to avoid session state conflicts
+        container=custom_container
+    )
+    
+    # Add custom variant to the combined list if mutations were selected
+    if selected_mutations:
+        # Get the variant name from the input field
+        variant_query = st.session_state.get("custom_variant_variantQuery", "Custom Variant")
+        
+        # Create and add the custom variant
+        custom_variant = Variant(
+            name=variant_query,
+            signature_mutations=selected_mutations
+        )
+        combined_variants.add_variant(custom_variant)
+        
+        # Show confirmation
+        st.success(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations")
+
     # Combine all selected variants for processing
     selected_variants = [variant.name for variant in combined_variants.variants]
-    
+
     if not selected_variants:
         st.warning("Please select at least one variant from either the curated list or create a custom variant")
         return
