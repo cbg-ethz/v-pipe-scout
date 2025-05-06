@@ -19,6 +19,9 @@ from api.signatures import VariantList as SignatureVariantList
 
 # Define a simplified Variant class for this page
 class Variant(BaseModel):
+    """Model for a variant with its signature mutations.
+    This is a simplified version of the Variant class from signatures.py.
+    """
     name: str  # pangolin name
     signature_mutations: List[str]
     
@@ -30,8 +33,9 @@ class Variant(BaseModel):
             signature_mutations=signature_variant.signature_mutations
         )
 
-# Define the Pydantic model for the variant list
+
 class VariantList(BaseModel):
+    """Model for a list of variants."""
     variants: List[Variant] = []
     
     @classmethod
@@ -56,6 +60,17 @@ class ShowVariantList(BaseModel):
         description="Select Variants"
     )
 
+# Cache the API calls to avoid unnecessary requests
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def cached_get_variant_list():
+    """Cached version of get_variant_list to avoid repeated API calls."""
+    return get_variant_list()
+
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def cached_get_variant_names():
+    """Cached version of get_variant_names to avoid repeated API calls."""
+    return get_variant_names()
+
 def app():
     st.title("Multi Variant Signature Composer")
 
@@ -64,12 +79,12 @@ def app():
 
     st.markdown("---")
 
-    # Get the available variant names from the signatures API
-    available_variants = get_variant_names()
+    # Get the available variant names from the signatures API (cached)
+    available_variants = cached_get_variant_names()
     
     # Create a multi-select box for variants
     selected_variants = st.multiselect(
-        "Select variants of interest",
+        "Select known variants of interest – curated by the V-Pipe team",
         options=available_variants,
         default=["LP.8"] if "LP.8" in available_variants else None,
         help="Select one or more variants to include in the mutation matrix"
@@ -79,8 +94,8 @@ def app():
         st.warning("Please select at least one variant")
         return
 
-    # Load the full variant list
-    signature_variant_list = get_variant_list()
+    # Load the full variant list (cached)
+    signature_variant_list = cached_get_variant_list()
     
     # Filter to only include selected variants
     filtered_variants = VariantList()
