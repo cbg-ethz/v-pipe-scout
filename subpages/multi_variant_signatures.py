@@ -194,13 +194,16 @@ def app():
             # Combine heatmap and text
             st.altair_chart(heatmap + text, use_container_width=True)
             
-            # 2. Venn Diagram (for 2-5 variants)
-            if 2 <= len(filtered_variants.variants) <= 5:
+            # 2. Venn Diagram (only for 2-3 variants)
+            if 2 <= len(filtered_variants.variants) <= 3:
                 st.subheader("Mutation Overlap - Venn Diagram")
                 
                 import matplotlib.pyplot as plt
                 import matplotlib
                 matplotlib.use('agg')  # Use non-interactive backend
+                
+                # Set a professional style for the plots
+                plt.style.use('seaborn-v0_8-whitegrid')  # Modern, clean style
                 
                 if len(filtered_variants.variants) == 2:
                     from matplotlib_venn import venn2
@@ -208,12 +211,22 @@ def app():
                     # Create sets of mutations for each variant
                     sets = [set(variant.signature_mutations) for variant in filtered_variants.variants]
                     
-                    # Create the figure
-                    fig, ax = plt.subplots(figsize=(8, 6))
+                    # Create a more compact figure with better proportions
+                    fig, ax = plt.subplots(figsize=(5, 3.5))
                     venn = venn2(sets, [variant.name for variant in filtered_variants.variants], ax=ax)
                     
-                    # Display the venn diagram
-                    st.pyplot(fig)
+                    # Adjust layout to be more compact
+                    plt.tight_layout(pad=1.5)
+                    
+                    # Add a light gray border
+                    for spine in ax.spines.values():
+                        spine.set_visible(True)
+                        spine.set_color('#f0f0f0')
+                    
+                    # Display the venn diagram in a container with a fixed width
+                    col1, col2, col3 = st.columns([1, 3, 1])
+                    with col2:
+                        st.pyplot(fig)
                     
                 elif len(filtered_variants.variants) == 3:
                     from matplotlib_venn import venn3
@@ -221,17 +234,24 @@ def app():
                     # Create sets of mutations for each variant
                     sets = [set(variant.signature_mutations) for variant in filtered_variants.variants]
                     
-                    # Create the figure
-                    fig, ax = plt.subplots(figsize=(8, 6))
+                    # Create a more compact figure with better proportions
+                    fig, ax = plt.subplots(figsize=(5, 3.5))
                     venn = venn3(sets, [variant.name for variant in filtered_variants.variants], ax=ax)
                     
-                    # Display the venn diagram
-                    st.pyplot(fig)
+                    # Adjust layout to be more compact
+                    plt.tight_layout(pad=1.5)
                     
-                elif len(filtered_variants.variants) > 3:
-                    st.warning("Venn diagrams for more than 3 variants are recommended to be interpreted with caution. Consider using the heatmap for better clarity.")
+                    # Add a light gray border
+                    for spine in ax.spines.values():
+                        spine.set_visible(True)
+                        spine.set_color('#f0f0f0')
+                    
+                    # Display the venn diagram in a container with a fixed width
+                    col1, col2, col3 = st.columns([1, 3, 1])
+                    with col2:
+                        st.pyplot(fig)
             
-                
+
             # 3. Mutation-Variant Matrix Visualization (heatmap)
             st.subheader("Variant-Signatures Bitmap Visualization")
             
