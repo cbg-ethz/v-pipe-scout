@@ -91,7 +91,7 @@ def app():
         "Select known variants of interest – curated by the V-Pipe team",
         options=available_variants,
         default=["LP.8"] if "LP.8" in available_variants else None,
-        help="Select one or more variants to include in the mutation matrix"
+        help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team"
     )
     
     if not selected_variants:
