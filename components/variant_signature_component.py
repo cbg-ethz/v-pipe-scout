@@ -75,7 +75,6 @@ def fetch_mutations(
 
 def render_signature_composer(
     covSpectrum: Any, 
-    cov_spectrum_api: str,
     config: Dict = None,
     session_prefix: str = "",
     container = None
