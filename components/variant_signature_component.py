@@ -10,8 +10,7 @@ import yaml
 import io
 import time
 import matplotlib.pyplot as plt
-from typing import List, Dict, Optional, Tuple, Any, Callable
-import streamlit.components.v1 as components
+from typing import List, Dict, Optional, Tuple, Any
 
 
 def initialize_session_state() -> None:
@@ -80,7 +79,7 @@ def render_signature_composer(
     config: Dict = None,
     session_prefix: str = "",
     container = None
-) -> Optional[List[str]]:
+) -> Optional[Tuple[List[str], str]]:
     """
     Render a variant signature composer component in the provided container.
     
@@ -98,7 +97,9 @@ def render_signature_composer(
         container: Streamlit container to render in (optional)
     
     Returns:
-        List of selected mutations if available, otherwise None
+        Tuple containing:
+        - List of selected mutations if available, otherwise None
+        - The sequence type value ("nucleotide" or "amino acid")
     """
     # Default configuration
     default_config = {
@@ -293,15 +294,14 @@ def render_signature_composer(
             key=f'{session_prefix}download_button'
         )
     
-    return selected_mutations
+    return selected_mutations, sequence_type_value
 
 
 def render_distribution_plots(target, session_prefix: str = ""):
     """Render coverage and proportion distribution plots."""
     target.markdown('---')
     target.subheader('Coverage and Proportion Distributions')
-    
-    import matplotlib.pyplot as plt
+
     
     # Try to use the last mutation DataFrame if available
     mutation_df = st.session_state.get(f'{session_prefix}mutation_df', pd.DataFrame())

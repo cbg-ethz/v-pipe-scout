@@ -31,210 +31,12 @@ def app():
         'show_description': True
     }
 
-    # --- Debounce logic using session state ---
-    import time
-    if 'last_change' not in st.session_state:
-        st.session_state['last_change'] = time.time()
-    if 'mutations' not in st.session_state:
-        st.session_state['mutations'] = []
-    if 'mutation_df' not in st.session_state:
-        st.session_state['mutation_df'] = pd.DataFrame()
-
-    # Save the last fetched DataFrame for plotting
-    def fetch_mutations():
-        """
-        Fetch mutations from the API based on user input and update session state.
-        """
-        try:
-            mutation_data = covSpectrum.fetch_mutations(variantQuery, sequence_type, min_abundance)
-            df = pd.DataFrame(mutation_data)
-            st.session_state['last_fetched_df'] = df.copy()
-            st.session_state['has_fetched_mutations'] = True  # Set flag after first fetch
-            if df.empty:
-                st.session_state['mutations'] = []
-                st.session_state['mutation_df'] = pd.DataFrame()
-                st.error("No mutations found. This may be due to an invalid query or a server error. Please check your query and try again.\nIf you see errors in the console, please review the details or contact support.")
-                return
-            # Filter by min_coverage
-            df = df[df['coverage'] >= min_coverage]
-            muts = df['mutation'].tolist()
-            st.session_state['mutations'] = muts
-            st.session_state['mutation_df'] = pd.DataFrame({
-                'Mutation': muts,
-                'Selected': [True]*len(muts)
-            })
-        except Exception as e:
-            st.session_state['mutations'] = []
-            st.session_state['mutation_df'] = pd.DataFrame()
-            st.session_state['has_fetched_mutations'] = True  # Set flag even on error
-            st.error(f"Failed to fetch mutations. Please check your query and try again.\nError details: {e}")
-
-    # --- UI controls ---
-    variantQuery = st.text_input(
-        "Enter your variant query (e.g., LP.8, B.1.617.2):", "LP.8", key='variantQuery')
-    sequence_type = st.selectbox("Select Sequence Type:", ["Nucleotides", "Amino Acids"])
-    sequence_type_value = "amino acid" if sequence_type == "Amino Acids" else "nucleotide"
-    min_abundance = st.slider(
-        "Minimal Proportion (fraction of clinical sequences with this mutation in this variant):",
-        0.0, 1.0, 0.8, key='min_abundance',
-        help="This is the minimal fraction of clinical sequences assigned to this variant that must have the mutation for it to be included."
+    # Render the variant signature component
+    selected_mutations, sequence_type_value= render_signature_composer(
+        covSpectrum,
+        component_config,
+        session_prefix="compact_"  # Use a prefix to avoid session state conflicts
     )
-    min_coverage = st.slider("Select the minimal coverage of mutation – no of sequences:", 0, 250, 15, key='min_coverage')
-
-    # --- Debounce: update last_change on any input change ---
-    changed = False
-    for k in ['variantQuery', 'min_abundance', 'min_coverage']:
-        if st.session_state.get(k) != st.session_state.get(f'_prev_{k}'):
-            st.session_state[f'_prev_{k}'] = st.session_state.get(k)
-            st.session_state['last_change'] = time.time()
-            changed = True
-
-    # --- Debounce logic: fetch after 500ms idle ---
-    if changed:
-        st.session_state['debounce_triggered'] = False
-    if not st.session_state.get('debounce_triggered', False):
-        if time.time() - st.session_state['last_change'] > 0.5:
-            fetch_mutations()
-            st.session_state['debounce_triggered'] = True
-
-    # --- Manual fetch button ---
-    if st.button("Fetch Mutations"):
-        fetch_mutations()
-        st.session_state['debounce_triggered'] = True
-
-    st.markdown(
-        """
-        Below are the mutations found for your selected variant and filters.\
-        You can deselect mutations you don’t want to include, or add extra ones by adding a new row in the table below.
-        """
-    )
-
-    # --- Data editor for mutation selection ---
-    selected_mutations = None
-    if not st.session_state['mutation_df'].empty:
-        # Add edit mode toggle only if table is shown
-        if 'edit_mode' not in st.session_state:
-            st.session_state['edit_mode'] = False
-        if st.session_state['edit_mode']:
-            if st.button('Done Editing'):
-                st.session_state['edit_mode'] = False
-        else:
-            if st.button('Edit Table'):
-                st.session_state['edit_mode'] = True
-        # Try to get the last fetched DataFrame for extra columns
-        df = st.session_state.get('last_fetched_df', pd.DataFrame())
-        # Merge coverage and proportion columns if available
-        mutation_df = st.session_state['mutation_df']
-        if not df.empty and 'mutation' in df.columns:
-            # Only keep relevant columns
-            cols = ['mutation']
-            if 'coverage' in df.columns:
-                cols.append('coverage')
-            if 'proportion' in df.columns:
-                cols.append('proportion')
-            extra = df[cols].rename(columns={'mutation': 'Mutation'})
-            # Merge on Mutation
-            merged = pd.merge(mutation_df, extra, on='Mutation', how='left')
-            # Reorder columns for display
-            display_cols = ['Mutation', 'Selected']
-            if 'coverage' in merged.columns:
-                display_cols.append('coverage')
-            if 'proportion' in merged.columns:
-                display_cols.append('proportion')
-            merged = merged[display_cols]
-        else:
-            merged = mutation_df
-        st.info(f"{len(merged)} signature mutations found.")
-        # Set disabled columns based on edit mode
-        if st.session_state['edit_mode']:
-            disabled_cols = []  # allow editing all
-        else:
-            disabled_cols = merged.columns.tolist()  # disable all columns
-        edited_df = st.data_editor(
-            merged,
-            num_rows="dynamic",
-            use_container_width=True,
-            key='mutation_editor',
-            disabled=disabled_cols,
-        )
-        st.session_state['mutation_df'] = edited_df[[c for c in edited_df.columns if c in ['Mutation', 'Selected']]]
-        # Fill NaN in 'Selected' with False to avoid ValueError when filtering
-        edited_df['Selected'] = edited_df['Selected'].fillna(False)
-        selected_mutations = edited_df[edited_df['Selected']]['Mutation'].tolist()
-    else:
-        if st.session_state.get('has_fetched_mutations', False):
-            st.info("No mutations found. Adjust your filters or add mutations manually.")
-
-    # --- Only show coverage/proportion plots after first query ---
-    if 'last_fetched_df' in st.session_state:
-        st.markdown('---')
-        st.subheader('Coverage and Proportion Distributions')
-        import matplotlib.pyplot as plt
-        # Try to use the last mutation DataFrame if available
-        mutation_df = st.session_state.get('mutation_df', pd.DataFrame())
-        # Use the original DataFrame if available (for coverage/proportion columns)
-        if 'mutation_data_df' in st.session_state:
-            df = st.session_state['mutation_data_df']
-        else:
-            df = None
-        # Try to get the DataFrame from the last fetch
-        if df is None or df.empty:
-            if 'last_fetched_df' in st.session_state:
-                df = st.session_state['last_fetched_df']
-        if df is None or df.empty:
-            df = mutation_df
-        # Use a reasonable max width for the figure
-        fig, axes = plt.subplots(1, 2, figsize=(8, 4))
-        plotted = False
-        if not df.empty:
-            if 'coverage' in df.columns:
-                axes[0].hist(df['coverage'].dropna(), bins=20, color='skyblue', edgecolor='black')
-                axes[0].set_title('Coverage Distribution')
-                axes[0].set_xlabel('Coverage')
-                axes[0].set_ylabel('Count')
-                plotted = True
-            else:
-                axes[0].set_visible(False)
-            if 'proportion' in df.columns:
-                axes[1].hist(df['proportion'].dropna(), bins=20, color='orange', edgecolor='black')
-                axes[1].set_title('Proportion Distribution')
-                axes[1].set_xlabel('Proportion')
-                axes[1].set_ylabel('Count')
-                plotted = True
-            else:
-                axes[1].set_visible(False)
-        if not plotted:
-            fig.delaxes(axes[1])
-            fig.delaxes(axes[0])
-            fig, ax = plt.subplots(figsize=(5, 2))
-            ax.text(0.5, 0.5, 'No coverage or proportion data available.', ha='center', va='center')
-            ax.axis('off')
-            # Center the plot
-            cols = st.columns([1,2,1])
-            with cols[1]:
-                st.pyplot(fig)
-        else:
-            # Center the plot
-            cols = st.columns([1,2,1])
-            with cols[1]:
-                st.pyplot(fig)
-        st.markdown("---")
-
-            
-        # --- Option to download mutation signature as YAML ---
-        if not st.session_state['mutation_df'].empty and selected_mutations:
-            import io
-            import yaml as pyyaml
-            # Prepare YAML content
-            yaml_dict = {variantQuery: selected_mutations}
-            yaml_str = pyyaml.dump(yaml_dict, sort_keys=False, allow_unicode=True)
-            yaml_bytes = io.BytesIO(yaml_str.encode('utf-8'))
-            st.download_button(
-                label="Download mutation signature as YAML",
-                data=yaml_bytes,
-                file_name=f"{variantQuery}_signature.yaml",
-                mime="application/x-yaml"
-            )
 
     st.markdown("---")
 
@@ -255,7 +57,7 @@ def app():
     locations = wiseLoculus.fetch_locations(default_locations)
     location = st.selectbox("Select Location:", locations)
 
-   
+
     # Check if all necessary parameters are available
     if selected_mutations and date_range and len(date_range) == 2 and location:
 
@@ -267,7 +69,7 @@ def app():
         # of the list with double quotes, e.g., '["ORF1a:T103L", "ORF1a:N126K"]'
         # The lapisFilter uses double curly braces {{ and }} to escape the literal
         # curly braces needed for the JSON object within the f-string.
-        display_mutations = str(st.session_state['mutations']).replace("'", '"')
+        display_mutations = str(selected_mutations).replace("'", '"')
         components.html(
             f"""
             <html>
