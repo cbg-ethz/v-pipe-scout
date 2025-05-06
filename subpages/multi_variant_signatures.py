@@ -9,6 +9,10 @@
 """
 
 import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib
+import seaborn as sns
 from pydantic import BaseModel, Field
 from typing import List
 from api.signatures import get_variant_list, get_variant_names
@@ -116,7 +120,7 @@ def app():
         all_mutations = sorted(list(all_mutations))
         
         # Build the matrix
-        import pandas as pd
+        # (pandas is now imported at the top of the file)
         
         # Create a DataFrame with mutations as rows and variants as columns
         matrix_data = []
@@ -161,6 +165,8 @@ def app():
                     variant_comparison.iloc[i, j] = shared_count
             
             # Convert to long format for Altair
+            # Make sure to convert numeric data to avoid potential rendering issues
+            variant_comparison = variant_comparison.astype(int)
             variant_comparison_melted = variant_comparison.reset_index().melt(
                 id_vars="index", 
                 var_name="variant2", 
@@ -168,38 +174,49 @@ def app():
             )
             variant_comparison_melted.columns = ["variant1", "variant2", "shared_mutations"]
             
-            # Create a heatmap with text values
-            base = alt.Chart(variant_comparison_melted).encode(
-                x=alt.X('variant1:N', title='Variant'),
-                y=alt.Y('variant2:N', title='Variant'),
+            # Add a debug check to ensure we have valid data
+            if not variant_comparison_melted.empty:
+                st.write(f"Comparing {len(filtered_variants.variants)} variants with {variant_comparison_melted['shared_mutations'].sum()} total shared mutations")
+            
+            # Use Seaborn for the heatmap instead of Altair (more reliable)
+            import seaborn as sns
+            import matplotlib.pyplot as plt
+            import matplotlib
+            
+            if not matplotlib.get_backend() == 'agg':
+                matplotlib.use('agg')  # Set non-interactive backend if not already set
+                
+            # Create a figure for the heatmap
+            fig, ax = plt.subplots(figsize=(7, 5))
+            
+            # Create heatmap using the original square dataframe (not melted)
+            sns.heatmap(
+                variant_comparison, 
+                annot=True,            # Show values in cells
+                fmt="d",               # Display as integers
+                cmap="Blues",          # Use Blues colormap
+                linewidths=0.5,        # Add cell borders
+                ax=ax,                 # Use the axis we created
+                cbar_kws={'label': 'Shared Mutations'}  # Colorbar label
             )
             
-            # Heatmap
-            heatmap = base.mark_rect().encode(
-                color=alt.Color('shared_mutations:Q', 
-                                title='Shared Mutations',
-                                scale=alt.Scale(scheme='blues'))
-            )
+            # Rotate y-axis labels for better readability
+            plt.yticks(rotation=0)
             
-            # Text overlay
-            text = base.mark_text(baseline='middle').encode(
-                text='shared_mutations:Q',
-                color=alt.condition(
-                    alt.datum.shared_mutations > variant_comparison.mean().mean() * 1.5,
-                    alt.value('white'),
-                    alt.value('black')
-                )
-            )
+            # Add title
+            plt.title("Shared Mutations Between Variants")
             
-            # Combine heatmap and text
-            st.altair_chart(heatmap + text, use_container_width=True)
+            # Adjust layout
+            plt.tight_layout()
+            
+            # Display using Streamlit
+            st.pyplot(fig)
             
             # 2. Venn Diagram (only for 2-3 variants)
             if 2 <= len(filtered_variants.variants) <= 3:
                 st.subheader("Mutation Overlap - Venn Diagram")
                 
-                import matplotlib.pyplot as plt
-                import matplotlib
+                # Matplotlib is already imported at the top
                 matplotlib.use('agg')  # Use non-interactive backend
                 
                 # Set a professional style for the plots
