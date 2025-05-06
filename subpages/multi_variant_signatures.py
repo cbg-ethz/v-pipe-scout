@@ -163,10 +163,16 @@ def app():
             name=variant_query,
             signature_mutations=selected_mutations
         )
-        combined_variants.add_variant(custom_variant)
+
+        # Check if the variant already exists in the combined list
+        if any(v.name == custom_variant.name for v in combined_variants.variants):
+            st.warning(f"Variant '{custom_variant.name}' already exists in the list. Please choose a different name.")
+        else:
+            # Add the custom variant to the combined list
+            combined_variants.add_variant(custom_variant)
         
-        # Show confirmation
-        st.success(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations")
+            # Show confirmation
+            st.success(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations")
 
     # Combine all selected variants for processing
     selected_variants = [variant.name for variant in combined_variants.variants]
