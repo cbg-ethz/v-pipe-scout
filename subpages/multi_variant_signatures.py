@@ -123,8 +123,6 @@ def app():
         all_mutations = sorted(list(all_mutations))
         
         # Build the matrix
-        # (pandas is now imported at the top of the file)
-        
         # Create a DataFrame with mutations as rows and variants as columns
         matrix_data = []
         for mutation in all_mutations:
@@ -139,9 +137,6 @@ def app():
         
         # Create DataFrame
         matrix_df = pd.DataFrame(matrix_data, columns=columns)
-        
-        # Display the matrix
-        # st.dataframe(matrix_df)
         
         # Visualize the data in different ways
         if len(filtered_variants.variants) > 1:
@@ -163,8 +158,7 @@ def app():
                     
                     # Store in the dataframe
                     variant_comparison.iloc[i, j] = shared_count
-            
-            # Convert to long format for Altair
+        
             # Make sure to convert numeric data to avoid potential rendering issues
             variant_comparison = variant_comparison.astype(int)
             variant_comparison_melted = variant_comparison.reset_index().melt(
@@ -283,80 +277,50 @@ def app():
                 # First prepare the data in a suitable format
                 binary_matrix = matrix_df.set_index("Mutation")
                 
-                # Check if Plotly is available
-                if go is not None:
-                    # Use Plotly for a more interactive visualization
-                    fig = go.Figure(data=go.Heatmap(
-                        z=binary_matrix.values,
-                        x=binary_matrix.columns,
-                        y=binary_matrix.index,
-                        colorscale=[[0, 'white'], [1, '#1E88E5']],  # Match the color scheme
-                        showscale=False,  # Hide color scale bar
-                        hoverongaps=False
-                    ))
-                    
-                    # Customize layout
-                    fig.update_layout(
-                        title='Mutation-Variant Matrix',
-                        xaxis=dict(
-                            title='Variant',
-                            side='top',  # Show x-axis on top
-                        ),
-                        yaxis=dict(
-                            title='Mutation',
-                        ),
-                        height=max(500, min(1200, 20 * len(all_mutations))),  # Dynamic height based on mutations
-                        width=max(600, 100 * len(filtered_variants.variants)),  # Dynamic width based on variants
-                        margin=dict(l=100, r=20, t=60, b=20),  # Adjust margins for labels
-                    )
-                    
-                    # Add custom hover text
-                    hover_text = []
-                    for i, mutation in enumerate(binary_matrix.index):
-                        row_hover = []
-                        for j, variant in enumerate(binary_matrix.columns):
-                            if binary_matrix.iloc[i, j] == 1:
-                                text = f"Mutation: {mutation}<br>Variant: {variant}<br>Status: Present"
-                            else:
-                                text = f"Mutation: {mutation}<br>Variant: {variant}<br>Status: Absent"
-                            row_hover.append(text)
-                        hover_text.append(row_hover)
-                    
-                    fig.update_traces(hoverinfo='text', text=hover_text)
-                    
-                    # Display the interactive Plotly chart in Streamlit
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    # Fallback to matplotlib/seaborn if Plotly is not available
-                    # Calculate a reasonable figure height based on the number of mutations
-                    fig_height = min(20, max(8, len(all_mutations) * 0.25))  # At least 8, at most 20, otherwise scale with mutations
-                    fig_width = max(6, len(filtered_variants.variants) * 0.8)  # Scale width based on variant count
-                    
-                    # Create a figure for the heatmap
-                    fig_bitmap, ax_bitmap = plt.subplots(figsize=(fig_width, fig_height))
-                    
-                    # Create heatmap using seaborn
-                    sns.heatmap(
-                        binary_matrix,
-                        cmap=["white", "#1E88E5"],  # Use white for 0 and blue for 1
-                        linewidths=0.5,
-                        linecolor='lightgray',
-                        ax=ax_bitmap,
-                        cbar=False,  # No need for a colorbar for binary data
-                        yticklabels=True  # Show mutation labels
-                    )
-                    
-                    # Adjust axis labels and ticks
-                    plt.xlabel("Variant")
-                    plt.ylabel("Mutation")
-                    plt.yticks(rotation=0)  # Make mutation labels horizontal
-                    
-                    # Adjust layout
-                    plt.tight_layout(pad=1.2)
-                    
-                    # Display using Streamlit
-                    st.pyplot(fig_bitmap)
         
+                # Use Plotly for a more interactive visualization
+                fig = go.Figure(data=go.Heatmap(
+                    z=binary_matrix.values,
+                    x=binary_matrix.columns,
+                    y=binary_matrix.index,
+                    colorscale=[[0, 'white'], [1, '#1E88E5']],  # Match the color scheme
+                    showscale=False,  # Hide color scale bar
+                    hoverongaps=False
+                ))
+                
+                # Customize layout
+                fig.update_layout(
+                    title='Mutation-Variant Matrix',
+                    xaxis=dict(
+                        title='Variant',
+                        side='top',  # Show x-axis on top
+                    ),
+                    yaxis=dict(
+                        title='Mutation',
+                    ),
+                    height=max(500, min(1200, 20 * len(all_mutations))),  # Dynamic height based on mutations
+                    width=max(600, 100 * len(filtered_variants.variants)),  # Dynamic width based on variants
+                    margin=dict(l=100, r=20, t=60, b=20),  # Adjust margins for labels
+                )
+                
+                # Add custom hover text
+                hover_text = []
+                for i, mutation in enumerate(binary_matrix.index):
+                    row_hover = []
+                    for j, variant in enumerate(binary_matrix.columns):
+                        if binary_matrix.iloc[i, j] == 1:
+                            text = f"Mutation: {mutation}<br>Variant: {variant}<br>Status: Present"
+                        else:
+                            text = f"Mutation: {mutation}<br>Variant: {variant}<br>Status: Absent"
+                        row_hover.append(text)
+                    hover_text.append(row_hover)
+                
+                fig.update_traces(hoverinfo='text', text=hover_text)
+                
+                # Display the interactive Plotly chart in Streamlit
+                st.plotly_chart(fig, use_container_width=True)
+
+    
         # Export functionality
         st.subheader("Export Data")
         
