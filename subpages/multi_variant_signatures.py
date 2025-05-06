@@ -148,7 +148,6 @@ def app():
     # Render the variant signature component
     selected_mutations, _ = render_signature_composer(
         covSpectrum,
-        cov_spectrum_api,
         component_config,
         session_prefix="custom_variant_",  # Use a prefix to avoid session state conflicts
         container=custom_container
