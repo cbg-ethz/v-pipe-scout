@@ -197,6 +197,7 @@ def render_signature_composer(
     # --- Data editor for mutation selection ---
     selected_mutations = None
     mutation_df = st.session_state.get(f'{session_prefix}mutation_df', pd.DataFrame())
+    expander_placeholder = target.empty()
     if not mutation_df.empty:
         # Add edit mode toggle only if table is shown
         if st.session_state.get(f'{session_prefix}edit_mode', False):
@@ -235,8 +236,8 @@ def render_signature_composer(
         else:
             disabled_cols = merged.columns.tolist()  # disable all columns
 
-        # Wrap data editor in an expander that's open by default
-        with target.expander("View and Edit Mutations", expanded=False):
+        # Use placeholder for expander to keep widget tree stable
+        with expander_placeholder.expander("View and Edit Mutations", expanded=False):
             edited_df = target.data_editor(
                 merged,
                 num_rows="dynamic",
@@ -250,9 +251,11 @@ def render_signature_composer(
         # Fill NaN in 'Selected' with False to avoid ValueError when filtering
         edited_df['Selected'] = edited_df['Selected'].fillna(False)
         selected_mutations = edited_df[edited_df['Selected']]['Mutation'].tolist()
-    elif st.session_state.get(f'{session_prefix}has_fetched_mutations', False):
-        # Only show info message, do not show expander
-        target.info("No mutations found. Adjust your filters or add mutations manually.")
+    else:
+        expander_placeholder.empty()
+        if st.session_state.get(f'{session_prefix}has_fetched_mutations', False):
+            # Only show info message, do not show expander
+            target.info("No mutations found. Adjust your filters or add mutations manually.")
     
     # --- Only show coverage/proportion plots after first query ---
     if config['show_distributions'] and f'{session_prefix}last_fetched_df' in st.session_state:
