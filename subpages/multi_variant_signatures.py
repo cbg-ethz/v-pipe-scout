@@ -169,7 +169,7 @@ def app():
             variant_comparison_melted.columns = ["variant1", "variant2", "shared_mutations"]
             
             # Create a section with two visualizations side by side
-            st.subheader("Variant Comparison Visualizations")
+            st.subheader("Variant Signature Comparison")
             
             # Create two columns for the visualizations
             col1, col2 = st.columns(2)

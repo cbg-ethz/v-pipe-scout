@@ -5,6 +5,7 @@ import streamlit.components.v1 as components
 
 from api.wiseloculus import WiseLoculusLapis
 from api.covspectrum import CovSpectrumLapis
+from api.variant_signature_component import render_signature_composer
 
 
 # Load configuration from config.yaml
@@ -18,14 +19,17 @@ wiseLoculus = WiseLoculusLapis(server_ip)
 covSpectrum = CovSpectrumLapis(cov_sprectrum_api)
 
 def app():
-    st.title("Variant Signature Composer")
-
-    st.write("This page allows you to visualize signature mutations for different variants over time.")
-    st.write("We query CovSpectrum for the defining mutations of the variants.")
-
-    st.write("The user may adjust the choices of how variants signatures are defined.")
-    st.markdown("---")
-    st.markdown("### Variant Signature Composer")
+    # Configure the component with full functionality
+    component_config = {
+        'show_nucleotides_only': False,
+        'slim_table': False,
+        'show_distributions': True,
+        'show_download': True,
+        'show_plot': True,
+        'title': "Variant Signature Composer",
+        'show_title': True,
+        'show_description': True
+    }
 
     # --- Debounce logic using session state ---
     import time
