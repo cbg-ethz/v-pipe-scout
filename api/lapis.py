@@ -6,6 +6,8 @@ from urllib.parse import urlparse
 import streamlit as st
 
 class Lapis:
+    """Base class for LAPIS API queries."""
+    
     def __init__(self, server_ip):
         self.server_ip = server_ip
 

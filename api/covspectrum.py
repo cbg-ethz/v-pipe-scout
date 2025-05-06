@@ -4,9 +4,11 @@ import requests
 from .lapis import Lapis
 
 class CovSpectrumLapis(Lapis):
-    def fetch_mutations(self, variantQuery, sequence_type, min_abundance, cov_spectrum_api=None):
+    """Implements CovSpectrum API."""
+
+    def fetch_mutations(self, variantQuery, sequence_type, min_abundance):
         """Fetches mutations from CovSpectrum API for a given variant query, sequence type, and minimal abundance."""
-        base_url = f"{cov_spectrum_api or self.server_ip}/open/v2/sample/"
+        base_url = f"{self.server_ip}/open/v2/sample/"
         params = (
             f"variantQuery={variantQuery}"
             f"&minProportion={min_abundance}"

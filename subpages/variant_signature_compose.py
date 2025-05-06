@@ -5,17 +5,17 @@ import streamlit.components.v1 as components
 
 from api.wiseloculus import WiseLoculusLapis
 from api.covspectrum import CovSpectrumLapis
-from api.variant_signature_component import render_signature_composer
+from components.variant_signature_component import render_signature_composer
 
 
 # Load configuration from config.yaml
 with open('config.yaml', 'r') as file:
     config = yaml.safe_load(file)
 
-server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
+wise_server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
 cov_sprectrum_api = config.get('server', {}).get('cov_spectrum_api', 'https://lapis.cov-spectrum.org')
     
-wiseLoculus = WiseLoculusLapis(server_ip)
+wiseLoculus = WiseLoculusLapis(wise_server_ip)
 covSpectrum = CovSpectrumLapis(cov_sprectrum_api)
 
 def app():
@@ -46,7 +46,7 @@ def app():
         Fetch mutations from the API based on user input and update session state.
         """
         try:
-            mutation_data = covSpectrum.fetch_mutations(variantQuery, sequence_type, min_abundance, cov_sprectrum_api)
+            mutation_data = covSpectrum.fetch_mutations(variantQuery, sequence_type, min_abundance)
             df = pd.DataFrame(mutation_data)
             st.session_state['last_fetched_df'] = df.copy()
             st.session_state['has_fetched_mutations'] = True  # Set flag after first fetch
@@ -277,7 +277,7 @@ def app():
             </head>
                 <body>
                 <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
-                <gs-app lapis="{server_ip}">
+                <gs-app lapis="{wise_server_ip}">
                     <gs-mutations-over-time
                     lapisFilter='{{"sampling_dateFrom":"{start_date}", "sampling_dateTo": "{end_date}", "location_name": "{location}"}}'
                     sequenceType='{sequence_type_value}'
