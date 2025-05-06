@@ -19,6 +19,8 @@ import plotly.graph_objects as go
 from pydantic import BaseModel, Field
 from typing import List
 from api.signatures import get_variant_list, get_variant_names
+from api.covspectrum import CovSpectrumLapis
+from components.variant_signature_component import render_signature_composer
 
 # Import the Variant class from signatures but adapt it to our needs
 from api.signatures import Variant as SignatureVariant
@@ -86,37 +88,104 @@ def app():
 
     st.markdown("---")
 
-    # Get the available variant names from the signatures API (cached)
-    available_variants = cached_get_variant_names()
+    # Load configuration from config.yaml
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
     
-    # Create a multi-select box for variants
-    selected_variants = st.multiselect(
-        "Select known variants of interest – curated by the V-Pipe team",
-        options=available_variants,
-        default=["LP.8"] if "LP.8" in available_variants else None,
-        help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team"
-    )
+    # Setup APIs
+    cov_spectrum_api = config.get('server', {}).get('cov_spectrum_api', 'https://lapis.cov-spectrum.org')
+    covSpectrum = CovSpectrumLapis(cov_spectrum_api)
+
+    st.subheader("Variant Selection")
+    st.write("Select the variants of interest from either the curated list or compose new signature on the fly from CovSpectrum.")
+    
+    # Create two columns for variant selection options
+    col1, col2 = st.columns(2)
+    
+    # Initialize list to store all selected variants and their mutations
+    combined_variants = VariantList()
+    
+    with col1:
+        st.markdown("#### Curated Variant List")
+        # Get the available variant names from the signatures API (cached)
+        available_variants = cached_get_variant_names()
+        
+        # Create a multi-select box for variants
+        selected_curated_variants = st.multiselect(
+            "Select known variants of interest – curated by the V-Pipe team",
+            options=available_variants,
+            default=["LP.8"] if "LP.8" in available_variants else None,
+            help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team"
+        )
+        
+        # Add selected curated variants to the combined list
+        if selected_curated_variants:
+            # Load the full variant list (cached)
+            signature_variant_list = cached_get_variant_list()
+            
+            # Filter to only include selected variants
+            for variant in signature_variant_list.variants:
+                if variant.name in selected_curated_variants:
+                    combined_variants.add_variant(Variant.from_signature_variant(variant))
+    
+    with col2:
+        st.markdown("#### Compose Custom Variant")
+        
+        # Configure the component with compact functionality
+        component_config = {
+            'show_nucleotides_only': True,
+            'slim_table': True,
+            'show_distributions': False,
+            'show_download': True,
+            'show_plot': False,
+            'title': "Custom Variant Composer",
+            'show_title': False,
+            'show_description': False,
+            'default_variant': None,
+            'default_min_abundance': 0.8,
+            'default_min_coverage': 15
+        }
+        
+        # Create a container for the component
+        custom_container = st.container()
+        
+        # Render the variant signature component
+        selected_mutations, _ = render_signature_composer(
+            covSpectrum,
+            cov_spectrum_api,
+            component_config,
+            session_prefix="custom_variant_",  # Use a prefix to avoid session state conflicts
+            container=custom_container
+        )
+        
+        # Add custom variant to the combined list if mutations were selected
+        if selected_mutations:
+            # Get the variant name from the input field
+            variant_query = st.session_state.get("custom_variant_variantQuery", "Custom Variant")
+            
+            # Create and add the custom variant
+            custom_variant = Variant(
+                name=variant_query,
+                signature_mutations=selected_mutations
+            )
+            combined_variants.add_variant(custom_variant)
+            
+            # Show confirmation
+            st.success(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations")
+    
+    # Combine all selected variants for processing
+    selected_variants = [variant.name for variant in combined_variants.variants]
     
     if not selected_variants:
-        st.warning("Please select at least one variant")
+        st.warning("Please select at least one variant from either the curated list or create a custom variant")
         return
 
-    # Load the full variant list (cached)
-    signature_variant_list = cached_get_variant_list()
-    
-    # Filter to only include selected variants
-    filtered_variants = VariantList()
-    for variant in signature_variant_list.variants:
-        if variant.name in selected_variants:
-            filtered_variants.add_variant(Variant.from_signature_variant(variant))
-
-
     # Build the mutation-variant matrix
-    if filtered_variants.variants:
+    if combined_variants.variants:
         
         # Collect all unique mutations across selected variants
         all_mutations = set()
-        for variant in filtered_variants.variants:
+        for variant in combined_variants.variants:
             all_mutations.update(variant.signature_mutations)
         
         # Sort mutations for consistent display
@@ -127,28 +196,28 @@ def app():
         matrix_data = []
         for mutation in all_mutations:
             row = [mutation]
-            for variant in filtered_variants.variants:
+            for variant in combined_variants.variants:
                 # 1 if mutation is in variant's signature mutations, 0 otherwise
                 row.append(1 if mutation in variant.signature_mutations else 0)
             matrix_data.append(row)
         
         # Create column names (variant names)
-        columns = ["Mutation"] + [variant.name for variant in filtered_variants.variants]
+        columns = ["Mutation"] + [variant.name for variant in combined_variants.variants]
         
         # Create DataFrame
         matrix_df = pd.DataFrame(matrix_data, columns=columns)
         
         # Visualize the data in different ways
-        if len(filtered_variants.variants) > 1:
+        if len(combined_variants.variants) > 1:
             import altair as alt
             
             # Create a matrix to show shared mutations between variants
-            variant_names = [variant.name for variant in filtered_variants.variants]
+            variant_names = [variant.name for variant in combined_variants.variants]
             variant_comparison = pd.DataFrame(index=variant_names, columns=variant_names)
             
             # For each pair of variants, count the number of shared mutations
-            for i, variant1 in enumerate(filtered_variants.variants):
-                for j, variant2 in enumerate(filtered_variants.variants):
+            for i, variant1 in enumerate(combined_variants.variants):
+                for j, variant2 in enumerate(combined_variants.variants):
                     # Get the sets of mutations for each variant
                     mutations1 = set(variant1.signature_mutations)
                     mutations2 = set(variant2.signature_mutations)
@@ -178,8 +247,8 @@ def app():
                 st.markdown("#### Shared Mutations Heatmap")
                 # Calculate the shared mutations for hover text
                 shared_mutations_hover = {}
-                for i, variant1 in enumerate(filtered_variants.variants):
-                    for j, variant2 in enumerate(filtered_variants.variants):
+                for i, variant1 in enumerate(combined_variants.variants):
+                    for j, variant2 in enumerate(combined_variants.variants):
                         mutations1 = set(variant1.signature_mutations)
                         mutations2 = set(variant2.signature_mutations)
                         shared = mutations1.intersection(mutations2)
@@ -187,9 +256,9 @@ def app():
 
                 # Create hover text with shared mutations
                 hover_text = []
-                for i, variant1 in enumerate([v.name for v in filtered_variants.variants]):
+                for i, variant1 in enumerate([v.name for v in combined_variants.variants]):
                     hover_row = []
-                    for j, variant2 in enumerate([v.name for v in filtered_variants.variants]):
+                    for j, variant2 in enumerate([v.name for v in combined_variants.variants]):
                         count = variant_comparison.iloc[i, j]
                         shared = shared_mutations_hover.get((variant1, variant2), set())
                         
@@ -232,7 +301,7 @@ def app():
                         )
 
                 # Determine size based on number of variants (square plot)
-                size = max(350, min(500, 100 * len(filtered_variants.variants)))
+                size = max(350, min(500, 100 * len(combined_variants.variants)))
 
                 # Create Plotly heatmap
                 fig = go.Figure(data=go.Heatmap(
@@ -260,7 +329,7 @@ def app():
             
             # Venn Diagram in the second column (only for 2-3 variants)
             with col2:
-                if 2 <= len(filtered_variants.variants) <= 3:
+                if 2 <= len(combined_variants.variants) <= 3:
                     st.markdown("#### Mutation Overlap")
                     
                     # Matplotlib is already imported at the top
@@ -269,15 +338,15 @@ def app():
                     # Set a professional style for the plots
                     plt.style.use('seaborn-v0_8-whitegrid')  # Modern, clean style
                     
-                    if len(filtered_variants.variants) == 2:
+                    if len(combined_variants.variants) == 2:
                         from matplotlib_venn import venn2
                         
                         # Create sets of mutations for each variant
-                        sets = [set(variant.signature_mutations) for variant in filtered_variants.variants]
+                        sets = [set(variant.signature_mutations) for variant in combined_variants.variants]
                         
                         # Create a more compact figure with better proportions
                         fig_venn, ax_venn = plt.subplots(figsize=(5, 4))
-                        venn = venn2(sets, [variant.name for variant in filtered_variants.variants], ax=ax_venn)
+                        venn = venn2(sets, [variant.name for variant in combined_variants.variants], ax=ax_venn)
                         
                         # Adjust layout to be more compact
                         plt.tight_layout(pad=1.0)
@@ -290,15 +359,15 @@ def app():
                         # Display the venn diagram
                         st.pyplot(fig_venn)
                         
-                    elif len(filtered_variants.variants) == 3:
+                    elif len(combined_variants.variants) == 3:
                         from matplotlib_venn import venn3
                         
                         # Create sets of mutations for each variant
-                        sets = [set(variant.signature_mutations) for variant in filtered_variants.variants]
+                        sets = [set(variant.signature_mutations) for variant in combined_variants.variants]
                         
                         # Create a more compact figure with better proportions
                         fig_venn, ax_venn = plt.subplots(figsize=(5, 4))
-                        venn = venn3(sets, [variant.name for variant in filtered_variants.variants], ax=ax_venn)
+                        venn = venn3(sets, [variant.name for variant in combined_variants.variants], ax=ax_venn)
                         
                         # Adjust layout to be more compact
                         plt.tight_layout(pad=1.0)
@@ -319,7 +388,7 @@ def app():
             with st.expander("Variant-Signatures Bitmap Visualization", expanded=False):
                 # Add debug information at the top of the expander
                 if not variant_comparison_melted.empty:
-                    st.write(f"Comparing {len(filtered_variants.variants)} variants with {variant_comparison_melted['shared_mutations'].sum()} total shared mutations")
+                    st.write(f"Comparing {len(combined_variants.variants)} variants with {variant_comparison_melted['shared_mutations'].sum()} total shared mutations")
                 
                 st.write("This heatmap shows which mutations (rows) are present in each variant (columns). Blue cells indicate the mutation is present.")
                 
@@ -348,7 +417,7 @@ def app():
                         title='Mutation',
                     ),
                     height=max(500, min(1200, 20 * len(all_mutations))),  # Dynamic height based on mutations
-                    width=max(600, 100 * len(filtered_variants.variants)),  # Dynamic width based on variants
+                    width=max(600, 100 * len(combined_variants.variants)),  # Dynamic width based on variants
                     margin=dict(l=100, r=20, t=60, b=20),  # Adjust margins for labels
                 )
                 
@@ -383,7 +452,7 @@ def app():
         )
         
         # Also prepare a YAML for var_dates
-        var_dates = {variant.name: "" for variant in filtered_variants.variants}
+        var_dates = {variant.name: "" for variant in combined_variants.variants}
         yaml_str = yaml.dump(var_dates, default_flow_style=False)
         
         st.download_button(

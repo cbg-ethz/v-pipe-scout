@@ -257,14 +257,16 @@ def render_signature_composer(
             disabled_cols = []  # allow editing all
         else:
             disabled_cols = merged.columns.tolist()  # disable all columns
-            
-        edited_df = target.data_editor(
-            merged,
-            num_rows="dynamic",
-            use_container_width=True,
-            key=f'{session_prefix}mutation_editor',
-            disabled=disabled_cols,
-        )
+        
+        # Wrap data editor in an expander that's open by default
+        with target.expander("View and Edit Mutations", expanded=False):
+            edited_df = target.data_editor(
+                merged,
+                num_rows="dynamic",
+                use_container_width=True,
+                key=f'{session_prefix}mutation_editor',
+                disabled=disabled_cols,
+            )
         
         st.session_state[f'{session_prefix}mutation_df'] = edited_df[[c for c in edited_df.columns if c in ['Mutation', 'Selected']]]
         
