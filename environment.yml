@@ -16,3 +16,4 @@ dependencies:
   - streamlit-pydantic
   - pydantic>=2.0.0
   - cojac>=0.9.3
+  - matplotlib_venn

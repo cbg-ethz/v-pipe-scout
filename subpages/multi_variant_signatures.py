@@ -136,11 +136,104 @@ def app():
         # Display the matrix
         # st.dataframe(matrix_df)
         
-        # Visualize as heatmap
+        # Visualize the data in different ways
         if len(filtered_variants.variants) > 1:
-            st.subheader("Variant-Signatures Bitmap Visualization")
-            
             import altair as alt
+            
+            # 1. Variant-to-Variant Comparison Heatmap (for 2+ variants)
+            st.subheader("Variant-to-Variant Shared Mutations")
+            
+            # Create a matrix to show shared mutations between variants
+            variant_names = [variant.name for variant in filtered_variants.variants]
+            variant_comparison = pd.DataFrame(index=variant_names, columns=variant_names)
+            
+            # For each pair of variants, count the number of shared mutations
+            for i, variant1 in enumerate(filtered_variants.variants):
+                for j, variant2 in enumerate(filtered_variants.variants):
+                    # Get the sets of mutations for each variant
+                    mutations1 = set(variant1.signature_mutations)
+                    mutations2 = set(variant2.signature_mutations)
+                    
+                    # Count number of shared mutations
+                    shared_count = len(mutations1.intersection(mutations2))
+                    
+                    # Store in the dataframe
+                    variant_comparison.iloc[i, j] = shared_count
+            
+            # Convert to long format for Altair
+            variant_comparison_melted = variant_comparison.reset_index().melt(
+                id_vars="index", 
+                var_name="variant2", 
+                value_name="shared_mutations"
+            )
+            variant_comparison_melted.columns = ["variant1", "variant2", "shared_mutations"]
+            
+            # Create a heatmap with text values
+            base = alt.Chart(variant_comparison_melted).encode(
+                x=alt.X('variant1:N', title='Variant'),
+                y=alt.Y('variant2:N', title='Variant'),
+            )
+            
+            # Heatmap
+            heatmap = base.mark_rect().encode(
+                color=alt.Color('shared_mutations:Q', 
+                                title='Shared Mutations',
+                                scale=alt.Scale(scheme='blues'))
+            )
+            
+            # Text overlay
+            text = base.mark_text(baseline='middle').encode(
+                text='shared_mutations:Q',
+                color=alt.condition(
+                    alt.datum.shared_mutations > variant_comparison.mean().mean() * 1.5,
+                    alt.value('white'),
+                    alt.value('black')
+                )
+            )
+            
+            # Combine heatmap and text
+            st.altair_chart(heatmap + text, use_container_width=True)
+            
+            # 2. Venn Diagram (for 2-5 variants)
+            if 2 <= len(filtered_variants.variants) <= 5:
+                st.subheader("Mutation Overlap - Venn Diagram")
+                
+                import matplotlib.pyplot as plt
+                import matplotlib
+                matplotlib.use('agg')  # Use non-interactive backend
+                
+                if len(filtered_variants.variants) == 2:
+                    from matplotlib_venn import venn2
+                    
+                    # Create sets of mutations for each variant
+                    sets = [set(variant.signature_mutations) for variant in filtered_variants.variants]
+                    
+                    # Create the figure
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    venn = venn2(sets, [variant.name for variant in filtered_variants.variants], ax=ax)
+                    
+                    # Display the venn diagram
+                    st.pyplot(fig)
+                    
+                elif len(filtered_variants.variants) == 3:
+                    from matplotlib_venn import venn3
+                    
+                    # Create sets of mutations for each variant
+                    sets = [set(variant.signature_mutations) for variant in filtered_variants.variants]
+                    
+                    # Create the figure
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    venn = venn3(sets, [variant.name for variant in filtered_variants.variants], ax=ax)
+                    
+                    # Display the venn diagram
+                    st.pyplot(fig)
+                    
+                elif len(filtered_variants.variants) > 3:
+                    st.warning("Venn diagrams for more than 3 variants are recommended to be interpreted with caution. Consider using the heatmap for better clarity.")
+            
+                
+            # 3. Mutation-Variant Matrix Visualization (heatmap)
+            st.subheader("Variant-Signatures Bitmap Visualization")
             
             # Prepare data for heatmap - binary values (0 = Not Present, 1 = Present)
             heatmap_data = pd.melt(
