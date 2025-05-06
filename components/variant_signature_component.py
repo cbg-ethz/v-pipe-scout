@@ -46,6 +46,9 @@ def fetch_mutations(
         min_coverage: Minimal coverage for mutations
         session_prefix: Optional prefix for session state keys to avoid conflicts
     """
+    if not variant_query or not variant_query.strip():
+        st.warning("Please enter a variant query before fetching mutations.")
+        return
     try:
         mutation_data = covSpectrum.fetch_mutations(variant_query, sequence_type, min_abundance)
         df = pd.DataFrame(mutation_data)
