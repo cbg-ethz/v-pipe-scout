@@ -141,7 +141,7 @@ def render_signature_composer(
         target.write("We query CovSpectrum for the defining mutations of the variants.")
         target.markdown("---")
     
-    # --- Debounce setup ---
+    # --- Fetch wrapper ---
     def fetch_mutations_wrapper():
         fetch_mutations(
             covSpectrum, 
@@ -158,7 +158,7 @@ def render_signature_composer(
         config['default_variant'], 
         key=f'{session_prefix}variantQuery'
     )
-    
+
     if config['show_nucleotides_only']:
         sequence_type = "Nucleotides"
         sequence_type_value = "nucleotide"
@@ -169,40 +169,23 @@ def render_signature_composer(
             key=f'{session_prefix}sequence_type'
         )
         sequence_type_value = "amino acid" if sequence_type == "Amino Acids" else "nucleotide"
-    
+
     min_abundance = target.slider(
         "Minimal Proportion (fraction of clinical sequences with this mutation in this variant):",
         0.0, 1.0, config['default_min_abundance'], 
         key=f'{session_prefix}min_abundance',
         help="This is the minimal fraction of clinical sequences assigned to this variant that must have the mutation for it to be included."
     )
-    
+
     min_coverage = target.slider(
         "Select the minimal coverage of mutation – no of sequences:", 
         0, 250, config['default_min_coverage'], 
         key=f'{session_prefix}min_coverage'
     )
-    
-    # --- Debounce: update last_change on any input change ---
-    changed = False
-    for k in [f'{session_prefix}variantQuery', f'{session_prefix}min_abundance', f'{session_prefix}min_coverage']:
-        if st.session_state.get(k) != st.session_state.get(f'_prev_{k}'):
-            st.session_state[f'_prev_{k}'] = st.session_state.get(k)
-            st.session_state[f'{session_prefix}last_change'] = time.time()
-            changed = True
-    
-    # --- Debounce logic: fetch after 500ms idle ---
-    if changed:
-        st.session_state[f'{session_prefix}debounce_triggered'] = False
-    if not st.session_state.get(f'{session_prefix}debounce_triggered', False):
-        if time.time() - st.session_state.get(f'{session_prefix}last_change', 0) > 0.5:
-            fetch_mutations_wrapper()
-            st.session_state[f'{session_prefix}debounce_triggered'] = True
-    
-    # --- Manual fetch button ---
+
+    # --- Manual fetch button only ---
     if target.button("Fetch Mutations", key=f'{session_prefix}fetch_button'):
         fetch_mutations_wrapper()
-        st.session_state[f'{session_prefix}debounce_triggered'] = True
     
     target.markdown(
         """
