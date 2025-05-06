@@ -196,7 +196,8 @@ def render_signature_composer(
     
     # --- Data editor for mutation selection ---
     selected_mutations = None
-    if not st.session_state.get(f'{session_prefix}mutation_df', pd.DataFrame()).empty:
+    mutation_df = st.session_state.get(f'{session_prefix}mutation_df', pd.DataFrame())
+    if not mutation_df.empty:
         # Add edit mode toggle only if table is shown
         if st.session_state.get(f'{session_prefix}edit_mode', False):
             if target.button('Done Editing', key=f'{session_prefix}done_edit'):
@@ -204,45 +205,36 @@ def render_signature_composer(
         else:
             if target.button('Edit Table', key=f'{session_prefix}edit_table'):
                 st.session_state[f'{session_prefix}edit_mode'] = True
-                
+
         # Try to get the last fetched DataFrame for extra columns
         df = st.session_state.get(f'{session_prefix}last_fetched_df', pd.DataFrame())
-        
+
         # Merge coverage and proportion columns if available
-        mutation_df = st.session_state[f'{session_prefix}mutation_df']
-        
         if not df.empty and 'mutation' in df.columns:
-            # Only keep relevant columns
             cols = ['mutation']
             if 'coverage' in df.columns and not config['slim_table']:
                 cols.append('coverage')
             if 'proportion' in df.columns and not config['slim_table']:
                 cols.append('proportion')
-            
             extra = df[cols].rename(columns={'mutation': 'Mutation'})
-            
-            # Merge on Mutation
             merged = pd.merge(mutation_df, extra, on='Mutation', how='left')
-            
-            # Reorder columns for display
             display_cols = ['Mutation', 'Selected']
             if 'coverage' in merged.columns and not config['slim_table']:
                 display_cols.append('coverage')
             if 'proportion' in merged.columns and not config['slim_table']:
                 display_cols.append('proportion')
-            
             merged = merged[display_cols]
         else:
             merged = mutation_df
-            
+
         target.info(f"{len(merged)} signature mutations found.")
-        
+
         # Set disabled columns based on edit mode
         if st.session_state.get(f'{session_prefix}edit_mode', False):
             disabled_cols = []  # allow editing all
         else:
             disabled_cols = merged.columns.tolist()  # disable all columns
-        
+
         # Wrap data editor in an expander that's open by default
         with target.expander("View and Edit Mutations", expanded=False):
             edited_df = target.data_editor(
@@ -252,15 +244,15 @@ def render_signature_composer(
                 key=f'{session_prefix}mutation_editor',
                 disabled=disabled_cols,
             )
-        
+
         st.session_state[f'{session_prefix}mutation_df'] = edited_df[[c for c in edited_df.columns if c in ['Mutation', 'Selected']]]
-        
+
         # Fill NaN in 'Selected' with False to avoid ValueError when filtering
         edited_df['Selected'] = edited_df['Selected'].fillna(False)
         selected_mutations = edited_df[edited_df['Selected']]['Mutation'].tolist()
-    else:
-        if st.session_state.get(f'{session_prefix}has_fetched_mutations', False):
-            target.info("No mutations found. Adjust your filters or add mutations manually.")
+    elif st.session_state.get(f'{session_prefix}has_fetched_mutations', False):
+        # Only show info message, do not show expander
+        target.info("No mutations found. Adjust your filters or add mutations manually.")
     
     # --- Only show coverage/proportion plots after first query ---
     if config['show_distributions'] and f'{session_prefix}last_fetched_df' in st.session_state:
