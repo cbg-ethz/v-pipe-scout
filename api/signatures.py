@@ -23,7 +23,7 @@ class Mutation(BaseModel):
     ref: str
     alt: str
 
-    @validator('ref', 'alt')
+    @validator('ref', 'alt', allow_reuse=True)
     def check_length_one(cls, v, field):
         if len(v) != 1:
             raise ValueError(f"{field.name} must be exactly one character long")
