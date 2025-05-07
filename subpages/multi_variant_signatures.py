@@ -82,6 +82,33 @@ def cached_get_variant_names():
     return get_variant_names()
 
 def app():
+    # Initialize session state variables if they don't exist
+    if "manual_variant_name_input" not in st.session_state:
+        st.session_state.manual_variant_name_input = ""
+    if "manual_mutations_input" not in st.session_state:
+        st.session_state.manual_mutations_input = ""
+    if "clear_manual_inputs_flag" not in st.session_state:
+        st.session_state.clear_manual_inputs_flag = False
+    
+    # Initialize the main list of combined variants in session state
+    if 'combined_variants_object' not in st.session_state:
+        st.session_state.combined_variants_object = VariantList()
+    
+    # Create a reference to the persistent variant list
+    combined_variants = st.session_state.combined_variants_object
+    
+    # Initialize session state for the curated variants multiselect
+    if 'ui_selected_curated_names' not in st.session_state:
+        available_curated_names_init = cached_get_variant_names() # Initial fetch for default
+        st.session_state.ui_selected_curated_names = ["LP.8"] if "LP.8" in available_curated_names_init else []
+    
+    # Check and apply the clearing flag for manual inputs
+    if st.session_state.clear_manual_inputs_flag:
+        st.session_state.manual_variant_name_input = ""
+        st.session_state.manual_mutations_input = ""
+        st.session_state.clear_manual_inputs_flag = False # Reset the flag
+    
+    # Now start the UI
     st.title("Multi Variant Signature Composer")
 
     st.write("This page will create the mutation-variant matrix.")
@@ -100,10 +127,9 @@ def app():
     st.subheader("Variant Selection")
     st.write("Select the variants of interest from either the curated list or compose new signature on the fly from CovSpectrum.")
     
-    # Initialize list to store all selected variants and their mutations
-    combined_variants = VariantList()
-    
+    # combined_variants is already initialized from session state
 
+    # --- Curated Variants Section ---
     st.markdown("#### Curated Variant List")
     # Get the available variant names from the signatures API (cached)
     available_variants = cached_get_variant_names()
@@ -112,19 +138,41 @@ def app():
     selected_curated_variants = st.multiselect(
         "Select known variants of interest – curated by the V-Pipe team",
         options=available_variants,
-        default=["LP.8"] if "LP.8" in available_variants else None,
+        default=st.session_state.ui_selected_curated_names,
         help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team (see https://github.com/cbg-ethz/cowwid/tree/master/voc)"
     )
     
-    # Add selected curated variants to the combined list
-    if selected_curated_variants:
-        # Load the full variant list (cached)
-        signature_variant_list = cached_get_variant_list()
+    # Update the session state if the selection has changed
+    if selected_curated_variants != st.session_state.ui_selected_curated_names:
+        st.session_state.ui_selected_curated_names = selected_curated_variants
+        st.rerun()
+    
+    # Sync the combined_variants with selected curated variants
+    # First, remove any curated variants that are no longer selected
+    all_curated_variants = cached_get_variant_list().variants
+    curated_names = {v.name for v in all_curated_variants}
+    
+    # Create a copy of the list to safely iterate and remove
+    variants_to_remove = []
+    for v in combined_variants.variants:
+        # If it's a curated variant (by checking name) and not in current selection, mark for removal
+        if v.name in curated_names and v.name not in selected_curated_variants:
+            variants_to_remove.append(v)
+    
+    # Now perform the removal
+    for v in variants_to_remove:
+        combined_variants.remove_variant(v)
         
-        # Filter to only include selected variants
-        for variant in signature_variant_list.variants:
-            if variant.name in selected_curated_variants:
-                combined_variants.add_variant(Variant.from_signature_variant(variant))
+    # Then add newly selected curated variants if they're not already in the combined list
+    if selected_curated_variants:
+        # Build a map of name to variant object for quick lookup
+        existing_variant_names = {v.name for v in combined_variants.variants}
+        curated_variant_map = {v.name: v for v in all_curated_variants}
+        
+        for name in selected_curated_variants:
+            if name not in existing_variant_names and name in curated_variant_map:
+                variant_to_add = curated_variant_map[name]
+                combined_variants.add_variant(Variant.from_signature_variant(variant_to_add))
     
     st.markdown("#### Compose Custom Variant")
     st.markdown("##### by selecting Signature Mutations from CovSpectrum")
@@ -174,6 +222,8 @@ def app():
         
             # Show confirmation
             st.success(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations")
+            # Rerun to update the UI
+            st.rerun()
 
     # Combine all selected variants for processing
     selected_variants = [variant.name for variant in combined_variants.variants]
@@ -271,20 +321,34 @@ def app():
     # allow the user to remove selected variants
     # Show the selected variants in a multiselect box
     st.subheader("Selected Variants")
-    selected_variant_names = [variant.name for variant in combined_variants.variants]
-    selected_variant_names = st.multiselect(
-        "Selected Variants",
-        options=[variant.name for variant in combined_variants.variants],
-        default=selected_variant_names,
-        help="Select variants to remove from the list."
-    )
-    # Remove selected variants from the combined list
-    if selected_variant_names:  
-        for variant in combined_variants.variants:
-            if variant.name not in selected_variant_names:
-                combined_variants.remove_variant(variant)
-                st.success(f"Removed variant '{variant.name}' from the list.")
     
+    # Get the current variants for display
+    current_variant_names = [variant.name for variant in combined_variants.variants]
+    
+    # Create a multiselect showing current variants (user can deselect to remove)
+    displayed_variant_names = st.multiselect(
+        "Currently Selected Variants (Deselect to remove)",
+        options=current_variant_names,
+        default=current_variant_names,
+        help="Deselect variants to remove them from the list."
+    )
+    
+    # Check if any variants were deselected and remove them
+    variants_removed = False
+    variants_to_remove = []
+    for variant in combined_variants.variants:
+        if variant.name not in displayed_variant_names:
+            variants_to_remove.append(variant)
+            variants_removed = True
+    
+    # Now perform the removal
+    for variant in variants_to_remove:
+        combined_variants.remove_variant(variant)
+        st.success(f"Removed variant '{variant.name}' from the list.")
+    
+    # If variants were removed, rerun to update the UI
+    if variants_removed:
+        st.rerun()
 
     st.markdown("---")
     # Build the mutation-variant matrix
@@ -572,18 +636,4 @@ def app():
         )
 
 if __name__ == "__main__":
-    # Initialize session state variables if they don't exist
-    if "manual_variant_name_input" not in st.session_state:
-        st.session_state.manual_variant_name_input = ""
-    if "manual_mutations_input" not in st.session_state:
-        st.session_state.manual_mutations_input = ""
-    if "clear_manual_inputs_flag" not in st.session_state:
-        st.session_state.clear_manual_inputs_flag = False
-
-    # Check and apply the clearing flag
-    if st.session_state.clear_manual_inputs_flag:
-        st.session_state.manual_variant_name_input = ""
-        st.session_state.manual_mutations_input = ""
-        st.session_state.clear_manual_inputs_flag = False # Reset the flag
-    
     app()
