@@ -23,6 +23,9 @@ from components.variant_signature_component import render_signature_composer
 # Import the Variant class from signatures but adapt it to our needs
 from api.signatures import Variant as SignatureVariant
 from api.signatures import VariantList as SignatureVariantList
+from api.signatures import Mutation 
+from pydantic import ValidationError 
+import re 
 
 # Define a simplified Variant class for this page
 class Variant(BaseModel):
@@ -175,36 +178,91 @@ def app():
     # Combine all selected variants for processing
     selected_variants = [variant.name for variant in combined_variants.variants]
 
+    with st.expander("##### Or Manual Input", expanded=False):
+        manual_variant_name = st.text_input(
+            "Variant Name", 
+            value="", 
+            max_chars=20,  # Increased max_chars slightly
+            placeholder="Enter unique variant name", 
+            key="manual_variant_name_input"
+        )
+        manual_mutations_input_str = st.text_area(
+            "Signature Mutations", 
+            value="", 
+            placeholder="e.g., C345T, 456-, 748G", 
+            help="Enter mutations separated by commas. Format: [REF]Position[ALT]. REF is optional (e.g., for insertions like 748G or deletions like 456-).",
+            key="manual_mutations_input"
+        )
+
+        if st.button("Add Manual Variant", key="add_manual_variant_button"):
+            # Validate variant name
+            if not manual_variant_name.strip():
+                st.error("Manual Variant Name cannot be empty.")
+            else:
+                # Process mutations
+                mutations_str_list = [m.strip() for m in manual_mutations_input_str.split(',') if m.strip()]
+                
+                validated_signature_mutations = []
+                all_mutations_valid = True
+
+                if not mutations_str_list:
+                    st.warning(f"No mutations entered for '{manual_variant_name}'. It will be added with an empty signature if the name is unique.")
+                
+                for mut_str in mutations_str_list:
+                    # Regex to capture: optional REF, mandatory POS, mandatory ALT
+                    # REF: A, C, G, T, N (optional)
+                    # POS: digits
+                    # ALT: A, C, G, T, N, -
+                    match = re.match(r"^([ACGTN]?)(\d+)([ACGTN-])$", mut_str.upper())
+                    
+                    if match:
+                        ref_char = match.group(1)
+                        pos_str = match.group(2)
+                        alt_char = match.group(3)
+                        
+                        try:
+                            mutation_data = {
+                                "position": int(pos_str),
+                                "ref": ref_char,
+                                "alt": alt_char
+                            }
+                            # Validate against the Pydantic model from api.signatures
+                            Mutation(**mutation_data)
+                            validated_signature_mutations.append(mut_str) # Store original valid string
+                        except ValidationError as e:
+                            error_details = []
+                            for error in e.errors():
+                                field = error['loc'][0] if error['loc'] else 'mutation'
+                                msg = error['msg']
+                                error_details.append(f"for field '{field}': {msg}")
+                            st.error(f"Invalid mutation format for '{mut_str}': {'; '.join(error_details)}.")
+                            all_mutations_valid = False
+                        except ValueError: # Handles int(pos_str) conversion error
+                            st.error(f"Invalid position in mutation '{mut_str}'. Position must be a number.")
+                            all_mutations_valid = False
+                    else:
+                        st.error(f"Cannot parse mutation: '{mut_str}'. Expected format like 'C123T', '123-', or '123A'.")
+                        all_mutations_valid = False
+
+                if all_mutations_valid:
+                    # Check if the variant already exists in the combined list
+                    if any(v.name == manual_variant_name for v in combined_variants.variants):
+                        st.warning(f"Variant '{manual_variant_name}' already exists in the list. Please choose a different name.")
+                    else:
+                        # Create and add the custom variant using the local Variant model
+                        new_manual_variant = Variant(
+                            name=manual_variant_name,
+                            signature_mutations=validated_signature_mutations
+                        )
+                        combined_variants.add_variant(new_manual_variant)
+                        
+                        st.success(f"Added manual variant '{manual_variant_name}' with {len(validated_signature_mutations)} mutations.")
+                        st.session_state.manual_variant_name_input = ""
+                        st.session_state.manual_mutations_input = ""
+    
     if not selected_variants:
         st.warning("Please select at least one variant from either the curated list or create a custom variant")
-        return
     
-    with st.expander("##### Or Manual Input", expanded=False):
-        # a text field to expand and define a variant name
-        # and its mutaitons
-
-        variant_name = st.text_input("Variant Name", value="", max_chars=16, placeholder="Enter variant name")
-        variant_mutations = st.text_area("Signature Mutations", value="", placeholder="C345T, 456-, 748G", help="Enter mutations separated by commas. Reference only for user information, not required.")
-        # Split the input into a list of mutations
-        if variant_mutations:
-            variant_mutations = [mutation.strip() for mutation in variant_mutations.split(",") if mutation.strip()]
-        else:
-            variant_mutations = []
-        # Add a button to add the variant
-        if st.button("Add Variant"):
-            # Check if the variant already exists in the combined list
-            if any(v.name == variant_name for v in combined_variants.variants):
-                st.warning(f"Variant '{variant_name}' already exists in the list. Please choose a different name.")
-            else:
-                # Create and add the custom variant
-                custom_variant = Variant(
-                    name=variant_name,
-                    signature_mutations=variant_mutations
-                )
-                combined_variants.add_variant(custom_variant)
-                
-                # Show confirmation
-                st.success(f"Added custom variant '{variant_name}' with {len(variant_mutations)} mutations")
 
     st.markdown("---")
 
@@ -235,6 +293,9 @@ def app():
         # Create DataFrame
         matrix_df = pd.DataFrame(matrix_data, columns=columns)
         
+        # Create a section with two visualizations side by side
+        st.subheader("Variant Signature Comparison")
+
         # Visualize the data in different ways
         if len(combined_variants.variants) > 1:
             import altair as alt
@@ -265,8 +326,6 @@ def app():
             )
             variant_comparison_melted.columns = ["variant1", "variant2", "shared_mutations"]
             
-            # Create a section with two visualizations side by side
-            st.subheader("Variant Signature Comparison")
             
             # Create two columns for the visualizations
             col1, col2 = st.columns(2)
@@ -465,7 +524,8 @@ def app():
                 
                 # Display the interactive Plotly chart in Streamlit
                 st.plotly_chart(fig, use_container_width=True)
-
+        else:
+            st.warning("At least two variants are required to visualize the mutation-variant matrix.")
     
         # Export functionality
         st.subheader("Export Data")
