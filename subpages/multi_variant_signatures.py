@@ -124,7 +124,7 @@ def app():
                 combined_variants.add_variant(Variant.from_signature_variant(variant))
     
     st.markdown("#### Compose Custom Variant")
-    st.markdown("##### by selecting signature mutations from CovSpectrum")
+    st.markdown("##### by selecting Signature Mutations from CovSpectrum")
     # Configure the component with compact functionality
     component_config = {
         'show_nucleotides_only': True,
@@ -179,33 +179,32 @@ def app():
         st.warning("Please select at least one variant from either the curated list or create a custom variant")
         return
     
-    st.markdown("##### by Manual Input")
+    with st.expander("##### Or Manual Input", expanded=False):
+        # a text field to expand and define a variant name
+        # and its mutaitons
 
-    # a text field to expand and define a variant name
-    # and its mutaitons
-
-    variant_name = st.text_input("Variant Name", value="", max_chars=16, placeholder="Enter variant name")
-    variant_mutations = st.text_area("Signature Mutations", value="", placeholder="C345T, 456-, 748G", help="Enter mutations separated by commas. Reference only for user information, not required.")
-    # Split the input into a list of mutations
-    if variant_mutations:
-        variant_mutations = [mutation.strip() for mutation in variant_mutations.split(",") if mutation.strip()]
-    else:
-        variant_mutations = []
-    # Add a button to add the variant
-    if st.button("Add Variant"):
-        # Check if the variant already exists in the combined list
-        if any(v.name == variant_name for v in combined_variants.variants):
-            st.warning(f"Variant '{variant_name}' already exists in the list. Please choose a different name.")
+        variant_name = st.text_input("Variant Name", value="", max_chars=16, placeholder="Enter variant name")
+        variant_mutations = st.text_area("Signature Mutations", value="", placeholder="C345T, 456-, 748G", help="Enter mutations separated by commas. Reference only for user information, not required.")
+        # Split the input into a list of mutations
+        if variant_mutations:
+            variant_mutations = [mutation.strip() for mutation in variant_mutations.split(",") if mutation.strip()]
         else:
-            # Create and add the custom variant
-            custom_variant = Variant(
-                name=variant_name,
-                signature_mutations=variant_mutations
-            )
-            combined_variants.add_variant(custom_variant)
-            
-            # Show confirmation
-            st.success(f"Added custom variant '{variant_name}' with {len(variant_mutations)} mutations")
+            variant_mutations = []
+        # Add a button to add the variant
+        if st.button("Add Variant"):
+            # Check if the variant already exists in the combined list
+            if any(v.name == variant_name for v in combined_variants.variants):
+                st.warning(f"Variant '{variant_name}' already exists in the list. Please choose a different name.")
+            else:
+                # Create and add the custom variant
+                custom_variant = Variant(
+                    name=variant_name,
+                    signature_mutations=variant_mutations
+                )
+                combined_variants.add_variant(custom_variant)
+                
+                # Show confirmation
+                st.success(f"Added custom variant '{variant_name}' with {len(variant_mutations)} mutations")
 
     st.markdown("---")
 
