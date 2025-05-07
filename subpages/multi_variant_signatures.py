@@ -17,15 +17,13 @@ import plotly.graph_objects as go
 from pydantic import BaseModel, Field
 from typing import List
 from api.signatures import get_variant_list, get_variant_names
+from api.signatures import Mutation
 from api.covspectrum import CovSpectrumLapis
 from components.variant_signature_component import render_signature_composer
 
 # Import the Variant class from signatures but adapt it to our needs
 from api.signatures import Variant as SignatureVariant
 from api.signatures import VariantList as SignatureVariantList
-from api.signatures import Mutation 
-from pydantic import ValidationError 
-import re 
 
 # Define a simplified Variant class for this page
 class Variant(BaseModel):
