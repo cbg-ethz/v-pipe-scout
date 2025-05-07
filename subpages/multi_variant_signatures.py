@@ -257,8 +257,9 @@ def app():
                         combined_variants.add_variant(new_manual_variant)
                         
                         st.success(f"Added manual variant '{manual_variant_name}' with {len(validated_signature_mutations)} mutations.")
-                        st.session_state.manual_variant_name_input = ""
-                        st.session_state.manual_mutations_input = ""
+                        # Set flag to clear inputs on next rerun
+                        st.session_state.clear_manual_inputs_flag = True
+                        st.rerun() # Trigger rerun
     
     if not selected_variants:
         st.warning("Please select at least one variant from either the curated list or create a custom variant")
@@ -266,6 +267,26 @@ def app():
 
     st.markdown("---")
 
+    # Display the selected variants - as a mutliselect box - fill it with the selected variants
+    # allow the user to remove selected variants
+    # Show the selected variants in a multiselect box
+    st.subheader("Selected Variants")
+    selected_variant_names = [variant.name for variant in combined_variants.variants]
+    selected_variant_names = st.multiselect(
+        "Selected Variants",
+        options=[variant.name for variant in combined_variants.variants],
+        default=selected_variant_names,
+        help="Select variants to remove from the list."
+    )
+    # Remove selected variants from the combined list
+    if selected_variant_names:  
+        for variant in combined_variants.variants:
+            if variant.name not in selected_variant_names:
+                combined_variants.remove_variant(variant)
+                st.success(f"Removed variant '{variant.name}' from the list.")
+    
+
+    st.markdown("---")
     # Build the mutation-variant matrix
     if combined_variants.variants:
         
@@ -551,4 +572,18 @@ def app():
         )
 
 if __name__ == "__main__":
+    # Initialize session state variables if they don't exist
+    if "manual_variant_name_input" not in st.session_state:
+        st.session_state.manual_variant_name_input = ""
+    if "manual_mutations_input" not in st.session_state:
+        st.session_state.manual_mutations_input = ""
+    if "clear_manual_inputs_flag" not in st.session_state:
+        st.session_state.clear_manual_inputs_flag = False
+
+    # Check and apply the clearing flag
+    if st.session_state.clear_manual_inputs_flag:
+        st.session_state.manual_variant_name_input = ""
+        st.session_state.manual_mutations_input = ""
+        st.session_state.clear_manual_inputs_flag = False # Reset the flag
+    
     app()
