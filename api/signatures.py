@@ -47,7 +47,7 @@ class VariantDefinition(BaseModel):
     variant: VariantInfo
     mut: Dict[int, str]
 
-    @validator('mut', pre=True)
+    @validator('mut', pre=True, allow_reuse=True)
     def convert_string_keys_to_int(cls, v):
         """Convert dictionary string keys to integers for mutation positions."""
         return {int(k): v for k, v in v.items()}
@@ -259,5 +259,4 @@ if __name__ == "__main__":
     logger.info("Examples of reformatted mutations:")
     for variant in variant_list.variants[:10]:  # Show first 3 variants as examples
         logger.info(f"Variant: {variant.name}, Signature mutations (first 5): {variant.signature_mutations[:5]}")
-    
-        
+
