@@ -76,8 +76,6 @@ class VariantDefinition(BaseModel):
         mutations = []
 
         # handle deletion
-        print(f"change: {change}")
-        print(f"is delteion: {all(c == '-' for c in change)}")
         if all(c == '-' for c in change):
             ref = ""
             alt = "-"
