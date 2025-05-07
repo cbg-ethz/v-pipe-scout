@@ -74,11 +74,20 @@ class VariantDefinition(BaseModel):
             List of formatted mutation strings
         """
         mutations = []
-        
-        # Handle empty cases and deletions
-        if not change or change == '-' or all(c == '-' for c in change):
-            return mutations
+
+        # handle deletion
+        print(f"change: {change}")
+        print(f"is delteion: {all(c == '-' for c in change)}")
+        if all(c == '-' for c in change):
+            ref = ""
+            alt = "-"
+
+            for i in range(len(change)):
+                mutations.append(f"{ref}{position}{alt}")
             
+            return mutations
+                
+
         # Check if it's in the REF>ALT format
         if '>' in change:
             parts = change.split('>')
@@ -87,15 +96,11 @@ class VariantDefinition(BaseModel):
                 return mutations
                 
             ref, alt = parts
-            
-            # Check for deletions (REF>-)
-            if not alt or alt == '-':
-                return mutations
                 
             # Handle multiple mutations (e.g., GGG>AAC)
             if len(ref) > 1 and len(alt) > 1 and len(ref) == len(alt):
                 for i in range(len(ref)):
-                    if i < len(alt) and alt[i] != '-':  # Skip deletions and ensure index is valid
+                    if i < len(alt):  #  ensure index is valid
                         mutations.append(f"{ref[i]}{position + i}{alt[i]}")
             # Handle single ref multiple alt (e.g., G>AAC) or multiple ref single alt (e.g., GGG>A)
             elif len(ref) != len(alt):
