@@ -16,5 +16,7 @@ dependencies:
   - streamlit-pydantic
   - pydantic>=1.9,<2
   - cojac>=0.9.3
-  - matplotlib_venn
   - plotly
+  - pip:
+      - matplotlib-venn
+  
