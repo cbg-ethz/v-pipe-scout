@@ -3,7 +3,8 @@
 import requests
 import yaml
 import os
-from typing import Dict, List, Optional, Any
+import re
+from typing import Dict, List, Optional, Any, Tuple
 from pathlib import Path
 from pydantic import BaseModel, validator
 import logging
@@ -23,15 +24,80 @@ class Mutation(BaseModel):
     ref: str
     alt: str
 
-    @validator('ref', 'alt', allow_reuse=True)
-    def check_length_one_or_empty(cls, v, field):
-        if field.name == 'ref':
-            if not (len(v) == 0 or len(v) == 1):
-                raise ValueError(f"{field.name} must be empty or 1 character long")
-        else:
-            if len(v) != 1:
-                raise ValueError(f"{field.name} must be exactly 1 character long")
+    @validator('position')
+    def validate_position(cls, v):
+        if v <= 0:
+            raise ValueError("Position must be a positive integer")
         return v
+
+    @validator('ref')
+    def validate_ref(cls, v):
+        if not (len(v) == 0 or len(v) == 1):
+            raise ValueError("Reference must be empty or a single nucleotide")
+        if v and v not in "ACGTN":
+            raise ValueError("Reference must be one of A, C, G, T, or N")
+        return v
+
+    @validator('alt')
+    def validate_alt(cls, v):
+        if len(v) != 1:
+            raise ValueError("Alternative must be a single character")
+        if v not in "ACGTN-":
+            raise ValueError("Alternative must be one of A, C, G, T, N, or - (deletion)")
+        return v
+    
+    @classmethod
+    def validate_mutation_string(cls, mutation_str: str) -> tuple[bool, str, dict]:
+        """
+        Validate a mutation string and return a tuple of:
+        (is_valid, error_message, mutation_data)
+        
+        Valid formats:
+        - REF+POS+ALT (e.g., C123T)
+        - POS+ALT (e.g., 123T)
+        - POS+- (e.g., 123-, for deletion)
+        
+        Args:
+            mutation_str: Mutation string to validate
+            
+        Returns:
+            Tuple of (is_valid, error_message, mutation_data)
+            If valid, error_message will be empty and mutation_data will contain the parsed data
+            If invalid, mutation_data will be empty
+        """
+        # Regex to capture: optional REF, mandatory POS, mandatory ALT
+        # REF: A, C, G, T, N (optional)
+        # POS: digits
+        # ALT: A, C, G, T, N, -
+        match = re.match(r"^([ACGTN]?)(\d+)([ACGTN-])$", mutation_str.upper())
+        
+        if not match:
+            return False, f"Invalid format for '{mutation_str}'. Expected format is like 'C123T', '123-', or '123A'.", {}
+        
+        ref_char = match.group(1)
+        pos_str = match.group(2)
+        alt_char = match.group(3)
+        
+        try:
+            position = int(pos_str)
+            mutation_data = {
+                "position": position,
+                "ref": ref_char,
+                "alt": alt_char
+            }
+            
+            # Create an instance to validate
+            cls(**mutation_data)
+            
+            return True, "", mutation_data
+            
+        except ValueError as e:
+            if "position" in str(e):
+                return False, f"Invalid position in '{mutation_str}': {str(e)}", {}
+            return False, f"Invalid value in '{mutation_str}': {str(e)}", {}
+            
+        except Exception as e:
+            return False, f"Error validating '{mutation_str}': {str(e)}", {}
 
 
 # Pydantic models that match the YAML structure
@@ -250,6 +316,30 @@ def get_variant_names() -> List[str]:
     """Get a list of all available variant names."""
     variant_list = get_variant_list()
     return [variant.name for variant in variant_list.variants]
+
+def validate_mutation_strings(mutations_str_list: List[str]) -> Tuple[bool, List[str], List[str]]:
+    """
+    Validate a list of mutation strings.
+    
+    Args:
+        mutations_str_list: List of mutation strings to validate
+        
+    Returns:
+        Tuple of (all_valid, valid_mutations, error_messages)
+    """
+    valid_mutations = []
+    error_messages = []
+    all_valid = True
+    
+    for mutation_str in mutations_str_list:
+        is_valid, error_message, _ = Mutation.validate_mutation_string(mutation_str)
+        if is_valid:
+            valid_mutations.append(mutation_str)
+        else:
+            error_messages.append(error_message)
+            all_valid = False
+            
+    return all_valid, valid_mutations, error_messages
 
 
 if __name__ == "__main__":

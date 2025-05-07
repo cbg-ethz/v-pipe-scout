@@ -259,39 +259,13 @@ def app():
                     st.warning(f"No mutations entered for '{manual_variant_name}'. It will be added with an empty signature if the name is unique.")
                 
                 for mut_str in mutations_str_list:
-                    # Regex to capture: optional REF, mandatory POS, mandatory ALT
-                    # REF: A, C, G, T, N (optional)
-                    # POS: digits
-                    # ALT: A, C, G, T, N, -
-                    match = re.match(r"^([ACGTN]?)(\d+)([ACGTN-])$", mut_str.upper())
+                    # Use the improved validation method from the Mutation class
+                    is_valid, error_message, mutation_data = Mutation.validate_mutation_string(mut_str)
                     
-                    if match:
-                        ref_char = match.group(1)
-                        pos_str = match.group(2)
-                        alt_char = match.group(3)
-                        
-                        try:
-                            mutation_data = {
-                                "position": int(pos_str),
-                                "ref": ref_char,
-                                "alt": alt_char
-                            }
-                            # Validate against the Pydantic model from api.signatures
-                            Mutation(**mutation_data)
-                            validated_signature_mutations.append(mut_str) # Store original valid string
-                        except ValidationError as e:
-                            error_details = []
-                            for error in e.errors():
-                                field = error['loc'][0] if error['loc'] else 'mutation'
-                                msg = error['msg']
-                                error_details.append(f"for field '{field}': {msg}")
-                            st.error(f"Invalid mutation format for '{mut_str}': {'; '.join(error_details)}.")
-                            all_mutations_valid = False
-                        except ValueError: # Handles int(pos_str) conversion error
-                            st.error(f"Invalid position in mutation '{mut_str}'. Position must be a number.")
-                            all_mutations_valid = False
+                    if is_valid:
+                        validated_signature_mutations.append(mut_str) # Store original valid string
                     else:
-                        st.error(f"Cannot parse mutation: '{mut_str}'. Expected format like 'C123T', '123-', or '123A'.")
+                        st.error(f"Invalid mutation: {error_message}")
                         all_mutations_valid = False
 
                 if all_mutations_valid:
