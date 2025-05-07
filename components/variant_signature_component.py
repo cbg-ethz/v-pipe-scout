@@ -250,6 +250,7 @@ def render_signature_composer(
 
         # Fill NaN in 'Selected' with False to avoid ValueError when filtering
         edited_df['Selected'] = edited_df['Selected'].fillna(False)
+        edited_df = edited_df.infer_objects(copy=False)
         selected_mutations = edited_df[edited_df['Selected']]['Mutation'].tolist()
     else:
         expander_placeholder.empty()

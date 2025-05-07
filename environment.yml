@@ -4,10 +4,10 @@ channels:
   - bioconda
 dependencies:
   - python=3.9
-  - streamlit
+  - streamlit=1.45.0
   - matplotlib
   - numpy
-  - pandas
+  - pandas=2.2.3
   - pyyaml
   - seaborn
   - aiohttp

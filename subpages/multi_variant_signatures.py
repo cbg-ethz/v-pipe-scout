@@ -13,8 +13,6 @@ import yaml
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
-import seaborn as sns
-import plotly.express as px
 import plotly.graph_objects as go
 from pydantic import BaseModel, Field
 from typing import List
