@@ -3,11 +3,10 @@
 import requests
 import yaml
 import os
-from typing import Dict, List, Optional, Any, Annotated
+from typing import Dict, List, Optional, Any
 from pathlib import Path
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, validator
 import logging
-from pydantic import BaseModel, constr
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,8 +20,14 @@ LOCAL_CACHE_DIR = Path("data/known_variants")
 class Mutation(BaseModel): 
     """A mutation in nucleotide format."""
     position: int
-    ref: Annotated[str, constr(min_length=1, max_length=1)]
-    alt: Annotated[str, constr(min_length=1, max_length=1)]
+    ref: str
+    alt: str
+
+    @validator('ref', 'alt')
+    def check_length_one(cls, v, field):
+        if len(v) != 1:
+            raise ValueError(f"{field.name} must be exactly one character long")
+        return v
 
 
 # Pydantic models that match the YAML structure
@@ -41,12 +46,12 @@ class VariantDefinition(BaseModel):
     """
     variant: VariantInfo
     mut: Dict[int, str]
-    
-    @field_validator('mut', mode='before')
-    def convert_string_keys_to_int(cls, v: Dict) -> Dict[int, str]:
+
+    @validator('mut', pre=True)
+    def convert_string_keys_to_int(cls, v):
         """Convert dictionary string keys to integers for mutation positions."""
         return {int(k): v for k, v in v.items()}
-    
+
     def format_mutation(self, position: int, change: str) -> List[str]:
         """
         Format a mutation from position and change (e.g., 241: 'C>T') to the new format (e.g., 'C241T').
@@ -198,7 +203,7 @@ def download_yaml_file(file_name: str) -> Optional[Dict[str, Any]]:
 def load_variant_definition(yaml_data: Dict[str, Any]) -> Optional[VariantDefinition]:
     """Convert YAML data to VariantDefinition."""
     try:
-        return VariantDefinition.model_validate(yaml_data)
+        return VariantDefinition.parse_obj(yaml_data)
     except Exception as e:
         logger.error(f"Error parsing variant definition: {e}")
         return None
