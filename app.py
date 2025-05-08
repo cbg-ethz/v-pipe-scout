@@ -13,6 +13,7 @@ if __name__ == "__main__":
     )
     
     # Create navigation with proper URLs for subpages, but hide the default navigation UI
+    # to replace it with a custom navigation system in the sidebar for a more tailored user experience.
     pages = [
         st.Page(index.app, title="Home", icon="🏠", default=True),
         st.Page(resistance_mut_silo.app, title="Resistance Mutations", icon="🧬", url_path="resistance"),
