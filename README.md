@@ -7,7 +7,35 @@
 
 ## Overview
 
-This front-end application is part of the "V-Pipe on Cloud" initiative, which aims to bring the capabilities of V-Pipe to the cloud, making it more accessible and scalable. The application leverages Streamlit to provide an interactive interface for users to generate heatmaps and perform variant deconvolution on-demand.
+Recognizing and qualtifiying viral variants from wastwater requires expert human judgment in the final setps.
+V-Pipe Scout allows for rapid exploration of wastewater viral sequences down to the single read level. 
+
+It's aim: discovery novel viral threads a a few weeks earlier
+
+This Proof-Of-Concept is setup for Sars-Cov-2, yet is build virus agnostic and to be expanded, to RSV and Influenza soon
+
+Specifically V-Pipe Scout enables:
+    - to explore Mutations on Read level
+        - for known Resistance Mutations
+        - guided by smart filters and Variant Signatures
+    - to compose Variant Signatures, used in the Variant Abundancec estimates
+        - by leveraging clinical sequencce databases e.g. CovSpectrum
+        - and our curated Variant Signatures
+
+Further we will implement:
+    - on-demand Variant Abundance Estimates by [Lollipop](https://github.com/cbg-ethz/LolliPop)
+
+V-Pipe Scout brings toegther:
+- [V-pipe](https://github.com/cbg-ethz/V-pipe) our prime Wastewater Viral Analyis Pipeline, see [publication](https://www.biorxiv.org/content/10.1101/2023.10.16.562462v1.full). 
+- [GenSpectrum](https://genspectrum.org/) in particular the novel fast database for genomic sequences [LAPIS-SILO](https://github.com/GenSpectrum/LAPIS-SILO), see [publication](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-023-05364-3)
+
+our Wastewater Survailance Analysis Pipeline 
+
+
+Related repos
+    - WisePulse
+    - sr2silo
+
 
 For more information about V-Pipe, visit the [V-Pipe website](https://cbg-ethz.github.io/V-pipe/).
 
