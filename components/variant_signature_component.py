@@ -113,9 +113,6 @@ def render_signature_composer(
         'default_variant': 'LP.8',
         'default_min_abundance': 0.8,
         'default_min_coverage': 15,
-        'show_title': True,
-        'title': "Variant Signature Composer",
-        'show_description': True
     }
     
     # Merge provided config with defaults
@@ -131,16 +128,7 @@ def render_signature_composer(
     
     # Initialize session state with prefix
     initialize_session_state()
-    
-    # --- Title and description ---
-    if config['show_title']:
-        target.title(config['title'])
-    
-    if config['show_description']:
-        target.write("This component allows you to visualize signature mutations for different variants over time.")
-        target.write("We query CovSpectrum for the defining mutations of the variants.")
-        target.markdown("---")
-    
+
     # --- Fetch wrapper ---
     def fetch_mutations_wrapper():
         fetch_mutations(

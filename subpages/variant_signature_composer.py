@@ -16,18 +16,19 @@ import matplotlib
 import plotly.graph_objects as go
 from pydantic import BaseModel, Field
 from typing import List
+
 from api.signatures import get_variant_list, get_variant_names
 from api.signatures import Mutation
 from api.covspectrum import CovSpectrumLapis
 from components.variant_signature_component import render_signature_composer
-
-# Import the Variant class from signatures but adapt it to our needs
+from state import VariantSignatureComposerState
 from api.signatures import Variant as SignatureVariant
 from api.signatures import VariantList as SignatureVariantList
 
-# Define a simplified Variant class for this page
+
 class Variant(BaseModel):
-    """Model for a variant with its signature mutations.
+    """
+    Model for a variant with its signature mutations.
     This is a simplified version of the Variant class from signatures.py.
     """
     name: str  # pangolin name
@@ -68,7 +69,7 @@ class ShowVariantList(BaseModel):
         description="Select Variants"
     )
 
-# Cache the API calls to avoid unnecessary requests
+
 @st.cache_data(ttl=3600)  # Cache for 1 hour
 def cached_get_variant_list():
     """Cached version of get_variant_list to avoid repeated API calls."""
@@ -80,37 +81,23 @@ def cached_get_variant_names():
     return get_variant_names()
 
 def app():
-    # Initialize session state variables if they don't exist
-    if "manual_variant_name_input" not in st.session_state:
-        st.session_state.manual_variant_name_input = ""
-    if "manual_mutations_input" not in st.session_state:
-        st.session_state.manual_mutations_input = ""
-    if "clear_manual_inputs_flag" not in st.session_state:
-        st.session_state.clear_manual_inputs_flag = False
+    # Initialize all session state variables
+    VariantSignatureComposerState.initialize()
     
-    # Initialize the main list of combined variants in session state
-    if 'combined_variants_object' not in st.session_state:
-        st.session_state.combined_variants_object = VariantList()
+    # Apply clearing flag for manual inputs if needed
+    VariantSignatureComposerState.apply_clear_flag()
     
     # Create a reference to the persistent variant list
-    combined_variants = st.session_state.combined_variants_object
-    
-    # Initialize session state for the curated variants multiselect
-    if 'ui_selected_curated_names' not in st.session_state:
-        available_curated_names_init = cached_get_variant_names() # Initial fetch for default
-        st.session_state.ui_selected_curated_names = ["LP.8"] if "LP.8" in available_curated_names_init else []
-    
-    # Check and apply the clearing flag for manual inputs
-    if st.session_state.clear_manual_inputs_flag:
-        st.session_state.manual_variant_name_input = ""
-        st.session_state.manual_mutations_input = ""
-        st.session_state.clear_manual_inputs_flag = False # Reset the flag
+    combined_variants = VariantSignatureComposerState.get_combined_variants()
     
     # Now start the UI
-    st.title("Multi Variant Signature Composer")
+    st.title("Variant Signature Composer")
+    st.subheader("Compose the list of variants and their respective mutational signatures.")
+    st.write("This page allows you to select variants of interest and their respective signature mutations.")
+    st.write("You can either select from a curated list, compose a custom variant signature with live queries to CovSpectrum or manually input the mutations.")
+    st.write("The selected variants will be used to build a mutation-variant matrix.")
 
-    st.write("This page will create the mutation-variant matrix.")
-    st.write("This is one of the inputs to Lollipop")
+    st.write("This is one of the inputs that requires human judgment for finding the abundance of the variants in the wastewater data.")
 
     st.markdown("---")
 
@@ -136,13 +123,13 @@ def app():
     selected_curated_variants = st.multiselect(
         "Select known variants of interest – curated by the V-Pipe team",
         options=available_variants,
-        default=st.session_state.ui_selected_curated_names,
+        default=VariantSignatureComposerState.get_selected_curated_names(),
         help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team (see https://github.com/cbg-ethz/cowwid/tree/master/voc)"
     )
     
     # Update the session state if the selection has changed
-    if selected_curated_variants != st.session_state.ui_selected_curated_names:
-        st.session_state.ui_selected_curated_names = selected_curated_variants
+    if selected_curated_variants != VariantSignatureComposerState.get_selected_curated_names():
+        VariantSignatureComposerState.set_selected_curated_names(selected_curated_variants)
         st.rerun()
     
     # Sync the combined_variants with selected curated variants
@@ -280,18 +267,13 @@ def app():
                         
                         st.success(f"Added manual variant '{manual_variant_name}' with {len(validated_signature_mutations)} mutations.")
                         # Set flag to clear inputs on next rerun
-                        st.session_state.clear_manual_inputs_flag = True
+                        VariantSignatureComposerState.clear_manual_inputs()
                         st.rerun() # Trigger rerun
     
     if not selected_variants:
         st.warning("Please select at least one variant from either the curated list or create a custom variant")
     
-
     st.markdown("---")
-
-    # Display the selected variants - as a mutliselect box - fill it with the selected variants
-    # allow the user to remove selected variants
-    # Show the selected variants in a multiselect box
     st.subheader("Selected Variants")
     
     # Get the current variants for display
@@ -334,7 +316,6 @@ def app():
         # Sort mutations for consistent display
         all_mutations = sorted(list(all_mutations))
         
-        # Build the matrix
         # Create a DataFrame with mutations as rows and variants as columns
         matrix_data = []
         for mutation in all_mutations:

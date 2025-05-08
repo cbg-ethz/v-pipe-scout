@@ -24,13 +24,13 @@ class Mutation(BaseModel):
     ref: str
     alt: str
 
-    @validator('position')
+    @validator('position', allow_reuse=True)
     def validate_position(cls, v):
         if v <= 0:
             raise ValueError("Position must be a positive integer")
         return v
 
-    @validator('ref')
+    @validator('ref', allow_reuse=True)
     def validate_ref(cls, v):
         if not (len(v) == 0 or len(v) == 1):
             raise ValueError("Reference must be empty or a single nucleotide")
@@ -38,7 +38,7 @@ class Mutation(BaseModel):
             raise ValueError("Reference must be one of A, C, G, T, or N")
         return v
 
-    @validator('alt')
+    @validator('alt', allow_reuse=True)
     def validate_alt(cls, v):
         if len(v) != 1:
             raise ValueError("Alternative must be a single character")

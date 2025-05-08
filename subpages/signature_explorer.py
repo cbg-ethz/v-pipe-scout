@@ -19,6 +19,13 @@ wiseLoculus = WiseLoculusLapis(wise_server_ip)
 covSpectrum = CovSpectrumLapis(cov_sprectrum_api)
 
 def app():
+
+    st.title("Variant Signature Explorer")
+    st.subheader("Explore the variant signatures in the wastewater data.")
+    st.write("First make a variant definition based on live queries to CovSpectrum.")
+    st.write("Then explore the variant signature in the wastewater data, on read level.")
+
+
     # Configure the component with full functionality
     component_config = {
         'show_nucleotides_only': False,
@@ -26,7 +33,7 @@ def app():
         'show_distributions': True,
         'show_download': True,
         'show_plot': True,
-        'title': "Variant Signature Composer",
+        'title': "Variant Signature Explorer",
         'show_title': True,
         'show_description': True
     }
@@ -39,8 +46,6 @@ def app():
     )
 
     st.markdown("---")
-
-    ## Add a subheader: Make dynamic plot of this
 
     st.subheader("Dynamic Mutations-over-time of Signature Mutations")
     st.markdown("#### on Read Level")

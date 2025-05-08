@@ -2,15 +2,15 @@ import streamlit as st
 import subpages.index as index
 import subpages.resistance_mut_silo as resistance_mut_silo
 import subpages.dynamic_mutations as dynamic_mutations
-import subpages.variant_signature_compose as variant_signature_compose
-import subpages.multi_variant_signatures as multi_variant_signatures
+import subpages.signature_explorer as signature_explorer
+import subpages.variant_signature_composer as variant_signature_composer
 
 PAGES = {
     "Home": {"module": index},
     "Resistance Mutations": {"module": resistance_mut_silo},
     "Dynamic Mutation Heatmap": {"module": dynamic_mutations},
-    "Variant Signature Composer": {"module": variant_signature_compose},
-    "Multi Variant Signature Composer": {"module": multi_variant_signatures},
+    "Variant Signature Explorer": {"module": signature_explorer},
+    "Variant Signature Composer": {"module": variant_signature_composer},
 }
 
 def sidebar():
