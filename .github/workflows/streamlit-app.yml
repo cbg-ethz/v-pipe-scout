@@ -1,4 +1,4 @@
-name: Streamlit app
+name: Streamlit App CI
 
 on:
   push:
@@ -17,9 +17,9 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v3
         with:
           environment-file: environment.yml
-          activate-environment: vpipe-frontend
+          activate-environment: v-pipe-scout
           auto-activate-base: false
       - name: Testing – Smoke & Unit Tests
-        run: conda run -n vpipe-frontend pytest
+        run: conda run -n v-pipe-scout pytest
         env:
           PYTHONPATH: ${{ github.workspace }}
