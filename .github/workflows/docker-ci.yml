@@ -21,11 +21,16 @@ jobs:
 
       - name: Check if Docker container is running
         run: |
-          sleep 10 # Give the container a moment to start
-          docker ps
-          if [ $(docker ps -q -f "ancestor=v-pipe-scout") ]; then
-            echo "Docker container is running."
-          else
+          for i in {1..30}; do # Wait up to 30 seconds for the container to start
+            if [ $(docker ps -q -f "ancestor=v-pipe-scout") ]; then
+              echo "Docker container is running."
+              break
+            else
+              echo "Waiting for Docker container to start..."
+              sleep 1
+            fi
+          done
+          if [ -z $(docker ps -q -f "ancestor=v-pipe-scout") ]; then
             echo "Docker container failed to start."
             docker logs $(docker ps -aq -f "ancestor=v-pipe-scout" | head -n 1)
             exit 1
