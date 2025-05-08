@@ -1,4 +1,4 @@
-name: vpipe-frontend
+name: v-pipe-scout
 channels:
   - conda-forge
   - bioconda
