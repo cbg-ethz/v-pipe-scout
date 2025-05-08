@@ -58,4 +58,4 @@ docker:
 	@echo "Building Docker image..."
 	@docker build -t v-pipe-scout .
 	@echo "Running Docker container..."
-	@docker run -p 80:8000 v-pipe-scout
+	@docker run -d -p 80:8000 v-pipe-scout

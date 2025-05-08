@@ -59,21 +59,44 @@ _Only accessible within ETH Zürich Networks._
       cov_sprectrum_api: "https://lapis.cov-spectrum.org"
     ```
 
-3. Set up the environment (optional if using Docker):
-    ```sh
-    conda env create -f environment.yml
-    conda activate vpipe-scout
-    ```
+3. Choose one of the following installation methods:
 
-4. Build the Docker image:
-    ```sh
-    docker build -t v-pipe-scout .
-    ```
+#### Option A: Using Makefile (Recommended)
 
-5. Run the Docker container:
-    ```sh
-    docker run -p 80:8000 v-pipe-scout
-    ```
+The project includes a Makefile to simplify setup and execution:
+
+```sh
+# View available commands
+make help
+
+# Set up the conda environment and install dependencies
+make setup
+
+# Run the application
+make run
+```
+
+#### Option B: Manual Setup
+
+```sh
+# Create and activate conda environment
+conda env create -f environment.yml
+conda activate v-pipe-scout
+
+# Run the application
+streamlit run app.py
+```
+
+#### Option C: Using Docker
+
+```sh
+# Build and run with one command
+make docker
+
+# Or manually
+docker build -t v-pipe-scout .
+docker run -d -p 80:8000 v-pipe-scout
+```
 
 
 ## Project Origin
