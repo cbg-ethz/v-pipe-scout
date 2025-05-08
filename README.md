@@ -5,6 +5,7 @@
 ![Streamlit](https://img.shields.io/badge/streamlit-1.45.0-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+
 ## Overview
 
 Recognizing and quantifying viral variants from wastewater requires expert human judgment in the final steps.
@@ -17,16 +18,21 @@ This Proof-of-Concept is set up for SARS-CoV-2, yet is built to be virus-agnosti
 This is an effort of the V-Pipe team.
 For more information about V-Pipe, visit the [V-Pipe website](https://cbg-ethz.github.io/V-pipe/).
 
+<div align="center">
+  <img src="images/1Month_POC_FastQueryReads.png" alt="Fast Query Visualization" width="800"/>
+  <p><em>Real-time visualization of viral sequencing data</em></p>
+</div>
+
 Specifically, V-Pipe Scout enables:
-- Exploration of mutations at the read level  
+- **Exploration of mutations at the read level**  
     - For known resistance mutations  
     - Guided by smart filters and variant signatures
-- Composition of variant signatures for abundance estimates  
-    - Leveraging clinical sequence databases (e.g., CovSpectrum)  
+- **Composition of variant signatures for abundance estimates**  
+    - Leveraging clinical sequence databases (e.g., [CovSpectrum](https://cov-spectrum.org/))  
     - Using curated variant signatures
 
 Further, we will implement:
-- On-demand variant abundance estimates by [Lollipop](https://github.com/cbg-ethz/LolliPop)  
+- On-demand variant abundance estimates by [Lollipop](https://github.com/cbg-ethz/LolliPop)
 
 V-Pipe Scout brings together:
 - [V-pipe](https://github.com/cbg-ethz/V-pipe) - our prime Wastewater Viral Analysis Pipeline, see [publication](https://www.biorxiv.org/content/10.1101/2023.10.16.562462v1.full). 
