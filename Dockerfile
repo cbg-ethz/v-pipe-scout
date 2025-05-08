@@ -23,4 +23,4 @@ COPY . .
 EXPOSE 8000
 
 # Run the Streamlit application
-CMD ["conda", "run", "-n", "vpipe-frontend", "streamlit", "run", "app.py", "--server.port=8000", "--server.address=0.0.0.0"]
+CMD ["conda", "run", "-n", "v-pipe-scout", "streamlit", "run", "app.py", "--server.port=8000", "--server.address=0.0.0.0"]
