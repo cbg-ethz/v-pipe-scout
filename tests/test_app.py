@@ -1,12 +1,26 @@
-"""test_app.py"""
+"""test_app.py - Tests for the V-Pipe Online Streamlit application"""
+
 from streamlit.testing.v1 import AppTest
 
-def test_app():
+
+def test_navigation_links():
+    """Test that all navigation links are present in the sidebar."""
     at = AppTest.from_file("app.py")
     at.run()
-    # Check that the sidebar is rendered
-    assert at.sidebar is not None
-    # Check that the navigation radio exists and has the correct options
-    nav_radio = at.sidebar.radio[0] # Access the first radio button
-    assert nav_radio.label == "Explore the data using" # Verify it's the correct one by label
+    
+    # Get all page links from the sidebar
+    page_links = at.sidebar.get("page_link")
+    
+    # Check that we have the expected number of navigation links (5 pages)
+    assert len(page_links) == 5
+    
+    # Check that all expected page titles are present in the navigation
+    expected_pages = ["Home", "Resistance Mutations", "Dynamic Mutation Heatmap", 
+                     "Variant Signature Explorer", "Variant Signature Composer"]
+    
+    page_titles = [link.label for link in page_links]
+    for expected_page in expected_pages:
+        assert any(expected_page in title for title in page_titles)
+
+
     
