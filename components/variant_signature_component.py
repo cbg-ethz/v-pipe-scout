@@ -13,18 +13,18 @@ import matplotlib.pyplot as plt
 from typing import List, Dict, Optional, Tuple, Any
 
 
-def initialize_session_state() -> None:
+def initialize_session_state(session_prefix: str = "") -> None:
     """Initialize the session state variables needed for the component."""
-    if 'last_change' not in st.session_state:
-        st.session_state['last_change'] = time.time()
-    if 'mutations' not in st.session_state:
-        st.session_state['mutations'] = []
-    if 'mutation_df' not in st.session_state:
-        st.session_state['mutation_df'] = pd.DataFrame()
-    if 'edit_mode' not in st.session_state:
-        st.session_state['edit_mode'] = False
-    if 'debounce_triggered' not in st.session_state:
-        st.session_state['debounce_triggered'] = False
+    if f'{session_prefix}last_change' not in st.session_state:
+        st.session_state[f'{session_prefix}last_change'] = time.time()
+    if f'{session_prefix}mutations' not in st.session_state:
+        st.session_state[f'{session_prefix}mutations'] = []
+    if f'{session_prefix}mutation_df' not in st.session_state:
+        st.session_state[f'{session_prefix}mutation_df'] = pd.DataFrame()
+    if f'{session_prefix}edit_mode' not in st.session_state:
+        st.session_state[f'{session_prefix}edit_mode'] = False
+    if f'{session_prefix}debounce_triggered' not in st.session_state:
+        st.session_state[f'{session_prefix}debounce_triggered'] = False
 
 
 def fetch_mutations(
