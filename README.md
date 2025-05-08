@@ -1,15 +1,9 @@
-# V-Pipe on Cloud: Front-End for On-Demand Analysis
+# V-Pipe Scout: Rapid Interactive Viral Variant Detection 
 
-![WIP](https://img.shields.io/badge/status-WIP-yellow)
+![POC](https://img.shields.io/badge/status-POC-yellow)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue)
 ![Streamlit](https://img.shields.io/badge/streamlit-0.84.0-brightgreen)
 ![Docker](https://img.shields.io/badge/docker-19.03.12-blue)
-![AWS S3](https://img.shields.io/badge/AWS%20S3-Cloud-orange)
-
-This project provides a front-end interface for three primary use cases:
-- On-demand heatmaps of mutations to identify new variants emerging, based on V-Pipe outputs.
-- On-demand variant deconvolution powered by LolliPop.
-- On-demand heatmaps of resistance mutations - querying LAPS of wastewater data. 
 
 ## Overview
 
@@ -17,72 +11,41 @@ This front-end application is part of the "V-Pipe on Cloud" initiative, which ai
 
 For more information about V-Pipe, visit the [V-Pipe website](https://cbg-ethz.github.io/V-pipe/).
 
-## Tech Stack
-
-- **Python**: The core programming language used for the project.
-- **Streamlit**: Used for creating the front-end interface.
-- **Docker**: Used to containerize the application, ensuring consistency across different environments.
-- **AWS S3**: Used for storing and retrieving data files.
-
-## Work in Progress
-
-This project is a work in progress and is being actively developed. Contributions and feedback are welcome.
-
-## Hackathon Project
-
-This project was initiated as part of a hackathon project at the [BioHackathon Europe 2024](https://biohackathon-europe.org/).
-
-## Related Repositories
-
-This repository relates to the back-end at [vpipe-biohack24-backend](https://github.com/cbg-ethz/vpipe-biohack24-backend).
-
 ## Deployment
 
-The current deployment of this project can be accessed at [biohack24.g15n.net](http://biohack24.g15n.net).
+The current deployment of this project can be accessed at [dev.vpipe.ethz.ch](dev.vpipe.ethz.ch).
 
-## Getting Started
 
-### Prerequisites
-
-- Docker
-- AWS credentials with access to the required S3 buckets
 ### Installation
 
 1. Clone the repository:
     ```sh
     git clone https://github.com/cbg-ethz/vpipe-biohack24-frontend.git
-    cd vpipe-biohack24-frontend
-    ```
+    cd vpipe-biohack24-frontend    ```
 
-2. Create a `.secrets.toml` file in the `.streamlit` directory with your AWS credentials and S3 bucket information:
-    ```env
-    AWS_ACCESS_KEY_ID=your_access_key_id
-    AWS_SECRET_ACCESS_KEY=your_secret_access_key
-    S3_BUCKET_NAME=your_s3_bucket_name
-    ```
 
-3. Configure the server IP addresses to LAPIS API for clinical and wastewater data in `config.yaml` including ports:
+2. Configure the Wise Loculus to LAPIS APIs for clinical and wastewater data in `config.yaml` including ports:
     ```env
-    server:
-        ip_address: "http://3.71.80.16:8000"
-        lapis_address: "http://3.126.120.246:8080"
+        server:
+        lapis_address: "http://88.198.54.174:80"
+        cov_sprectrum_api: "https://lapis.cov-spectrum.org"
     ```
 
 4. Build the Docker image:
     ```sh
-    docker build -t vpipe-frontend .
+    docker build -t v-pipe-scout .
     ```
 
 5. Run the Docker container:
     ```sh
-    docker run -p 8000:8000 vpipe-frontend
+    docker run -p 80:8000 v-pipe-scout
     ```
 
-### Usage
 
-1. Open your web browser and navigate to `http://localhost:8000` to access the application.
+## Project Origin
 
-2. Follow the on-screen instructions to upload your data and generate heatmaps or perform variant deconvolution.
+This project was initiated as part of a hackathon project at the [BioHackathon Europe 2024](https://biohackathon-europe.org/).
+
 
 ## Contributing
 
