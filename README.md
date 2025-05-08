@@ -16,16 +16,16 @@ This Proof-Of-Concept is setup for Sars-Cov-2, yet is build virus agnostic and t
 This is an effort of the V-Pipe team.
 For more information about V-Pipe, visit the [V-Pipe website](https://cbg-ethz.github.io/V-pipe/).
 
-Specifically V-Pipe Scout enables:
-    - to explore Mutations on Read level
-        - for known Resistance Mutations
-        - guided by smart filters and Variant Signatures
-    - to compose Variant Signatures, used in the Variant Abundancec estimates
-        - by leveraging clinical sequencce databases e.g. CovSpectrum
-        - and our curated Variant Signatures
+Specifically, V-Pipe Scout enables:
+- Exploration of mutations at the read level  
+    - For known resistance mutations  
+    - Guided by smart filters and variant signatures
+- Composition of variant signatures for abundance estimates  
+    - Leveraging clinical sequence databases (e.g., CovSpectrum)  
+    - Using curated variant signatures
 
-Further we will implement:
-    - on-demand Variant Abundance Estimates by [Lollipop](https://github.com/cbg-ethz/LolliPop)
+Further, we will implement:
+- On-demand variant abundance estimates by [Lollipop](https://github.com/cbg-ethz/LolliPop)  
 
 V-Pipe Scout brings toegther:
 - [V-pipe](https://github.com/cbg-ethz/V-pipe) our prime Wastewater Viral Analyis Pipeline, see [publication](https://www.biorxiv.org/content/10.1101/2023.10.16.562462v1.full). 
