@@ -14,12 +14,25 @@ if __name__ == "__main__":
     
     # Create navigation with proper URLs for subpages, but hide the default navigation UI
     # to replace it with a custom navigation system in the sidebar for a more tailored user experience.
+    # Page configurations
+    PAGE_CONFIGS = [
+        {"app": index.app, "title": "Home", "icon": "🏠", "default": True, "url_path": None},
+        {"app": resistance_mut_silo.app, "title": "Resistance Mutations", "icon": "🧬", "url_path": "resistance"},
+        {"app": dynamic_mutations.app, "title": "Dynamic Mutation Heatmap", "icon": "🧮", "url_path": "dynamic-mutations"},
+        {"app": signature_explorer.app, "title": "Variant Signature Explorer", "icon": "🔍", "url_path": "signature-explorer"},
+        {"app": variant_signature_composer.app, "title": "Variant Signature Composer", "icon": "🧩", "url_path": "signature-composer"}
+    ]
+    
+    # Create pages dynamically from configurations
     pages = [
-        st.Page(index.app, title="Home", icon="🏠", default=True),
-        st.Page(resistance_mut_silo.app, title="Resistance Mutations", icon="🧬", url_path="resistance"),
-        st.Page(dynamic_mutations.app, title="Dynamic Mutation Heatmap", icon="🧮", url_path="dynamic-mutations"),
-        st.Page(signature_explorer.app, title="Variant Signature Explorer", icon="🔍", url_path="signature-explorer"),
-        st.Page(variant_signature_composer.app, title="Variant Signature Composer", icon="🧩", url_path="signature-composer")
+        st.Page(
+            config["app"],
+            title=config["title"],
+            icon=config["icon"],
+            default=config.get("default", False),
+            url_path=config.get("url_path")
+        )
+        for config in PAGE_CONFIGS
     ]
     
     # Get the current page but hide the navigation UI
