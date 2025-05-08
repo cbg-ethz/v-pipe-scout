@@ -1,8 +1,8 @@
-# Makefile for vpipe-biohack24-frontend
+# Makefile for v-pipe-scout
 # This Makefile provides commands to set up and run the project
 
 # Environment name
-ENV_NAME = vpipe-frontend
+ENV_NAME = v-pipe-scout
 
 # Default target
 .PHONY: all
@@ -11,7 +11,7 @@ all: help
 # Help message
 .PHONY: help
 help:
-	@echo "V-Pipe BioHack24 Frontend Makefile"
+	@echo "V-Pipe Scout Frontend"
 	@echo "=================================="
 	@echo ""
 	@echo "Available commands:"
@@ -56,6 +56,6 @@ update:
 .PHONY: docker
 docker:
 	@echo "Building Docker image..."
-	@docker build -t vpipe-frontend .
+	@docker build -t v-pipe-scout .
 	@echo "Running Docker container..."
-	@docker run -p 8000:8000 vpipe-frontend
+	@docker run -p 80:8000 v-pipe-scout
