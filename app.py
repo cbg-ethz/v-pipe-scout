@@ -12,18 +12,27 @@ if __name__ == "__main__":
         layout="wide"
     )
     
-    # Display the logo at the top of the sidebar
-    st.sidebar.image("images/V-Pipe_SILO_logo.png", caption="")
-    
-    # Create navigation with proper URLs for subpages
+    # Create navigation with proper URLs for subpages, but hide the default navigation UI
     pages = [
         st.Page(index.app, title="Home", icon="🏠", default=True),
         st.Page(resistance_mut_silo.app, title="Resistance Mutations", icon="🧬", url_path="resistance"),
-        st.Page(dynamic_mutations.app, title="Dynamic Mutation Heatmap", icon="🔥", url_path="dynamic-mutations"),
+        st.Page(dynamic_mutations.app, title="Dynamic Mutation Heatmap", icon="🧮", url_path="dynamic-mutations"),
         st.Page(signature_explorer.app, title="Variant Signature Explorer", icon="🔍", url_path="signature-explorer"),
         st.Page(variant_signature_composer.app, title="Variant Signature Composer", icon="🧩", url_path="signature-composer")
     ]
     
-    # Get the current page and run it
-    current_page = st.navigation(pages, position="sidebar")
+    # Get the current page but hide the navigation UI
+    current_page = st.navigation(pages, position="hidden")
+    
+    # Display the logo and create custom navigation in the sidebar
+    with st.sidebar:
+        # Display the logo above navigation
+        st.image("images/V-Pipe_SILO_logo.png", caption="")
+        st.title("Navigation")
+        
+        # Create custom navigation links using page_link
+        for page in pages:
+            st.page_link(page, label=f"{page.icon} {page.title}" if page.icon else page.title)
+    
+    # Run the current page
     current_page.run()
