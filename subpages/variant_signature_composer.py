@@ -328,7 +328,6 @@ def app():
         # Create column names (variant names)
         columns = ["Mutation"] + [variant.name for variant in combined_variants.variants]
 
-        import re
         # Extract the position number from mutation strings for sorting
         def extract_position(mutation_str):
             # Use the same regex pattern from Mutation.validate_mutation_string
