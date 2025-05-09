@@ -536,6 +536,8 @@ def app():
                 
                 # First prepare the data in a suitable format
                 binary_matrix = matrix_df.set_index("Mutation")
+
+                st.write(binary_matrix.index)
         
                 # Use Plotly for a more interactive visualization
                 fig = go.Figure(data=go.Heatmap(
@@ -546,8 +548,12 @@ def app():
                     showscale=False,  # Hide color scale bar
                     hoverongaps=False
                 ))
-                
-                # Customize layout
+
+                # Calculate dimensions based on data size
+                num_mutations = len(binary_matrix.index)
+                num_variants = len(binary_matrix.columns)
+
+                # Customize layout with settings to ensure all labels are visible
                 fig.update_layout(
                     title='Mutation-Variant Matrix',
                     xaxis=dict(
@@ -556,10 +562,14 @@ def app():
                     ),
                     yaxis=dict(
                         title='Mutation',
+                        automargin=True,  # Automatically adjust margins for labels
+                        tickmode='array',  # Force all ticks
+                        tickvals=list(range(len(binary_matrix.index))),  # Positions for each mutation
+                        ticktext=binary_matrix.index,  # Actual mutation labels
                     ),
-                    height=max(500, min(1200, 20 * len(all_mutations))),  # Dynamic height based on mutations
-                    width=max(600, 100 * len(combined_variants.variants)),  # Dynamic width based on variants
-                    margin=dict(l=100, r=20, t=60, b=20),  # Adjust margins for labels
+                    height=max(500, min(2000, 25 * num_mutations)),  # Dynamic height based on mutations
+                    width=max(600, 120 * num_variants),  # Dynamic width based on variants
+                    margin=dict(l=150, r=20, t=50, b=20),  # Increase left margin for y labels
                 )
                 
                 # Add custom hover text
