@@ -327,6 +327,23 @@ def app():
         
         # Create column names (variant names)
         columns = ["Mutation"] + [variant.name for variant in combined_variants.variants]
+
+        import re
+        # Extract the position number from mutation strings for sorting
+        def extract_position(mutation_str):
+            # Use the same regex pattern from Mutation.validate_mutation_string
+            match = re.match(r"^([ACGTN]?)(\d+)([ACGTN-])$", mutation_str.upper())
+            if match:
+                return int(match.group(2))  # Return the position as integer
+            return 0  # Fallback if regex fails
+        
+        # Sort mutations by position number
+        matrix_data.sort(key=lambda x: extract_position(x[0]), reverse=True)  # Sort by position in descending order
+        
+        # Sort columns alphabetically by variant name, but keep "Mutation" as the first column
+        variant_columns = columns[1:]  # Skip the "Mutation" column
+        variant_columns.sort()  # Sort alphabetically
+        columns = ["Mutation"] + variant_columns
         
         # Create DataFrame
         matrix_df = pd.DataFrame(matrix_data, columns=columns)
@@ -519,7 +536,6 @@ def app():
                 
                 # First prepare the data in a suitable format
                 binary_matrix = matrix_df.set_index("Mutation")
-                
         
                 # Use Plotly for a more interactive visualization
                 fig = go.Figure(data=go.Heatmap(
