@@ -577,16 +577,6 @@ def app():
             mime="text/csv",
         )
         
-        # Also prepare a YAML for var_dates
-        var_dates = {variant.name: "" for variant in combined_variants.variants}
-        yaml_str = yaml.dump(var_dates, default_flow_style=False)
-        
-        st.download_button(
-            label="Download var_dates.yaml Template",
-            data=yaml_str,
-            file_name="var_dates.yaml",
-            mime="text/yaml",
-        )
 
 if __name__ == "__main__":
     app()
