@@ -532,8 +532,6 @@ def app():
                 
                 # First prepare the data in a suitable format
                 binary_matrix = matrix_df.set_index("Mutation")
-
-                st.write(binary_matrix.index)
         
                 # Use Plotly for a more interactive visualization
                 fig = go.Figure(data=go.Heatmap(
