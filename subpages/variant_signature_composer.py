@@ -336,12 +336,11 @@ def app():
 
         # Visualize the data in different ways
         if len(combined_variants.variants) > 1:
-            import altair as alt
             
             # Create a matrix to show shared mutations between variants
             variant_names = [variant.name for variant in combined_variants.variants]
             variant_comparison = pd.DataFrame(index=variant_names, columns=variant_names)
-            
+
             # For each pair of variants, count the number of shared mutations
             for i, variant1 in enumerate(combined_variants.variants):
                 for j, variant2 in enumerate(combined_variants.variants):
@@ -511,9 +510,10 @@ def app():
 
             # 3. Mutation-Variant Matrix Visualization (heatmap) - Collapsible
             with st.expander("Variant-Signatures Bitmap Visualization", expanded=False):
+
                 # Add debug information at the top of the expander
                 if not variant_comparison_melted.empty:
-                    st.write(f"Comparing {len(combined_variants.variants)} variants with {variant_comparison_melted['shared_mutations'].sum()} total shared mutations")
+                    st.write(f"Comparing {len(combined_variants.variants)} variants with {len(all_mutations)} unique mutations.")
                 
                 st.write("This heatmap shows which mutations (rows) are present in each variant (columns). Blue cells indicate the mutation is present.")
                 
