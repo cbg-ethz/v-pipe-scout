@@ -16,6 +16,7 @@ import matplotlib
 import plotly.graph_objects as go
 from pydantic import BaseModel, Field
 from typing import List
+import re
 
 from api.signatures import get_variant_list, get_variant_names
 from api.signatures import Mutation
