@@ -528,10 +528,6 @@ def app():
             # 3. Mutation-Variant Matrix Visualization (heatmap) - Collapsible
             with st.expander("Variant-Signatures Bitmap Visualization", expanded=False):
 
-                # Add debug information at the top of the expander
-                if not variant_comparison_melted.empty:
-                    st.write(f"Comparing {len(combined_variants.variants)} variants with {len(all_mutations)} unique mutations.")
-                
                 st.write("This heatmap shows which mutations (rows) are present in each variant (columns). Blue cells indicate the mutation is present.")
                 
                 # First prepare the data in a suitable format
