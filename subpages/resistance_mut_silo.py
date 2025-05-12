@@ -3,9 +3,9 @@ import numpy as np
 import streamlit as st
 import pandas as pd
 import asyncio
-import seaborn as sns
 import yaml
 import streamlit.components.v1 as components
+import plotly.graph_objects as go # Added
 
 from api.wiseloculus import WiseLoculusLapis
 
@@ -37,28 +37,81 @@ def fetch_reformat_data(formatted_mutations, date_range):
     return df
 
 
-def plot_heatmap(df):
-    # Replace None with np.nan and remove commas from numbers
-    df = df.replace({None: np.nan, ',': ''}, regex=True).astype(float)
+def plot_resistance_mutations(df):
+    """Plot resistance mutations over time as a heatmap using Plotly."""
 
-    # Create a colormap with a custom color for NaN values
-    cmap = sns.color_palette("Blues", as_cmap=True)
-    cmap.set_bad(color='#FFCCCC')  # Set NaN values to a fainter red color
+    # Replace None with np.nan and remove commas from numbers, then convert to float
+    df_processed = df.replace({None: np.nan, ',': ''}, regex=True).astype(float)
 
-    # Adjust the plot size based on the number of rows in the dataframe
-    height = max(8, len(df) * 0.3)  # Minimum height of 8, with 0.5 units per row
-    fig, ax = plt.subplots(figsize=(15, height))
+    # Create hover text
+    hover_text = []
+    for mutation in df_processed.index:
+        row_hover_text = []
+        for date in df_processed.columns:
+            count = df_processed.loc[mutation, date]
+            if pd.isna(count):
+                text = f"Mutation: {mutation}<br>Date: {date}<br>Status: No data"
+            else:
+                text = f"Mutation: {mutation}<br>Date: {date}<br>Count: {count:.1f}"
+            row_hover_text.append(text)
+        hover_text.append(row_hover_text)
 
-    annot = True if df.shape[0] * df.shape[1] <= 100 else False  # Annotate only if the plot is small enough
-    sns.heatmap(df, cmap=cmap, ax=ax, cbar_kws={'label': 'Occurrence Frequency', 'orientation': 'horizontal'}, 
-                linewidths=.5, linecolor='lightgrey', annot=annot, fmt=".1f", 
-                annot_kws={"size": 10}, mask=df.isnull(), cbar=True, cbar_ax=fig.add_axes([0.15, 0.90, 0.7, 0.02]))
+    # Determine dynamic height
+    height = max(400, len(df_processed.index) * 20 + 100) # Base height + per mutation + padding for title/axes
 
-    # Set axis labels
-    ax.set_xticks([0, len(df.columns) // 2, len(df.columns) - 1])
-    ax.set_xticklabels([df.columns[0], df.columns[len(df.columns) // 2], df.columns[-1]], rotation=45)
+    # Determine dynamic left margin based on mutation label length
+    max_len_mutation_label = 0
+    if not df_processed.index.empty: # Check if index is not empty
+        max_len_mutation_label = max(len(str(m)) for m in df_processed.index)
+    
+    margin_l = max(80, max_len_mutation_label * 7 + 30) # Min margin or calculated, adjust multiplier as needed
+
+
+    fig = go.Figure(data=go.Heatmap(
+        z=df_processed.values,
+        x=df_processed.columns,
+        y=df_processed.index,
+        colorscale='Blues',
+        showscale=True,
+        colorbar=dict(title='Count', orientation='h', y=1.05, x=0.5, xanchor='center', yanchor='bottom'),
+        hoverongaps=False, # Do not show hover for gaps (NaNs)
+        text=hover_text,
+        hoverinfo='text'
+    ))
+
+    # Customize layout
+    num_cols = len(df_processed.columns)
+    tick_indices = []
+    tick_labels = []
+    if num_cols > 0:
+        tick_indices = [df_processed.columns[0]]
+        if num_cols > 1:
+            tick_indices.append(df_processed.columns[num_cols // 2])
+        if num_cols > 2 and num_cols //2 != num_cols -1 : # Avoid duplicate if middle is last
+             tick_indices.append(df_processed.columns[-1])
+        tick_labels = [str(label) for label in tick_indices]
+
+
+    fig.update_layout(
+        title='Resistance Mutations Over Time',
+        xaxis=dict(
+            title='Date',
+            side='bottom',
+            tickmode='array',
+            tickvals=tick_indices,
+            ticktext=tick_labels,
+            tickangle=45,
+        ),
+        yaxis=dict(
+            title='Mutation',
+            autorange='reversed' # Show mutations from top to bottom as in original df
+        ),
+        height=height,
+        plot_bgcolor='lightpink',  # NaN values will appear as this background color
+        margin=dict(l=margin_l, r=20, t=80, b=100),  # Adjust margins
+    )
+    
     return fig
-
 
 
 def app():
@@ -166,8 +219,8 @@ def app():
             st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
         else:
             # Plot the heatmap
-            fig = plot_heatmap(df)
-            st.pyplot(fig)
+            fig = plot_resistance_mutations(df)
+            st.plotly_chart(fig, use_container_width=True)
     
 
     ### Debugging ###
