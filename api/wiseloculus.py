@@ -58,16 +58,9 @@ class WiseLoculusLapis(Lapis):
                 logging.error(await response.text())
                 return {"mutation": mutation, "data": None, "status_code": response.status, "error_details": await response.text()}
 
-    async def fetch_single_mutation(self, mutation: str, mutation_type: str, date_range: Tuple[datetime, datetime], location_name: Optional[str] = None) -> dict[str, Any]:
+    async def fetch_mutation_counts(self, mutations: List[str], mutation_type: str, date_range: Tuple[datetime, datetime], location_name: Optional[str] = None) -> List[dict[str, Any]]:
         """
-        Fetches data for a single mutation, specifying its type and optional location.
-        """
-        async with aiohttp.ClientSession() as session:
-            return await self.fetch_sample_aggregated(session, mutation, mutation_type, date_range, location_name)
-
-    async def fetch_all_data(self, mutations: List[str], mutation_type: str, date_range: Tuple[datetime, datetime], location_name: Optional[str] = None) -> List[dict[str, Any]]:
-        """
-        Fetches data for a list of mutations, specifying their type and optional location.
+        Fetches the mutation counts for a list of mutations, specifying their type and optional location.
         """
         async with aiohttp.ClientSession() as session:
             tasks = [self.fetch_sample_aggregated(session, m, mutation_type, date_range, location_name) for m in mutations]
