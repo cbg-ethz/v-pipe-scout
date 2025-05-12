@@ -129,13 +129,11 @@ def app():
 
     st.write("Select from the following resistance mutation sets:")
 
-    # TODO: currently hardcoded, should be fetched from the server
     options = {
         "3CLpro Inhibitors": 'data/translated_3CLpro_in_ORF1a_mutations.csv',
         "RdRP Inhibitors": 'data/translated_RdRp_in_ORF1a_ORF1b_mutations.csv',
         "Spike mAbs": 'data/translated_Spike_in_S_mutations.csv'
     }
-
 
     selected_option = st.selectbox("Select a resistance mutation set:", options.keys())
 
@@ -144,17 +142,14 @@ def app():
 
     df = pd.read_csv(options[selected_option])
 
-    
     # Get the list of mutations for the selected set
     mutations = df['Mutation'].tolist()
     # Apply the lambda function to each element in the mutations list
     formatted_mutations = mutations
     
-
     # Allow the user to choose a date range
     st.write("Select a date range:")
     date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08")])
-
 
     start_date = date_range[0].strftime('%Y-%m-%d')
     end_date = date_range[1].strftime('%Y-%m-%d')
@@ -163,6 +158,24 @@ def app():
     sequence_type_value = "amino acid"
 
     formatted_mutations_str = str(formatted_mutations).replace("'", '"')
+
+
+    ### Python plot ###
+    st.write("### Python Plot")
+    st.write("This plot shows the mutations over time.")
+
+    if st.button("Making Python Plot - manual API calls"):
+        st.write("Fetching data...")
+        df = fetch_reformat_data(formatted_mutations, date_range)
+        
+        # Check if the dataframe is all NaN
+        if df.isnull().all().all():
+            st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
+        else:
+            # Plot the heatmap
+            fig = plot_resistance_mutations(df)
+            st.plotly_chart(fig, use_container_width=True)
+    
 
     ### GenSpectrum Dashboard Component ###
 
@@ -206,23 +219,6 @@ def app():
         height=500,
     )
 
-    ### Python plot ###
-    st.write("### Python Plot")
-    st.write("This plot shows the mutations over time.")
-
-    if st.button("Making Python Plot - manual API calls"):
-        st.write("Fetching data...")
-        df = fetch_reformat_data(formatted_mutations, date_range)
-        
-        # Check if the dataframe is all NaN
-        if df.isnull().all().all():
-            st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
-        else:
-            # Plot the heatmap
-            fig = plot_resistance_mutations(df)
-            st.plotly_chart(fig, use_container_width=True)
-    
-
     ### Debugging ###
     st.write("### Debugging")
     st.write("This section shows the raw data for the mutations.")
@@ -239,7 +235,6 @@ def app():
     st.write(data_mut1)
     st.write("Data for mutation 2:")
     st.write(data_mut2)
-
 
     st.write('making calls to `sample/aggregated` endpoint for each mutation filtering for `aminoAcidMutations`: ["ORF1b:D475Y"]')
 if __name__ == "__main__":
