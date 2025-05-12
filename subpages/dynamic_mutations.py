@@ -2,7 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import yaml
-import logging # Import the logging module
+import logging 
 
 from api.lapis import Lapis
 
@@ -16,7 +16,7 @@ with open('config.yaml', 'r') as file:
 
 server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
 
-covSpectrumAPI = Lapis(server_ip)
+wiseLoculus = Lapis(server_ip)
 
 def app():
 
@@ -41,7 +41,7 @@ def app():
     ## Fetch locations from API
     default_locations = ["Zürich (ZH)", "Lugano (TI)", "Chur (GR)"] # Define default locations
     # Fetch locations using the new function
-    locations = covSpectrumAPI.fetch_locations(default_locations)
+    locations = wiseLoculus.fetch_locations(default_locations)
 
     location = st.selectbox("Select Location:", locations)
 
@@ -59,7 +59,7 @@ def app():
         </head>
             <body>
             <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
-            <gs-app lapis="{covSpectrumAPI.server_ip}">
+            <gs-app lapis="{wiseLoculus.server_ip}">
                 <gs-mutations-over-time
                 lapisFilter='{{"sampling_dateFrom":"{start_date}", "sampling_dateTo": "{end_date}", "location_name": "{location}"}}'
                 sequenceType='{sequence_type_value}'
