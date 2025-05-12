@@ -5,6 +5,9 @@ import aiohttp
 import asyncio
 from typing import Optional, List, Tuple, Any 
 from datetime import datetime
+
+import pandas as pd
+
 from .lapis import Lapis
 
 
@@ -149,3 +152,39 @@ class WiseLoculusLapis(Lapis):
                 ]
 
             return combined_results
+        
+    
+    def fetch_counts_and_coverage_3D_df_nuc(self, mutations, date_range, location_name) -> pd.DataFrame:
+        """Fetches mutation counts, coverage, and frequency for a list of nucleotide mutations over a date range.
+
+        Args:
+            mutations (list): List of nucleotide mutations to fetch data for.
+            date_range (tuple): Tuple containing start and end dates for the data range.
+
+        Returns:
+            pd.DataFrame: A MultiIndex DataFrame with mutation and sampling_date as the index, and count, coverage, and frequency as columns.
+        """
+        mutation_type = "nucleotide"
+        all_data = asyncio.run(self.fetch_mutation_counts_and_coverage(mutations, mutation_type, date_range, location_name))
+
+        # Flatten the data into a list of records
+        records = []
+        for mutation_data in all_data:
+            mutation = mutation_data["mutation"]
+            for stratified in mutation_data["stratified"]:
+                records.append({
+                    "mutation": mutation,
+                    "sampling_date": stratified["sampling_date"],
+                    "count": stratified["count"],
+                    "coverage": stratified["coverage"],
+                    "frequency": stratified["frequency"]
+                })
+
+        # Create a DataFrame from the records
+        df = pd.DataFrame(records)
+
+        # Set MultiIndex with mutation and sampling_date
+        df.set_index(["mutation", "sampling_date"], inplace=True)
+
+        # Return the DataFrame
+        return df
