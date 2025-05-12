@@ -72,9 +72,8 @@ def plot_resistance_mutations(df):
         x=df_processed.columns,
         y=df_processed.index,
         colorscale='Blues',
-        showscale=True,
-        colorbar=dict(title='Count', orientation='h', y=1.05, x=0.5, xanchor='center', yanchor='bottom'),
-        hoverongaps=False, # Do not show hover for gaps (NaNs)
+        showscale=False,  # Skip the color bar
+        hoverongaps=True, # Show hover for gaps (NaNs)
         text=hover_text,
         hoverinfo='text'
     ))
@@ -156,15 +155,11 @@ def app():
     mutaton_counts_df = fetch_reformat_data(formatted_mutations, date_range)
 
     if not mutaton_counts_df.empty:
-        # Check if the dataframe is all NaN
         if mutaton_counts_df.isnull().all().all():
             st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
         else:
-            # Plot the heatmap
             fig = plot_resistance_mutations(mutaton_counts_df)
             st.plotly_chart(fig, use_container_width=True)
-
-    ### GenSpectrum Dashboard Component ###
 
     st.write("### GenSpectrum Dashboard Dynamic Mutation Heatmap")
     st.write("This component only shows mutations above an unknown threshold.")
