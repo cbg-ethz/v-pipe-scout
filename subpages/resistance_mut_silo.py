@@ -5,9 +5,12 @@ import pandas as pd
 import asyncio
 import yaml
 import streamlit.components.v1 as components
-import plotly.graph_objects as go # Added
+import plotly.graph_objects as go 
 
 from api.wiseloculus import WiseLoculusLapis
+
+pd.set_option('future.no_silent_downcasting', True)
+
 
 # Load configuration from config.yaml
 with open('config.yaml', 'r') as file:
@@ -40,8 +43,8 @@ def fetch_reformat_data(formatted_mutations, date_range):
 def plot_resistance_mutations(df):
     """Plot resistance mutations over time as a heatmap using Plotly."""
 
-    # Replace None with np.nan and remove commas from numbers, then convert to float
-    df_processed = df.replace({None: np.nan, ',': ''}, regex=True).astype(float)
+    # Replace None with np.nan and remove commas from numbers
+    df_processed = df.replace({None: np.nan, ',': ''}, regex=True).infer_objects(copy=False).astype(float)
 
     # Create hover text
     hover_text = []
@@ -52,7 +55,7 @@ def plot_resistance_mutations(df):
             if pd.isna(count):
                 text = f"Mutation: {mutation}<br>Date: {date}<br>Status: No data"
             else:
-                text = f"Mutation: {mutation}<br>Date: {date}<br>Count: {count:.1f}"
+                text = f"Mutation: {mutation}<br>Date: {date}<br>Count: {count:.0f}"
             row_hover_text.append(text)
         hover_text.append(row_hover_text)
 
@@ -140,6 +143,11 @@ def app():
     st.write("Select a date range:")
     date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08")])
 
+    # Ensure date_range is a tuple with two elements
+    if len(date_range) != 2:
+        st.error("Please select a valid date range with a start and end date.")
+        return
+
     start_date = date_range[0].strftime('%Y-%m-%d')
     end_date = date_range[1].strftime('%Y-%m-%d')
 
@@ -152,18 +160,32 @@ def app():
     st.write("### Resistance Mutations Over Time")
     st.write("Shows the mutations over time in wastewater for the selected date range.")
 
+    # Add radio button for showing/hiding dates with no data
+    show_empty_dates = st.radio(
+        "Date display options:",
+        options=["Show all dates", "Skip dates with no coverage"],
+        index=0  # Default to showing all dates (off)
+    )
+
     mutaton_counts_df = fetch_reformat_data(formatted_mutations, date_range)
+
+    # Only skip NA dates if the option is selected
+    if show_empty_dates == "Skip dates with no coverage":
+        plot_df = mutaton_counts_df.dropna(axis=1, how='all')
+    else:
+        plot_df = mutaton_counts_df
 
     if not mutaton_counts_df.empty:
         if mutaton_counts_df.isnull().all().all():
             st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
         else:
-            fig = plot_resistance_mutations(mutaton_counts_df)
+            fig = plot_resistance_mutations(plot_df)
             st.plotly_chart(fig, use_container_width=True)
 
-    st.write("### GenSpectrum Dashboard Dynamic Mutation Heatmap")
-    st.write("This component only shows mutations above an unknown threshold.")
-    st.write("This is under investigation.")
+    st.write("### GenSpectrum Dashboard Dynamic Mutations Over Time")
+    st.write("In the long term, GenSpectrum will provide a dashboard to visualize the mutations over time.")
+    st.write("Yet currently, the below component only shows mutations above an unknown threshold.")
+    st.write("This is under investigation and will be addresed by the GenSpectrum team.")
 
     # Use the dynamically generated list of mutations string
     # The formatted_mutations_str variable already contains the string representation
@@ -201,23 +223,5 @@ def app():
         height=500,
     )
 
-    ### Debugging ###
-    st.write("### Debugging")
-    st.write("This section shows the raw data for the mutations.")
-    ## make textboxed top select two mutations
-    mutation1 = st.text_input("Mutation 1", "ORF1b:D475Y")
-    mutation2 = st.text_input("Mutation 2", "ORF1b:E793A")
-    st.write("Fetching data for mutations:")
-    st.write(mutation1)
-    st.write(mutation2)
-    mutation_type = "aminoAcid"  # as we care about amino acid mutations, as in resistance mutations
-    data_mut1 = asyncio.run(wiseLoculus.fetch_single_mutation(mutation1, mutation_type, date_range))
-    data_mut2 = asyncio.run(wiseLoculus.fetch_single_mutation(mutation2, mutation_type, date_range))
-    st.write("Data for mutation 1:")
-    st.write(data_mut1)
-    st.write("Data for mutation 2:")
-    st.write(data_mut2)
-
-    st.write('making calls to `sample/aggregated` endpoint for each mutation filtering for `aminoAcidMutations`: ["ORF1b:D475Y"]')
 if __name__ == "__main__":
     app()
