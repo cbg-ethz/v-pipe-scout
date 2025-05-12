@@ -19,7 +19,8 @@ wiseLoculus = WiseLoculusLapis(server_ip)
 
 
 def fetch_reformat_data(formatted_mutations, date_range):
-    all_data = asyncio.run(wiseLoculus.fetch_all_data(formatted_mutations, date_range))
+    mutation_type = "aminoAcid"  # as we care about amino acid mutations, as in resistance mutations
+    all_data = asyncio.run(wiseLoculus.fetch_all_data(formatted_mutations,mutation_type, date_range))
 
     # get dates from date_range
     dates = pd.date_range(date_range[0], date_range[1]).strftime('%Y-%m-%d')
@@ -178,8 +179,9 @@ def app():
     st.write("Fetching data for mutations:")
     st.write(mutation1)
     st.write(mutation2)
-    data_mut1 = asyncio.run(wiseLoculus.fetch_single_mutation(mutation1, date_range))
-    data_mut2 = asyncio.run(wiseLoculus.fetch_single_mutation(mutation2, date_range))
+    mutation_type = "aminoAcid"  # as we care about amino acid mutations, as in resistance mutations
+    data_mut1 = asyncio.run(wiseLoculus.fetch_single_mutation(mutation1, mutation_type, date_range))
+    data_mut2 = asyncio.run(wiseLoculus.fetch_single_mutation(mutation2, mutation_type, date_range))
     st.write("Data for mutation 1:")
     st.write(data_mut1)
     st.write("Data for mutation 2:")
