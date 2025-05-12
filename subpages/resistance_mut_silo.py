@@ -159,23 +159,20 @@ def app():
 
     formatted_mutations_str = str(formatted_mutations).replace("'", '"')
 
+    st.markdown("---")
+    st.write("### Resistance Mutations Over Time")
+    st.write("Shows the mutations over time in wastewater for the selected date range.")
 
-    ### Python plot ###
-    st.write("### Python Plot")
-    st.write("This plot shows the mutations over time.")
+    mutaton_counts_df = fetch_reformat_data(formatted_mutations, date_range)
 
-    if st.button("Making Python Plot - manual API calls"):
-        st.write("Fetching data...")
-        df = fetch_reformat_data(formatted_mutations, date_range)
-        
+    if not mutaton_counts_df.empty:
         # Check if the dataframe is all NaN
-        if df.isnull().all().all():
+        if mutaton_counts_df.isnull().all().all():
             st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
         else:
             # Plot the heatmap
-            fig = plot_resistance_mutations(df)
+            fig = plot_resistance_mutations(mutaton_counts_df)
             st.plotly_chart(fig, use_container_width=True)
-    
 
     ### GenSpectrum Dashboard Component ###
 
