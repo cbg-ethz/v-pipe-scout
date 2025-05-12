@@ -137,13 +137,13 @@ class WiseLoculusLapis(Lapis):
                 for date, data in stratified_results.items():
                     data["frequency"] = data["counts"].get(target_nucleotide, 0) / data["coverage"] if data["coverage"] > 0 else 0
 
-                # Append the stratified result for this mutation, only including the count of the actual mutation
+                # Append the stratified result for this mutation, ensuring NA for frequency and count if coverage is zero
                 combined_results[-1]["stratified"] = [
                     {
                         "sampling_date": date,
                         "coverage": data["coverage"],
-                        "frequency": data["frequency"],
-                        "count": data["counts"].get(target_nucleotide, 0)
+                        "frequency": data["frequency"] if data["coverage"] > 0 else "NA",
+                        "count": data["counts"].get(target_nucleotide, 0) if data["coverage"] > 0 else "NA"
                     }
                     for date, data in stratified_results.items()
                 ]
