@@ -91,9 +91,7 @@ def plot_resistance_mutations(df):
              tick_indices.append(df_processed.columns[-1])
         tick_labels = [str(label) for label in tick_indices]
 
-
     fig.update_layout(
-        title='Resistance Mutations Over Time',
         xaxis=dict(
             title='Date',
             side='bottom',
@@ -110,25 +108,17 @@ def plot_resistance_mutations(df):
         plot_bgcolor='lightpink',  # NaN values will appear as this background color
         margin=dict(l=margin_l, r=20, t=80, b=100),  # Adjust margins
     )
-    
     return fig
 
 
 def app():
     st.title("Resistance Mutations from Wastewater Data")
-
     st.write("This page allows you to visualize the numer of observed resistance mutations over time.")
     st.write("The data is fetched from the WISE-CovSpectrum API and currently cointains demo data for Feb-Mar 2025.")
-
     st.write("The sets of resistance mutations are provide from Stanfords Coronavirus Antivirial & Reistance Database. Last updated 05/14/2024")
-
     st.write("This is a demo frontend to later make the first queries to SILO for wastewater data.")
-
-    # make a horizontal line
     st.markdown("---")
-
     st.write("Select from the following resistance mutation sets:")
-
     options = {
         "3CLpro Inhibitors": 'data/translated_3CLpro_in_ORF1a_mutations.csv',
         "RdRP Inhibitors": 'data/translated_RdRp_in_ORF1a_ORF1b_mutations.csv',
