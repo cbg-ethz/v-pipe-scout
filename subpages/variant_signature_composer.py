@@ -21,6 +21,7 @@ import re
 from api.signatures import get_variant_list, get_variant_names
 from api.signatures import Mutation
 from api.covspectrum import CovSpectrumLapis
+from api.wiseloculus import WiseLoculusLapis
 from components.variant_signature_component import render_signature_composer
 from state import VariantSignatureComposerState
 from api.signatures import Variant as SignatureVariant
@@ -184,7 +185,7 @@ def app():
     selected_mutations, _ = render_signature_composer(
         covSpectrum,
         component_config,
-        session_prefix="custom_variant_",  # Use a prefix to avoid session state conflicts
+        session_prefix="custom_variant_",  
         container=custom_container
     )
     
@@ -586,7 +587,7 @@ def app():
             st.warning("At least two variants are required to visualize the mutation-variant matrix.")
     
         # Export functionality
-        st.subheader("Export Data")
+        st.subheader("Export Variant Signatures")
         
         # Convert to CSV for download
         csv = matrix_df.to_csv(index=False)
@@ -597,6 +598,70 @@ def app():
             mime="text/csv",
         )
         
+        st.markdown("---")
+
+        st.subheader("Download Mutation Counts and Coverage")
+
+        with st.expander("Fetch and download mutation counts and coverage data", expanded=False):
+            st.write("You can download the mutation counts and coverage data for the selected mutations over a specified date range and location.")
+            st.write("This data is fetched from the the Loculus Wastewater Instance and can be used for further analysis, such as tracking variant prevalence over time.")
+            st.write("Please specify the date range for the data.")
+            # Date range input
+            date_range = st.date_input(
+            "Select Date Range",
+            value=[pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-8")],
+            min_value=pd.to_datetime("2025-01-01"),
+            max_value=pd.to_datetime("2025-05-31"),
+            help="Select the date range for which you want to fetch mutation counts and coverage data."
+            )
+            
+            server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
+            wiseLoculus = WiseLoculusLapis(server_ip)
+
+            mutations = matrix_df["Mutation"].tolist()
+
+            # Fetch locations using the new function
+            locations = wiseLoculus.fetch_locations()
+
+            location = st.selectbox("Select Location:", locations)
+
+            with st.spinner('Fetching mutation counts and coverage data...'):
+                counts_df3d = wiseLoculus.fetch_counts_and_coverage_3D_df_nuc(
+                    mutations,
+                    date_range,
+                    location
+                )
+            # Create a download section
+
+            # Create columns for download buttons
+            col1, col2 = st.columns(2)
+            
+            # 1. CSV Download (original)
+            with col1:
+                # Make sure to preserve index for dates and mutations
+                csv = counts_df3d.to_csv(index=True)
+                st.download_button(
+                    label="Download as CSV",
+                    data=csv,
+                    file_name='mutation_counts_coverage.csv',
+                    mime='text/csv',
+                    help="Download all data as a single CSV file with preserved indices."
+                )
+            
+            # 2. JSON Download
+            with col2:
+            # Convert to JSON structure - using 'split' or 'index' to preserve indices
+            # 'split' format includes separate index, columns and data arrays
+                json_data = counts_df3d.to_json(orient='split', date_format='iso', index=True)
+                
+                st.download_button(
+                    label="Download as JSON",
+                    data=json_data,
+                    file_name='mutation_counts_coverage.json',
+                    mime='application/json',
+                    help="Download data as a JSON file that preserves dates and mutation indices."
+                )
+
 
 if __name__ == "__main__":
     app()
