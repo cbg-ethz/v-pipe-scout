@@ -78,7 +78,7 @@ def fetch_mutations(
 
 def render_signature_composer(
     covSpectrum: Any, 
-    config: Dict = None,
+    config: Optional[Dict],
     session_prefix: str = "",
     container = None
 ) -> Optional[Tuple[List[str], str]]:
@@ -131,9 +131,11 @@ def render_signature_composer(
 
     # --- Fetch wrapper ---
     def fetch_mutations_wrapper():
+        # Ensure variant_query is a string
+        variant_query_str = str(variant_query) if variant_query is not None else ""
         fetch_mutations(
             covSpectrum, 
-            variant_query, 
+            variant_query_str, 
             sequence_type, 
             min_abundance, 
             min_coverage, 
@@ -238,7 +240,7 @@ def render_signature_composer(
 
         # Fill NaN in 'Selected' with False to avoid ValueError when filtering
         edited_df['Selected'] = edited_df['Selected'].fillna(False)
-        edited_df = edited_df.infer_objects(copy=False)
+        edited_df = edited_df.infer_objects(copy=False) # type: ignore
         selected_mutations = edited_df[edited_df['Selected']]['Mutation'].tolist()
     else:
         expander_placeholder.empty()
