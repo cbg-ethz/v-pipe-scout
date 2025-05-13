@@ -54,17 +54,16 @@ def app():
 
     #### #3) Select the date range
     date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08")])
-
-    start_date = date_range[0].strftime('%Y-%m-%d')
-    end_date = date_range[1].strftime('%Y-%m-%d')
     #### #4) Select the location
     default_locations = ["Zürich (ZH)"]  # Define default locations
     locations = wiseLoculus.fetch_locations(default_locations)
     location = st.selectbox("Select Location:", locations)
 
-
     # Check if all necessary parameters are available
     if selected_mutations and date_range and len(date_range) == 2 and location:
+
+        start_date = date_range[0].strftime('%Y-%m-%d')
+        end_date = date_range[1].strftime('%Y-%m-%d')
 
         st.write("NOTE: currently the below GenSpectrum Plot does not show mutations that have zero proportion in the selected date range.")
         st.write("Absence of the mutation, does not mean no coverage – this ISSUE is currently being considered.")

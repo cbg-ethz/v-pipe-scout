@@ -27,7 +27,7 @@ class Lapis:
             logging.error(f"Error parsing URL {url_string}: {e}", exc_info=True)
             return url_string # Fallback in case of any parsing error
 
-    def fetch_locations(self, default_locations = "Zürich (ZH)"):
+    def fetch_locations(self, default_locations = ["Zürich (ZH)"]):
         """Fetches locations from the API endpoint."""
         address_no_port = self.parse_url_hostname(self.server_ip)
         location_url = f'{address_no_port}/sample/aggregated?fields=location_name&limit=100&dataFormat=JSON&downloadAsFile=false'
