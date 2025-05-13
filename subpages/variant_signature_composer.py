@@ -504,12 +504,15 @@ def app():
                     elif len(combined_variants.variants) == 3:
                         from matplotlib_venn import venn3
                         
-                        # Create sets of mutations for each variant
-                        sets = [set(variant.signature_mutations) for variant in combined_variants.variants]
+                        # Create sets of mutations for each variant - extract exactly 3 sets as required by venn3
+                        set1 = set(combined_variants.variants[0].signature_mutations)
+                        set2 = set(combined_variants.variants[1].signature_mutations)
+                        set3 = set(combined_variants.variants[2].signature_mutations)
                         
                         # Create a more compact figure with better proportions
                         fig_venn, ax_venn = plt.subplots(figsize=(5, 4))
-                        venn = venn3(sets, [variant.name for variant in combined_variants.variants], ax=ax_venn)
+                        variant_names = tuple(variant.name for variant in combined_variants.variants)
+                        venn3((set1, set2, set3), variant_names, ax=ax_venn)
                         
                         # Adjust layout to be more compact
                         plt.tight_layout(pad=1.0)
