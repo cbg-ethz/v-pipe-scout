@@ -618,49 +618,53 @@ def app():
             server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
             wiseLoculus = WiseLoculusLapis(server_ip)
 
-            mutations = matrix_df["Mutation"].tolist()
-
             # Fetch locations using the new function
             locations = wiseLoculus.fetch_locations()
-
             location = st.selectbox("Select Location:", locations)
 
-            with st.spinner('Fetching mutation counts and coverage data...'):
-                counts_df3d = wiseLoculus.fetch_counts_and_coverage_3D_df_nuc(
+            # Add a button to trigger fetching
+            if st.button("Fetch Data"):
+                # Get the latest mutation list
+                mutations = matrix_df["Mutation"].tolist()
+                
+                with st.spinner('Fetching mutation counts and coverage data...'):
+                    # Store the result in session state
+                    st.session_state.counts_df3d = wiseLoculus.fetch_counts_and_coverage_3D_df_nuc(
                     mutations,
                     date_range,
                     location
-                )
-            # Create a download section
-
-            # Create columns for download buttons
-            col1, col2 = st.columns(2)
-            
-            # 1. CSV Download (original)
-            with col1:
-                # Make sure to preserve index for dates and mutations
-                csv = counts_df3d.to_csv(index=True)
-                st.download_button(
+                    )
+                st.success("Data fetched successfully!")
+                
+            # Only show download buttons if data exists
+            if 'counts_df3d' in st.session_state and st.session_state.counts_df3d is not None:
+                # Create columns for download buttons
+                col1, col2 = st.columns(2)
+                
+                # 1. CSV Download
+                with col1:
+                    # Make sure to preserve index for dates and mutations
+                    csv = st.session_state.counts_df3d.to_csv(index=True)
+                    st.download_button(
                     label="Download as CSV",
                     data=csv,
                     file_name='mutation_counts_coverage.csv',
                     mime='text/csv',
                     help="Download all data as a single CSV file with preserved indices."
-                )
-            
-            # 2. JSON Download
-            with col2:
-            # Convert to JSON structure - using 'split' or 'index' to preserve indices
-            # 'split' format includes separate index, columns and data arrays
-                json_data = counts_df3d.to_json(orient='split', date_format='iso', index=True)
+                    )
                 
-                st.download_button(
+                # 2. JSON Download
+                with col2:
+                    # Convert to JSON structure - using 'split' format to preserve indices
+                    json_data = st.session_state.counts_df3d.to_json(orient='split', date_format='iso', index=True)
+                    
+                    st.download_button(
                     label="Download as JSON",
                     data=json_data,
                     file_name='mutation_counts_coverage.json',
                     mime='application/json',
                     help="Download data as a JSON file that preserves dates and mutation indices."
-                )
+                    )
 
 
 if __name__ == "__main__":
