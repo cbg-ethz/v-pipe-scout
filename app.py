@@ -1,9 +1,13 @@
 import streamlit as st
+import logging
+
 import subpages.index as index
 import subpages.resistance_mut_silo as resistance_mut_silo
 import subpages.dynamic_mutations as dynamic_mutations
 import subpages.signature_explorer as signature_explorer
 import subpages.variant_signature_composer as variant_signature_composer
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 if __name__ == "__main__":
     st.set_page_config(

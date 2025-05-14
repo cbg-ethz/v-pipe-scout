@@ -29,8 +29,6 @@ from state import VariantSignatureComposerState
 from api.signatures import Variant as SignatureVariant
 from api.signatures import VariantList as SignatureVariantList
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 
 class Variant(BaseModel):
     """
