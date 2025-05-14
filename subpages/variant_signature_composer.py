@@ -182,13 +182,17 @@ def app():
     custom_container = st.container()
     
     # Render the variant signature component
-    selected_mutations, _ = render_signature_composer(
+    result = render_signature_composer(
         covSpectrum,
         component_config,
         session_prefix="custom_variant_",  
         container=custom_container
     )
-    
+    if result is not None:
+        selected_mutations, _ = result
+    else:
+        selected_mutations = []
+
     # Add custom variant to the combined list if mutations were selected
     if selected_mutations:
         # Get the variant name from the input field
