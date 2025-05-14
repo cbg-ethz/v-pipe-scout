@@ -211,7 +211,6 @@ def app():
                                     name=variant_query,
                                     signature_mutations=selected_mutations
                                     )   
-            st.write(custom_variant)
             if any(v.name == custom_variant.name for v in combined_variants.variants):
                 st.warning(f"Variant '{custom_variant.name}' already exists in the list. Please choose a different name.")
             else:
