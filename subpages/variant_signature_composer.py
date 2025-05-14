@@ -17,6 +17,8 @@ import plotly.graph_objects as go
 from pydantic import BaseModel, Field
 from typing import List
 import re
+import logging
+
 
 from api.signatures import get_variant_list, get_variant_names
 from api.signatures import Mutation
@@ -26,6 +28,8 @@ from components.variant_signature_component import render_signature_composer
 from state import VariantSignatureComposerState
 from api.signatures import Variant as SignatureVariant
 from api.signatures import VariantList as SignatureVariantList
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 class Variant(BaseModel):
@@ -193,29 +197,33 @@ def app():
     else:
         selected_mutations = []
 
-    # Add custom variant to the combined list if mutations were selected
-    if selected_mutations:
-        # Get the variant name from the input field
-        variant_query = st.session_state.get("custom_variant_variantQuery", "Custom Variant")
-        
-        # Create and add the custom variant
-        custom_variant = Variant(
-            name=variant_query,
-            signature_mutations=selected_mutations
-        )
 
-        # Check if the variant already exists in the combined list
-        if any(v.name == custom_variant.name for v in combined_variants.variants):
-            st.warning(f"Variant '{custom_variant.name}' already exists in the list. Please choose a different name.")
+    # make button to add custom variant
+    st.button("Add Custom Variant", key="add_custom_variant_button")
+    # Check if the button was clicked
+    if st.session_state.get("add_custom_variant_button", False):
+        # Check if any mutations were selected
+        if not selected_mutations:
+            st.warning("Please select at least one mutation to create a custom variant.")
         else:
-            # Add the custom variant to the combined list
-            combined_variants.add_variant(custom_variant)
-        
-            # Show confirmation
-            st.success(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations")
-            # Rerun to update the UI
-            st.rerun()
-
+            # Show the selected mutations
+            st.write("Selected Signature Mutations:")
+            variant_query = st.session_state.get("custom_variant_variantQuery", "Custom Variant")
+            custom_variant = Variant(
+                                    name=variant_query,
+                                    signature_mutations=selected_mutations
+                                    )   
+            st.write(custom_variant)
+            if any(v.name == custom_variant.name for v in combined_variants.variants):
+                st.warning(f"Variant '{custom_variant.name}' already exists in the list. Please choose a different name.")
+            else:
+                # Add the custom variant to the combined list
+                combined_variants.add_variant(custom_variant)
+                logging.info(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations.")
+                
+                # Show confirmation
+                st.success(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations")
+    
     # Combine all selected variants for processing
     selected_variants = [variant.name for variant in combined_variants.variants]
 
