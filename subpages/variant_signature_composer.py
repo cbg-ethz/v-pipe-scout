@@ -636,7 +636,9 @@ def app():
             wiseLoculus = WiseLoculusLapis(server_ip)
 
             # Fetch locations using the new function
-            locations = wiseLoculus.fetch_locations()
+            if "locations" not in st.session_state:
+                st.session_state.locations = wiseLoculus.fetch_locations()
+            locations = st.session_state.locations
             location = st.selectbox("Select Location:", locations)
 
             # Add a button to trigger fetching
