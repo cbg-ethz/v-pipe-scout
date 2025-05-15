@@ -12,18 +12,22 @@ requires the command line tools:
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import yaml
-import shutil
 import subprocess
 import json
+import pandas as pd
 
 # load the data
 mutation_counts = Path("data/mutation_counts_coverage.csv")
 mutation_variant_matrix = Path("data/mutation_variant_matrix.csv")
 
+# read in the data
+mutation_counts_df = pd.read_csv(mutation_counts)
+mutation_variant_matrix_df = pd.read_csv(mutation_variant_matrix)
+
 
 def devconvolve(
-    mutation_counts: Path,
-    mutation_variant_matrix: Path,
+    mutation_counts_df: pd.DataFrame,
+    mutation_variant_matrix_df: pd.DataFrame,
     bootstraps: int = 0,
     bandwidth: int = 30,
     regressor: str = "robust",
@@ -46,9 +50,21 @@ def devconvolve(
         input_dir.mkdir(parents=True, exist_ok=True)
 
         # copy the data to the input directory
+        mutation_counts = Path("mutation_counts_coverage.csv")
+        mutations_variant_matrix = Path("mutation_variant_matrix.csv")
 
-        shutil.copy(mutation_counts, input_dir / mutation_counts.name)
-        shutil.copy(mutation_variant_matrix, input_dir / mutation_variant_matrix.name)
+        pd.DataFrame.to_csv(
+            mutation_counts_df,
+            input_dir / mutation_counts.name,
+            index=False,
+            sep=",",
+        )
+        pd.DataFrame.to_csv(
+            mutation_variant_matrix_df,
+            input_dir / mutations_variant_matrix.name,
+            index=False,
+            sep=",",
+        )
 
         ###########################
         # make the variants_config.yaml file yaml
@@ -259,3 +275,19 @@ def devconvolve(
             deconvoluted_data = json.load(f)
 
     return deconvoluted_data
+
+
+if __name__ == "__main__":
+    # Example usage
+    deconvoluted_data = devconvolve(
+        mutation_counts_df,
+        mutation_variant_matrix_df,
+        bootstraps=100,
+        bandwidth=30,
+        regressor="robust",
+        regressor_params={"f_scale": 0.01},
+        deconv_params={"min_tol": 1e-3},
+    )
+
+    # Print the deconvoluted data
+    print(deconvoluted_data)
