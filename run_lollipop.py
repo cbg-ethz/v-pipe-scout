@@ -114,6 +114,56 @@ except subprocess.CalledProcessError as e:
 # # add the  above-update matrix to the mutation counts+coverage table
 # xsv join --left mutation  /tmp/mutation_counts_coverage.csv  Mutation /tmp/mutation_variant_matrix2.csv | xsv select sampling_date,count,coverage,frequency,mutation,pos,base,9-  | xsv fmt --out-delimiter '\t'  | sed '1s/sampling_date/date/;1s/coverage/cov/;1s/frequency/frac/' >  /tmp/tallymut.tsv
 
+# Create output filename with descriptive suffix
+tallymut_file = output_dir / (mutation_counts.stem + "_tallymut.tsv")
+
+try:
+    # First subprocess: xsv join
+    join_command = [
+        "xsv",
+        "join",
+        "--left",
+        "mutation",
+        str(input_dir / mutation_counts.name),
+        "Mutation",
+        str(matrix_pos_base_file)
+    ]
+    join_result = subprocess.run(join_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    # Second subprocess: xsv select
+    select_command = [
+        "xsv",
+        "select",
+        "sampling_date,count,coverage,frequency,mutation,pos,base,9-"
+    ]
+    select_result = subprocess.run(select_command, input=join_result.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+
+    # Third subprocess: xsv fmt
+    fmt_command = [
+        "xsv",
+        "fmt",
+        "--out-delimiter",
+        "\t"
+    ]
+    fmt_result = subprocess.run(fmt_command, input=select_result.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+
+    # Fourth subprocess: sed
+    sed_command = [
+        "sed",
+        "1s/sampling_date/date/;1s/coverage/cov/;1s/frequency/frac/"
+    ]
+    with open(tallymut_file, "w") as f:
+        subprocess.run(sed_command, input=fmt_result.stdout, stdout=f, stderr=subprocess.PIPE, text=True, check=True)
+    print(f"Successfully created tally mutation file: {tallymut_file}")
+
+except subprocess.CalledProcessError as e:
+    print(f"Error running command: {e}")
+    if e.stderr:
+        print(e.stderr)
+    exit(1)
+
+
+
 # # deconvolute
 # lollipop deconvolute --output /tmp/deconvolved.csv --out-json /tmp/deconvolved.json -c /tmp/lolli_config.yaml --deconv-config /home/dryak/project/LolliPop/presets/deconv_bootstrap_cowwid.yaml --namefield mutation /tmp/tallymut.tsv 
 
