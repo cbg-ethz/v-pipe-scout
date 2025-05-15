@@ -15,6 +15,7 @@ from tempfile import TemporaryDirectory
 import yaml
 import shutil
 import subprocess 
+import json
 
 # load the data
 mutation_counts = Path("data/mutation_counts_coverage.csv")
@@ -55,7 +56,8 @@ shutil.copy(mutation_variant_matrix, input_dir / mutation_variant_matrix.name)
 
 """
 # get the variants from the mutation_variant_matrix, i.e. the columns
-with open(input_dir / "variants_config.yaml", "w") as f:
+variants_config = input_dir / "variants_config.yaml"
+with open(variants_config, "w") as f:
     variants = mutation_variant_matrix.read_text().splitlines()[0].split(",")[1:]
     variants_dict = {variant: variant for variant in variants}
     yaml.dump({"variants_pangolin": variants_dict}, f)
@@ -75,7 +77,9 @@ deconv_params:
 min_tol: 1e-3
 """
 
-with open(input_dir / "deconv_bootstrap_cowwid.yaml", "w") as f:
+deconv_config_fp = input_dir / "deconv_bootstrap_cowwid.yaml"
+
+with open(deconv_config_fp, "w") as f:
     deconv_config = {
         "bootstrap": bootstraps,
         "kernel_params": {
@@ -164,12 +168,48 @@ except subprocess.CalledProcessError as e:
 
 
 
-# # deconvolute
+##################### run deconvolute - run Lollipop
 # lollipop deconvolute --output /tmp/deconvolved.csv --out-json /tmp/deconvolved.json -c /tmp/lolli_config.yaml --deconv-config /home/dryak/project/LolliPop/presets/deconv_bootstrap_cowwid.yaml --namefield mutation /tmp/tallymut.tsv 
 
+output_json_fp = output_dir / "deconvolved.json"
+output_csv_fp = output_dir / "deconvolved.csv"
+
+run_lollipop_command = [
+    "lollipop",
+    "deconvolute",
+    "--output",
+    str(output_csv_fp),
+    "--out-json",
+    str(output_json_fp),
+    "-c",
+    str(variants_config),
+    "--deconv-config",
+    str(deconv_config_fp),
+    "--namefield",
+    "mutation",
+    str(tallymut_file)
+]
+
+try:
+    subprocess.run(run_lollipop_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    print(f"Successfully deconvoluted: {output_csv_fp}")
+    
+    # Read and format the JSON file properly
+    with open(output_json_fp, 'r') as f:
+        deconvolved_data = json.loads(f.read())
+    
+    # Write back with proper indentation
+    with open(output_json_fp, 'w') as f:
+        json.dump(deconvolved_data, f, indent=4)
+    
+    print(f"Formatted JSON output: {output_json_fp}")
+except subprocess.CalledProcessError as e:
+    print(f"Error running lollipop command: {e}")
+    if e.stderr:
+        print(e.stderr)
+    exit(1)
 
 
-# run lollipop
 
 
 # read in the deconvoluted.json file
