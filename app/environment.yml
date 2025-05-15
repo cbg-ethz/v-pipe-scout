@@ -1,0 +1,22 @@
+name: v-pipe-scout
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.9
+  - streamlit=1.45.0
+  - matplotlib
+  - numpy
+  - pandas=2.2.3
+  - pyyaml
+  - aiohttp
+  - requests
+  - pytest
+  - streamlit-pydantic
+  - pydantic>=1.9,<2
+  - cojac>=0.9.3
+  - plotly
+  - pip
+  - pip:
+      - matplotlib-venn
+  
