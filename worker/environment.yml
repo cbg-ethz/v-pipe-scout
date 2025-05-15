@@ -1,0 +1,33 @@
+name: v-pipe-scout-backend
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # Python and lollipop dependencies
+  - python=3.10
+  - numpy>=1.23
+  - scipy>=1.9
+  - pandas>=1.5
+  - tqdm>=4.64
+  - threadpoolctl>=3.5.0
+  - ruamel.yaml>=0.15.80
+  - strictyaml>=1.7
+  - zstandard>=0.20
+  - click>=8.0
+  - click-option-group>=0.5
+  
+  # CLI tools - for tallymut assembly
+  - xsv
+  - gawk
+  
+  # other python
+  - pyyaml
+
+  # Optional: for your workflow/testing
+  - pytest
+  # TODO: remove lollipop to proper conda install with next version
+  # remove all above lollipop dependencies
+  - pip
+  - pip:
+      - git+https://github.com/cbg-ethz/LolliPop.git
