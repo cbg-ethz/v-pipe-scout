@@ -1,4 +1,4 @@
-name: v-pipe-scout
+name: v-pipe-scout-app
 channels:
   - conda-forge
   - bioconda
@@ -19,4 +19,7 @@ dependencies:
   - pip
   - pip:
       - matplotlib-venn
-  
+  # For the backend worker communication
+  - celery==5.3.6
+  - pip:
+      - redis==5.0.1 

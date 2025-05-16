@@ -1,4 +1,4 @@
-name: v-pipe-scout-backend
+name: v-pipe-scout-worker
 channels:
   - conda-forge
   - bioconda
