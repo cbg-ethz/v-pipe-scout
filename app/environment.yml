@@ -17,9 +17,7 @@ dependencies:
   - cojac>=0.9.3
   - plotly
   - pip
-  - pip:
-      - matplotlib-venn
-  # For the backend worker communication
   - celery==5.3.6
   - pip:
+      - matplotlib-venn
       - redis==5.0.1 
