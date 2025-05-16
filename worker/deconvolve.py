@@ -40,6 +40,11 @@ def devconvolve(
     This function runs lollipop on the input data and returns the deconvoluted data.
     """
 
+    print(f"Dataframe mutation_counts_df: {mutation_counts_df.head()}")
+
+    print(f"Dataframe mutation_variant_matrix_df: {mutation_variant_matrix_df.head()}")
+
+
     with TemporaryDirectory() as tmpdir:
         # make the temporary directory
         tmpdir = Path(tmpdir)
@@ -56,12 +61,14 @@ def devconvolve(
         mutations_variant_matrix = Path("mutation_variant_matrix.csv")
 
         # Save the dataframes to CSV files in the input directory
-        mutation_counts_df.to_csv(
+        pd.DataFrame.to_csv(
+            mutation_counts_df,
             input_dir / mutation_counts.name,
             index=False,
             sep=",",
         )
-        mutation_variant_matrix_df.to_csv(
+        pd.DataFrame.to_csv(
+            mutation_variant_matrix_df,
             input_dir / mutations_variant_matrix.name,
             index=False,
             sep=",",
