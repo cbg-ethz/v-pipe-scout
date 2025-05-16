@@ -8,10 +8,6 @@ COPY environment.yml .
 # Create the conda environment from environment.yml
 RUN conda env create -f environment.yml
 
-# Install Celery worker dependencies within the conda environment
-RUN conda run -n v-pipe-scout-backend pip install --no-cache-dir \
-    celery==5.3.6 redis==5.0.1 watchdog==3.0.0
-
 # Copy all worker files (scripts, configs, and data)
 COPY . .
 

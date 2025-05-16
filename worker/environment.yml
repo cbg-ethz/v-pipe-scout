@@ -26,8 +26,13 @@ dependencies:
 
   # Optional: for your workflow/testing
   - pytest
+
+  # Celery worker dependencies
+  - celery=5.3.6
+  
   # TODO: remove lollipop to proper conda install with next version
   # remove all above lollipop dependencies
   - pip
   - pip:
+      - redis==5.0.1 
       - git+https://github.com/cbg-ethz/LolliPop.git
