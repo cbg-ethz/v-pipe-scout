@@ -1,9 +1,11 @@
-import time
-import json
-import os
-import redis
-import pandas as pd
 from celery import Celery
+import os
+import json
+import time
+import redis
+import pickle
+import base64
+import pandas as pd
 from deconvolve import devconvolve
 
 # Initialize Celery
@@ -128,7 +130,7 @@ def run_deconvolve(self, mutation_counts_df, mutation_variant_matrix_df,
             progress_data["status"] = message
             redis_client.set(progress_key, json.dumps(progress_data), ex=3600)
         
-        # Convert serialized DataFrames back to pandas DataFrames
+        # Convert serialized DataFrames back to pandas DataFrames if needed
         try:
             # Add debug info about the input types
             update_progress(1.5, f"Input types: mutation_counts_df: {type(mutation_counts_df)}, mutation_variant_matrix_df: {type(mutation_variant_matrix_df)}")
@@ -137,24 +139,25 @@ def run_deconvolve(self, mutation_counts_df, mutation_variant_matrix_df,
             if isinstance(mutation_counts_df, pd.DataFrame) and isinstance(mutation_variant_matrix_df, pd.DataFrame):
                 update_progress(2, "Inputs are already DataFrames, no parsing needed")
             else:
-                # Try to load serialized DataFrames using pickle or JSON
+                # Try to deserialize if needed
                 try:
-                    # Try pickle first if inputs are byte strings
-                    import pickle
-                    import base64
-                    if isinstance(mutation_counts_df, str) and isinstance(mutation_variant_matrix_df, str):
-                        # If they're base64 encoded pickle strings
+                    # If they're base64 encoded pickle strings
+                    if isinstance(mutation_counts_df, str):
                         try:
                             mutation_counts_df = pickle.loads(base64.b64decode(mutation_counts_df))
-                            mutation_variant_matrix_df = pickle.loads(base64.b64decode(mutation_variant_matrix_df))
-                            update_progress(2, f"Successfully unpickled DataFrames, shapes: {mutation_counts_df.shape}, {mutation_variant_matrix_df.shape}")
+                            update_progress(2, f"Successfully unpickled counts DataFrame, shape: {mutation_counts_df.shape}")
                         except:
-                            # Fall back to JSON if pickle fails
-                            mutation_counts_df = pd.read_json(mutation_counts_df, orient='split')
-                            mutation_variant_matrix_df = pd.read_json(mutation_variant_matrix_df, orient='split')
-                            update_progress(2, f"Successfully parsed JSON DataFrames, shapes: {mutation_counts_df.shape}, {mutation_variant_matrix_df.shape}")
+                            update_progress(2, "Failed to unpickle counts DataFrame as base64")
+                    
+                    if isinstance(mutation_variant_matrix_df, str):
+                        try:
+                            mutation_variant_matrix_df = pickle.loads(base64.b64decode(mutation_variant_matrix_df))
+                            update_progress(2, f"Successfully unpickled matrix DataFrame, shape: {mutation_variant_matrix_df.shape}")
+                        except:
+                            update_progress(2, "Failed to unpickled matrix DataFrame as base64")
+                    
                 except Exception as e:
-                    update_progress(2, f"Error parsing DataFrames with both pickle and JSON methods: {str(e)}")
+                    update_progress(2, f"Error parsing DataFrames: {str(e)}")
                     raise ValueError(f"Failed to deserialize DataFrames: {str(e)}")
         except Exception as e:
             update_progress(2, f"Error processing DataFrames: {str(e)}")
@@ -178,9 +181,10 @@ def run_deconvolve(self, mutation_counts_df, mutation_variant_matrix_df,
         if deconv_params is not None:
             kwargs['deconv_params'] = deconv_params
             
-        # Run the deconvolution with only the provided parameters
-        # devconvolve will use its default values for any missing parameters
+        # Update progress before running deconvolution
         update_progress(3, "Running deconvolution algorithm")
+        
+        # Run the deconvolution with only the provided parameters
         deconvolved_data = devconvolve(**kwargs)
         
         # Update progress after deconvolution is complete
@@ -194,7 +198,6 @@ def run_deconvolve(self, mutation_counts_df, mutation_variant_matrix_df,
         redis_client.set(progress_key, json.dumps(progress_data), ex=3600)
         
         return deconvolved_data
-        
     except Exception as e:
         # If there's an error, report it
         error_message = str(e)

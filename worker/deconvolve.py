@@ -56,20 +56,29 @@ def devconvolve(
         input_dir = tmpdir / "input"
         input_dir.mkdir(parents=True, exist_ok=True)
 
-        # copy the data to the input directory
+        # name the data to the input directory
         mutation_counts = Path("mutation_counts_coverage.csv")
         mutations_variant_matrix = Path("mutation_variant_matrix.csv")
 
+        # paths to the input files
+        mutation_counts_fp = input_dir / mutation_counts.name
+        mutations_variant_matrix_fp = input_dir / mutations_variant_matrix.name
+
+        # Reset the index to columns if it's a MultiIndex
+        if isinstance(mutation_counts_df.index, pd.MultiIndex):
+            print("Detected MultiIndex in mutation_counts_df, resetting to columns")
+            mutation_counts_df = mutation_counts_df.reset_index()
+        
         # Save the dataframes to CSV files in the input directory
         pd.DataFrame.to_csv(
             mutation_counts_df,
-            input_dir / mutation_counts.name,
+            mutation_counts_fp,
             index=False,
             sep=",",
         )
         pd.DataFrame.to_csv(
             mutation_variant_matrix_df,
-            input_dir / mutations_variant_matrix.name,
+            mutations_variant_matrix_fp,
             index=False,
             sep=",",
         )
@@ -125,7 +134,7 @@ def devconvolve(
         gawk_command = [
             "gawk",
             r'BEGIN{FS=","};NR==1{print "pos,base," $0};NR>1{match($1,/[ATGC]?([[:digit:]]+)([ATCG\-])/, ary); print ary[1] "," ary[2] "," $0 }',
-            str(input_dir / mutation_variant_matrix.name),
+            str(mutations_variant_matrix_fp),
         ]
 
         # Create output filename with descriptive suffix
@@ -159,6 +168,26 @@ def devconvolve(
         # Create output filename with descriptive suffix
         tallymut_file = output_dir / (mutation_counts.stem + "_tallymut.tsv")
 
+        # DEBUG pring head of mutation_counts_fp
+        print(f"Mutation counts file: {mutation_counts_fp}")
+        # do head in the terminal
+        head_command = ["head", "-n", "5", str(mutation_counts_fp)]
+        try:
+            subprocess.run(
+                head_command,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"Error running head command: {e}")
+            if e.stderr:
+                print(e.stderr)
+            exit(1)
+
+
+
         try:
             # First subprocess: xsv join
             join_command = [
@@ -166,10 +195,56 @@ def devconvolve(
                 "join",
                 "--left",
                 "mutation",
-                str(input_dir / mutation_counts.name),
+                str(mutation_counts_fp),
                 "Mutation",
                 str(matrix_pos_base_file),
             ]
+            
+            # Debug: Print more details about the files
+            print(f"Running command: {' '.join(join_command)}")
+            print(f"Checking if files exist:")
+            print(f"  - mutation_counts_fp exists: {Path(mutation_counts_fp).exists()}")
+            print(f"  - matrix_pos_base_file exists: {Path(matrix_pos_base_file).exists()}")
+            
+            # Debug: Print file contents
+            print(f"Contents of mutation_counts_fp (first 5 lines):")
+            try:
+                with open(mutation_counts_fp, 'r') as f:
+                    for i, line in enumerate(f):
+                        if i < 5:
+                            print(f"  {line.strip()}")
+                        else:
+                            break
+            except Exception as e:
+                print(f"Error reading mutation_counts_fp: {e}")
+                
+            print(f"Contents of matrix_pos_base_file (first 5 lines):")
+            try:
+                with open(matrix_pos_base_file, 'r') as f:
+                    for i, line in enumerate(f):
+                        if i < 5:
+                            print(f"  {line.strip()}")
+                        else:
+                            break
+            except Exception as e:
+                print(f"Error reading matrix_pos_base_file: {e}")
+            
+            # Try basic xsv command first to verify xsv works
+            try:
+                print("Testing basic xsv command...")
+                test_result = subprocess.run(
+                    ["xsv", "count", str(mutation_counts_fp)],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                print(f"xsv count result: {test_result.stdout.strip()}")
+            except subprocess.CalledProcessError as e:
+                print(f"Basic xsv command failed: {e}")
+                print(f"stderr: {e.stderr}")
+            
+            # Now try the actual join command
             join_result = subprocess.run(
                 join_command,
                 check=True,
@@ -223,7 +298,23 @@ def devconvolve(
         except subprocess.CalledProcessError as e:
             print(f"Error running command: {e}")
             if e.stderr:
-                print(e.stderr)
+                print(f"stderr: {e.stderr}")
+            
+            # Debug - print file existence and content
+            print(f"\nDebug info:")
+            for file_path in [mutation_counts_fp, matrix_pos_base_file]:
+                if Path(file_path).exists():
+                    print(f"File exists: {file_path}")
+                    try:
+                        # Print first few lines of the file
+                        with open(file_path, 'r') as f:
+                            content = [next(f).strip() for _ in range(3)]
+                            print(f"Content of {file_path}:\n{content}")
+                    except Exception as read_err:
+                        print(f"Error reading file: {read_err}")
+                else:
+                    print(f"File does not exist: {file_path}")
+                    
             exit(1)
 
         ##################### run deconvolute - run Lollipop

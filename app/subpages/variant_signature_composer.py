@@ -790,8 +790,7 @@ def app():
                                         result = task.get()
                                         st.session_state.deconv_result = result
                                         st.success("Deconvolution completed!")
-                                        with st.expander("View Results", expanded=True):
-                                            st.json(result)
+                                        st.json(result)
                                     except Exception as e:
                                         st.error(f"Error retrieving result: {str(e)}")
                                 else:
