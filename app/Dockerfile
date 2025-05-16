@@ -14,7 +14,7 @@ RUN conda env create -f environment.yml
 SHELL ["/bin/bash", "-c"]
 
 # Activate the environment and ensure it's used for subsequent commands
-ENV PATH=/opt/conda/envs/vpipe-frontend/bin:$PATH
+ENV PATH=/opt/conda/envs/v-pipe-scout-app/bin:$PATH
 
 # Copy the rest of the application code
 COPY . .
@@ -23,4 +23,4 @@ COPY . .
 EXPOSE 8000
 
 # Run the Streamlit application
-CMD ["conda", "run", "-n", "v-pipe-scout", "streamlit", "run", "app.py", "--server.port=8000", "--server.address=0.0.0.0"]
+CMD ["conda", "run", "-n", "v-pipe-scout-app", "streamlit", "run", "app.py", "--server.port=8000", "--server.address=0.0.0.0"]

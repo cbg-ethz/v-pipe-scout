@@ -1,4 +1,4 @@
-name: v-pipe-scout
+name: v-pipe-scout-app
 channels:
   - conda-forge
   - bioconda
@@ -17,6 +17,7 @@ dependencies:
   - cojac>=0.9.3
   - plotly
   - pip
+  - celery==5.3.6
   - pip:
       - matplotlib-venn
-  
+      - redis==5.0.1 

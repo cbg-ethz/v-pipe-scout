@@ -6,6 +6,7 @@ import subpages.resistance_mut_silo as resistance_mut_silo
 import subpages.dynamic_mutations as dynamic_mutations
 import subpages.signature_explorer as signature_explorer
 import subpages.variant_signature_composer as variant_signature_composer
+import subpages.task_runner as task_runner
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -24,7 +25,8 @@ if __name__ == "__main__":
         {"app": resistance_mut_silo.app, "title": "Resistance Mutations", "icon": "🧬", "url_path": "resistance"},
         {"app": dynamic_mutations.app, "title": "Dynamic Mutation Heatmap", "icon": "🧮", "url_path": "dynamic-mutations"},
         {"app": signature_explorer.app, "title": "Variant Signature Explorer", "icon": "🔍", "url_path": "signature-explorer"},
-        {"app": variant_signature_composer.app, "title": "Variant Signature Composer", "icon": "🧩", "url_path": "signature-composer"}
+        {"app": variant_signature_composer.app, "title": "Variant Signature Composer", "icon": "🧩", "url_path": "signature-composer"},
+        {"app": task_runner.app, "title": "Task Runner", "icon": "⚙️", "url_path": "task-runner"}
     ]
     
     # Create pages dynamically from configurations
