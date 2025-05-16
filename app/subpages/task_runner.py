@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 import os
+import time  
 from celery import Celery
 import redis
 
@@ -90,6 +91,6 @@ def app():
             else:
                 status_placeholder.info('Task is pending or in progress...')
         
-        # Add a button to refresh the status
-        if st.button('Refresh Status'):
+            # auto-refresh once per second (st.experimental_rerun is available in Streamlit 1.45.0)
+            time.sleep(1)
             st.rerun()
