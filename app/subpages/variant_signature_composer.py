@@ -18,6 +18,11 @@ from pydantic import BaseModel, Field
 from typing import List
 import re
 import logging
+import os
+import json
+from celery import Celery
+import redis
+
 
 
 from api.signatures import get_variant_list, get_variant_names
@@ -28,6 +33,21 @@ from components.variant_signature_component import render_signature_composer
 from state import VariantSignatureComposerState
 from api.signatures import Variant as SignatureVariant
 from api.signatures import VariantList as SignatureVariantList
+
+
+# Initialize Celery
+celery_app = Celery(
+    'tasks',
+    broker=os.environ.get('CELERY_BROKER_URL', 'redis://redis:6379/0'),
+    backend=os.environ.get('CELERY_RESULT_BACKEND', 'redis://redis:6379/0')
+)
+
+# Initialize Redis client for checking task status
+redis_client = redis.Redis(
+    host=os.environ.get('REDIS_HOST', 'redis'),
+    port=int(os.environ.get('REDIS_PORT', 6379)),
+    db=0
+)
 
 
 class Variant(BaseModel):
@@ -681,6 +701,109 @@ def app():
                     mime='application/json',
                     help="Download data as a JSON file that preserves dates and mutation indices."
                     )
+
+             # Only show download buttons if data exists
+            if 'counts_df3d' in st.session_state and st.session_state.counts_df3d is not None:
+    
+                st.markdown("---")
+
+                st.subheader("Estimate Variant Abundances")
+
+                bootstraps = st.slider("Number of Bootstrap Iterations", 
+                                     min_value=0, max_value=100, value=10, step=10)
+                
+                mutation_counts_df = st.session_state.counts_df3d
+                mutation_variant_matrix_df = matrix_df
+
+                # Create columns for visualization
+                col1, col2 = st.columns(2)
+
+                # Initialize task ID in session state if not present
+                if 'deconv_task_id' not in st.session_state:
+                    st.session_state.deconv_task_id = None
+                
+                if 'deconv_result' not in st.session_state:
+                    st.session_state.deconv_result = None
+
+                # In the left column, show the deconvolution button and parameters
+                with col1:
+                    # Simple button to trigger deconvolution
+                    if st.button("Run Deconvolution"):
+                        with st.spinner('Starting deconvolution task...'):
+                            # Use pickle to serialize DataFrames, which preserves the exact structure
+                            import pickle
+                            import base64
+                            
+                            # Convert DataFrames to base64-encoded pickle strings for serialization
+                            counts_pickle = base64.b64encode(pickle.dumps(mutation_counts_df)).decode('utf-8')
+                            matrix_pickle = base64.b64encode(pickle.dumps(mutation_variant_matrix_df)).decode('utf-8')
+                            
+                            # Log the shapes for debugging
+                            st.write(f"Debug - Counts DF shape: {mutation_counts_df.shape}")
+                            st.write(f"Debug - Matrix DF shape: {mutation_variant_matrix_df.shape}")
+                            
+                            # Submit the task to Celery worker
+                            task = celery_app.send_task(
+                                'tasks.run_deconvolve',
+                                kwargs={
+                                    'mutation_counts_df': counts_pickle,
+                                    'mutation_variant_matrix_df': matrix_pickle,
+                                    'bootstraps': bootstraps
+                                }
+                            )
+                            # Store task ID in session state
+                            st.session_state.deconv_task_id = task.id
+                            st.success(f"Deconvolution started! Task ID: {task.id}")
+
+                # In the right column, show task status and results
+                with col2:
+                    if st.session_state.deconv_task_id:
+                        st.subheader("Task Status")
+                        task_id = st.session_state.deconv_task_id
+                        
+                        # Check if we already have results
+                        if st.session_state.deconv_result is not None:
+                            st.success("Deconvolution completed!")
+                            with st.expander("View Results", expanded=True):
+                                st.json(st.session_state.deconv_result)
+                        else:
+                            # Check task status
+                            progress_key = f"task_progress:{task_id}"
+                            progress_data = redis_client.get(progress_key)
+                            
+                            if progress_data:
+                                # Parse progress data from Redis
+                                progress_info = json.loads(progress_data)
+                                current = progress_info.get('current', 0)
+                                total = progress_info.get('total', 1) 
+                                status = progress_info.get('status', 'Processing...')
+                                
+                                # Display progress bar
+                                st.progress(current / total)
+                                st.write(f"Status: {status}")
+                            
+                            # Check result button
+                            if st.button("Check Result"):
+                                task = celery_app.AsyncResult(task_id)
+                                if task.ready():
+                                    try:
+                                        result = task.get()
+                                        st.session_state.deconv_result = result
+                                        st.success("Deconvolution completed!")
+                                        with st.expander("View Results", expanded=True):
+                                            st.json(result)
+                                    except Exception as e:
+                                        st.error(f"Error retrieving result: {str(e)}")
+                                else:
+                                    st.info("Task is still running. Please check again later.")
+                
+                # Clear results button
+                if st.session_state.deconv_task_id:
+                    if st.button("Start New Deconvolution"):
+                        st.session_state.deconv_task_id = None
+                        st.session_state.deconv_result = None
+                        st.rerun()
+    
 
 
 if __name__ == "__main__":

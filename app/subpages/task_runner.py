@@ -18,9 +18,6 @@ redis_client = redis.Redis(
     port=int(os.environ.get('REDIS_PORT', 6379)),
     db=0
 )
-# Maximum concurrent Celery tasks (reads from WORKER_CONCURRENCY env var)
-MAX_CONCURRENCY = 2 # TODO to get from config / backend
-
 
 
 def app():
@@ -86,3 +83,50 @@ def app():
     if any(not celery_app.AsyncResult(info['id']).ready() for info in st.session_state['tasks_info']):
         time.sleep(2)
         st.rerun()
+
+
+    st.markdown("---")
+
+    st.subheader('Simple Task, no progress, only show task is in queue')
+    # Single Config Task: track queued, processing, and done states
+    st.subheader('Single Config Task')
+    # Initialize single task state
+    if 'single_task_id' not in st.session_state:
+        st.session_state['single_task_id'] = None
+
+    # Button to start a single task
+    if st.button('Run Single Task'):
+        task = celery_app.send_task(
+            'tasks.long_running_task',
+            args=[n_iterations, sleep_time],
+            kwargs={}
+        )
+        st.session_state['single_task_id'] = task.id
+        st.success(f'Single task submitted with ID: {task.id}')
+
+    # Display status of the single task
+    if st.session_state['single_task_id']:
+        task_id = st.session_state['single_task_id']
+        task_result = celery_app.AsyncResult(task_id)
+        # Map Celery states to user-friendly labels
+        status_map = {
+            'PENDING': 'Queued',
+            'STARTED': 'Processing',
+            'SUCCESS': 'Done',
+            'FAILURE': 'Failed'
+        }
+        current_state = task_result.status
+        label = status_map.get(current_state, current_state)
+        # Use a placeholder to avoid stacking status messages on each rerun
+        status_slot = st.empty()
+        status_slot.info(f'Task {task_id} status: {label}')
+        if current_state == 'SUCCESS':
+            # Display result once when done
+            result = task_result.get()
+            result_slot = st.empty()
+            result_slot.json(result)
+        elif current_state in ('PENDING', 'STARTED'):
+            # Auto-refresh until task completes
+            time.sleep(2)
+            st.rerun()
+    

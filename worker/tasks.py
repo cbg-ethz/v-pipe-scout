@@ -2,6 +2,7 @@ import time
 import json
 import os
 import redis
+import pandas as pd
 from celery import Celery
 from deconvolve import devconvolve
 
@@ -127,8 +128,37 @@ def run_deconvolve(self, mutation_counts_df, mutation_variant_matrix_df,
             progress_data["status"] = message
             redis_client.set(progress_key, json.dumps(progress_data), ex=3600)
         
-        # Update progress for different stages
-        update_progress(2, "Processing mutation data")
+        # Convert serialized DataFrames back to pandas DataFrames
+        try:
+            # Add debug info about the input types
+            update_progress(1.5, f"Input types: mutation_counts_df: {type(mutation_counts_df)}, mutation_variant_matrix_df: {type(mutation_variant_matrix_df)}")
+            
+            # Check if inputs are already DataFrames or need to be deserialized
+            if isinstance(mutation_counts_df, pd.DataFrame) and isinstance(mutation_variant_matrix_df, pd.DataFrame):
+                update_progress(2, "Inputs are already DataFrames, no parsing needed")
+            else:
+                # Try to load serialized DataFrames using pickle or JSON
+                try:
+                    # Try pickle first if inputs are byte strings
+                    import pickle
+                    import base64
+                    if isinstance(mutation_counts_df, str) and isinstance(mutation_variant_matrix_df, str):
+                        # If they're base64 encoded pickle strings
+                        try:
+                            mutation_counts_df = pickle.loads(base64.b64decode(mutation_counts_df))
+                            mutation_variant_matrix_df = pickle.loads(base64.b64decode(mutation_variant_matrix_df))
+                            update_progress(2, f"Successfully unpickled DataFrames, shapes: {mutation_counts_df.shape}, {mutation_variant_matrix_df.shape}")
+                        except:
+                            # Fall back to JSON if pickle fails
+                            mutation_counts_df = pd.read_json(mutation_counts_df, orient='split')
+                            mutation_variant_matrix_df = pd.read_json(mutation_variant_matrix_df, orient='split')
+                            update_progress(2, f"Successfully parsed JSON DataFrames, shapes: {mutation_counts_df.shape}, {mutation_variant_matrix_df.shape}")
+                except Exception as e:
+                    update_progress(2, f"Error parsing DataFrames with both pickle and JSON methods: {str(e)}")
+                    raise ValueError(f"Failed to deserialize DataFrames: {str(e)}")
+        except Exception as e:
+            update_progress(2, f"Error processing DataFrames: {str(e)}")
+            raise ValueError(f"Failed to process DataFrames: {str(e)}")
         
         # Create kwargs dict with required parameters and optional parameters if provided
         kwargs = {

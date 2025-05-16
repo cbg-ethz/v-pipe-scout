@@ -55,14 +55,13 @@ def devconvolve(
         mutation_counts = Path("mutation_counts_coverage.csv")
         mutations_variant_matrix = Path("mutation_variant_matrix.csv")
 
-        pd.DataFrame.to_csv(
-            mutation_counts_df,
+        # Save the dataframes to CSV files in the input directory
+        mutation_counts_df.to_csv(
             input_dir / mutation_counts.name,
             index=False,
             sep=",",
         )
-        pd.DataFrame.to_csv(
-            mutation_variant_matrix_df,
+        mutation_variant_matrix_df.to_csv(
             input_dir / mutations_variant_matrix.name,
             index=False,
             sep=",",
@@ -77,12 +76,11 @@ def devconvolve(
         "LP.8": "LP.8"
 
         """
-        # get the variants from the mutation_variant_matrix, i.e. the columns
+        # get the variants from the mutation_variant_matrix_df, i.e. the columns
         variants_config = input_dir / "variants_config.yaml"
         with open(variants_config, "w") as f:
-            variants = (
-                mutation_variant_matrix.read_text().splitlines()[0].split(",")[1:]
-            )
+            # Get column names excluding the first column (which is Mutation)
+            variants = list(mutation_variant_matrix_df.columns)[1:]
             variants_dict = {variant: variant for variant in variants}
             yaml.dump({"variants_pangolin": variants_dict}, f)
 
