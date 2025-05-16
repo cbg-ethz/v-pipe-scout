@@ -18,6 +18,8 @@ redis_client = redis.Redis(
     port=int(os.environ.get('REDIS_PORT', 6379)),
     db=0
 )
+# Maximum concurrent Celery tasks (reads from WORKER_CONCURRENCY env var)
+MAX_CONCURRENCY = 2 # TODO to get from config / backend
 
 
 
@@ -25,6 +27,9 @@ def app():
         
     st.title('Streamlit with Celery and Redis')
     st.write('This is a simple example of using Celery with Redis to handle background tasks in Streamlit.')
+    # Initialize task list in session state
+    if 'tasks_info' not in st.session_state:
+        st.session_state['tasks_info'] = []
 
     # Input for task parameters
     st.subheader('Task Parameters')
@@ -32,6 +37,7 @@ def app():
     sleep_time = st.slider('Sleep time per iteration (seconds)', 1, 5, 2)
 
     # Button to start a new task
+    # Only submit when there is at least one free slot to avoid duplicate appends on rerun
     if st.button('Start Task'):
         # Submit the task to Celery
         task = celery_app.send_task(
@@ -39,58 +45,44 @@ def app():
             args=[n_iterations, sleep_time],
             kwargs={}
         )
-        
-        # Store the task ID in session state for later reference
-        st.session_state['task_id'] = task.id
+        # Append new task info (avoid duplicates)
+        if not any(info['id'] == task.id for info in st.session_state['tasks_info']):
+            st.session_state['tasks_info'].append({
+                'id': task.id,
+                'n_iterations': n_iterations,
+                'sleep_time': sleep_time
+            })
         st.success(f'Task submitted with ID: {task.id}')
 
-    # Check task status and display results
-    if 'task_id' in st.session_state:
-        task_id = st.session_state['task_id']
-        st.subheader('Task Status')
-        
-        # Status placeholder
-        status_placeholder = st.empty()
-        
-        # Progress bar placeholder
-        progress_bar = st.progress(0)
-        
-        # Results placeholder
-        results_placeholder = st.empty()
-        
-        # Check if task is completed
-        task_result = celery_app.AsyncResult(task_id)
-        
-        if task_result.ready():
-            status_placeholder.success('Task completed!')
-            progress_bar.progress(100)
-            result = task_result.get()
-            results_placeholder.json(result)
-        else:
-            # Check for progress updates in Redis
-            progress_key = f"task_progress:{task_id}"
-            progress_data = redis_client.get(progress_key)
-            
-            if progress_data:
-                progress_info = json.loads(progress_data)
-                current = progress_info.get('current', 0)
-                total = progress_info.get('total', 1)
-                status = progress_info.get('status', 'Processing')
-                
-                # Update progress bar
-                progress_percent = int(100 * current / total) if total > 0 else 0
-                progress_bar.progress(progress_percent)
-                
-                # Update status
-                status_placeholder.info(f"Status: {status} ({current}/{total})")
-                
-                # Show partial results if available
-                partial_results = progress_info.get('partial_results', [])
-                if partial_results:
-                    results_placeholder.json(partial_results)
+    # Display all submitted tasks and their status
+    for info in st.session_state['tasks_info']:
+        task_id = info['id']
+        with st.expander(f"Task {task_id} (iter={info['n_iterations']}, sleep={info['sleep_time']})"):
+            status_placeholder = st.empty()
+            progress_bar = st.progress(0)
+            results_placeholder = st.empty()
+            task_result = celery_app.AsyncResult(task_id)
+            if task_result.ready():
+                status_placeholder.success('Task completed!')
+                progress_bar.progress(100)
+                results_placeholder.json(task_result.get())
             else:
-                status_placeholder.info('Task is pending or in progress...')
-        
-            # auto-refresh once per second (st.experimental_rerun is available in Streamlit 1.45.0)
-            time.sleep(1)
-            st.rerun()
+                # Check for progress updates in Redis
+                progress_key = f"task_progress:{task_id}"
+                progress_data = redis_client.get(progress_key)
+                if progress_data:
+                    progress_info = json.loads(progress_data)
+                    current = progress_info.get('current', 0)
+                    total = progress_info.get('total', 1)
+                    status = progress_info.get('status', 'Processing')
+                    progress_bar.progress(int(100 * current / total) if total > 0 else 0)
+                    status_placeholder.info(f"Status: {status} ({current}/{total})")
+                    partial = progress_info.get('partial_results', [])
+                    if partial:
+                        results_placeholder.json(partial)
+                else:
+                    status_placeholder.info('Task pending or starting...')
+    # Auto-refresh if any task is still in progress
+    if any(not celery_app.AsyncResult(info['id']).ready() for info in st.session_state['tasks_info']):
+        time.sleep(2)
+        st.rerun()
