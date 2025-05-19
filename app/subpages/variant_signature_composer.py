@@ -22,10 +22,10 @@ import logging
 import os
 import json
 import time
+import pickle  
+import base64 
 from celery import Celery
 import redis
-from matplotlib.colors import to_rgba  # Added for color conversion
-
 
 
 from api.signatures import get_variant_list, get_variant_names
@@ -715,7 +715,7 @@ def app():
             st.warning("Please fetch mutation counts and coverage data first in the section above before estimating variant abundances.")
         else:
             bootstraps = st.slider("Number of Bootstrap Iterations", 
-                                min_value=0, max_value=100, value=10, step=10)
+                                min_value=0, max_value=300, value=10, step=10)
             
             mutation_counts_df = st.session_state.counts_df3d
             mutation_variant_matrix_df = matrix_df
@@ -727,27 +727,35 @@ def app():
             if 'deconv_result' not in st.session_state:
                 st.session_state.deconv_result = None
 
-            # Simple button to trigger deconvolution
-            if st.button("Run Deconvolution"):
-                with st.spinner('Starting deconvolution task...'):
-                    # Use pickle to serialize DataFrames, which preserves the exact structure
-                    import pickle
-                    import base64
-                    
-                    # Convert DataFrames to base64-encoded pickle strings for serialization
-                    counts_pickle = base64.b64encode(pickle.dumps(mutation_counts_df)).decode('utf-8')
-                    matrix_pickle = base64.b64encode(pickle.dumps(mutation_variant_matrix_df)).decode('utf-8')
-                    
-                    # Submit the task to Celery worker
-                    task = celery_app.send_task(
-                        'tasks.run_deconvolve',
-                        kwargs={
-                            'mutation_counts_df': counts_pickle,
-                            'mutation_variant_matrix_df': matrix_pickle,
-                            'bootstraps': bootstraps
-                        }
-                    )
-                    # Store task ID in session state
+            # Button logic depends on whether we already have results
+            if st.session_state.deconv_result is not None:
+                # If we have results, show a "Start New Deconvolution" button instead
+                if st.button("Start New Deconvolution", help="Clear current results and start a new deconvolution"):
+                    # Clear both the task ID and result to reset the workflow
+                    st.session_state.deconv_task_id = None
+                    st.session_state.deconv_result = None
+                    # Also clear any data hash to force recomputation
+                    if 'last_data_hash' in st.session_state:
+                        del st.session_state.last_data_hash
+                    st.rerun()  # Rerun to show the parameters and Run Deconvolution button
+            else:
+                # Only show Run Deconvolution button if we don't have results yet
+                if st.button("Run Deconvolution"):
+                    with st.spinner('Starting deconvolution task...'):
+                        # Convert DataFrames to base64-encoded pickle strings for serialization
+                        counts_pickle = base64.b64encode(pickle.dumps(mutation_counts_df)).decode('utf-8')
+                        matrix_pickle = base64.b64encode(pickle.dumps(mutation_variant_matrix_df)).decode('utf-8')
+                        
+                        # Submit the task to Celery worker
+                        task = celery_app.send_task(
+                            'tasks.run_deconvolve',
+                            kwargs={
+                                'mutation_counts_df': counts_pickle,
+                                'mutation_variant_matrix_df': matrix_pickle,
+                                'bootstraps': bootstraps
+                            }
+                        )
+                        # Store task ID in session state
                     st.session_state.deconv_task_id = task.id
                     st.success(f"Deconvolution started! Task ID: {task.id}")
 
@@ -903,6 +911,20 @@ def app():
                     else:
                         # Check task status with spinner
                         with st.spinner("Checking deconvolution task status..."):
+                            # First check if the task is completed
+                            task = celery_app.AsyncResult(task_id)
+                            if task.ready():
+                                try:
+                                    # Task is complete - get the result and store it
+                                    result = task.get()
+                                    st.session_state.deconv_result = result
+                                    st.success("Deconvolution completed!")
+                                    # Rerun to show the visualization immediately
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error retrieving result: {str(e)}")
+                            
+                            # If task is not ready yet, show progress
                             progress_key = f"task_progress:{task_id}"
                             progress_data = redis_client.get(progress_key)
                             
@@ -925,32 +947,12 @@ def app():
                         You can also manually check if the results are ready using the button below.
                         """)
                         
-                        # Set up auto-refresh using st.empty() and time.sleep
-                        # Initialize a timestamp for auto-refresh if not present
-                        if 'last_refresh_time' not in st.session_state:
-                            st.session_state.last_refresh_time = time.time()
+                        # Import the streamlit-autorefresh component
+                        from streamlit_autorefresh import st_autorefresh
                         
-                        # Auto-refresh logic
-                        current_time = time.time()
-                        time_since_refresh = current_time - st.session_state.last_refresh_time
-                        
-                        if time_since_refresh > 5:  # Auto-refresh every 5 seconds
-                            st.session_state.last_refresh_time = current_time
-                            
-                            # Check task status automatically
-                            task = celery_app.AsyncResult(task_id)
-                            if task.ready():
-                                try:
-                                    result = task.get()
-                                    st.session_state.deconv_result = result
-                                    st.rerun()  # Refresh the page to show results
-                                except Exception:
-                                    pass  # Silently continue if there's an error
-                            
-                        # Show countdown to next refresh
-                        refresh_placeholder = st.empty()
-                        next_refresh = max(0, 5 - time_since_refresh)
-                        refresh_placeholder.write(f"Next automatic check in {next_refresh:.1f} seconds...")
+                        # Set up auto-refresh every 5 seconds (5000 ms)
+                        # This will automatically rerun the app without showing a countdown
+                        st_autorefresh(interval=5000, key="autorefresh")
                         
                         # Check result button
                         check_col1, check_col2 = st.columns([1, 3])
@@ -970,41 +972,8 @@ def app():
                                     else:
                                         st.info("Task is still running. Please check again later.")
             
-            # Clear results button - only show when data has been changed
-            if st.session_state.deconv_task_id:
-                # Track if the data source has changed
-                if 'last_data_hash' not in st.session_state:
-                    # Store a hash of the current data for comparison
-                    try:
-                        import hashlib
-                        combined_hash = hashlib.md5(
-                            (pickle.dumps(mutation_counts_df) + pickle.dumps(mutation_variant_matrix_df))
-                        ).hexdigest()
-                        st.session_state.last_data_hash = combined_hash
-                    except Exception:
-                        st.session_state.last_data_hash = None
-                
-                # Check if data has changed
-                show_new_button = False
-                try:
-                    import hashlib
-                    current_hash = hashlib.md5(
-                        (pickle.dumps(mutation_counts_df) + pickle.dumps(mutation_variant_matrix_df))
-                    ).hexdigest()
-                    if st.session_state.last_data_hash != current_hash:
-                        show_new_button = True
-                except Exception:
-                    show_new_button = True  # Show button on error as fallback
-                
-                if show_new_button and st.button("Start New Deconvolution", help="Data source has changed. Start a new deconvolution with the updated data."):
-                    st.session_state.deconv_task_id = None
-                    st.session_state.deconv_result = None
-                    # Update the data hash
-                    try:
-                        st.session_state.last_data_hash = current_hash
-                    except Exception:
-                        pass
-                    st.rerun()
+            # We've removed the duplicate "Start New Deconvolution" button
+            # The button logic is already handled above in the workflow
     
 
 
