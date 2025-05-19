@@ -719,9 +719,6 @@ def app():
             mutation_counts_df = st.session_state.counts_df3d
             mutation_variant_matrix_df = matrix_df
 
-            # Create columns for visualization
-            col1, col2 = st.columns(2)
-
             # Initialize task ID in session state if not present
             if 'deconv_task_id' not in st.session_state:
                 st.session_state.deconv_task_id = None
@@ -729,40 +726,33 @@ def app():
             if 'deconv_result' not in st.session_state:
                 st.session_state.deconv_result = None
 
-            # In the left column, show the deconvolution button and parameters
-            with col1:
-                # Simple button to trigger deconvolution
-                if st.button("Run Deconvolution"):
-                    with st.spinner('Starting deconvolution task...'):
-                        # Use pickle to serialize DataFrames, which preserves the exact structure
-                        import pickle
-                        import base64
-                        
-                        # Convert DataFrames to base64-encoded pickle strings for serialization
-                        counts_pickle = base64.b64encode(pickle.dumps(mutation_counts_df)).decode('utf-8')
-                        matrix_pickle = base64.b64encode(pickle.dumps(mutation_variant_matrix_df)).decode('utf-8')
-                        
-                        # Log the shapes for debugging
-                        st.write(f"Debug - Counts DF shape: {mutation_counts_df.shape}")
-                        st.write(f"Debug - Matrix DF shape: {mutation_variant_matrix_df.shape}")
-                        
-                        # Submit the task to Celery worker
-                        task = celery_app.send_task(
-                            'tasks.run_deconvolve',
-                            kwargs={
-                                'mutation_counts_df': counts_pickle,
-                                'mutation_variant_matrix_df': matrix_pickle,
-                                'bootstraps': bootstraps
-                            }
-                        )
-                        # Store task ID in session state
-                        st.session_state.deconv_task_id = task.id
-                        st.success(f"Deconvolution started! Task ID: {task.id}")
+            # Simple button to trigger deconvolution
+            if st.button("Run Deconvolution"):
+                with st.spinner('Starting deconvolution task...'):
+                    # Use pickle to serialize DataFrames, which preserves the exact structure
+                    import pickle
+                    import base64
+                    
+                    # Convert DataFrames to base64-encoded pickle strings for serialization
+                    counts_pickle = base64.b64encode(pickle.dumps(mutation_counts_df)).decode('utf-8')
+                    matrix_pickle = base64.b64encode(pickle.dumps(mutation_variant_matrix_df)).decode('utf-8')
+                    
+                    # Submit the task to Celery worker
+                    task = celery_app.send_task(
+                        'tasks.run_deconvolve',
+                        kwargs={
+                            'mutation_counts_df': counts_pickle,
+                            'mutation_variant_matrix_df': matrix_pickle,
+                            'bootstraps': bootstraps
+                        }
+                    )
+                    # Store task ID in session state
+                    st.session_state.deconv_task_id = task.id
+                    st.success(f"Deconvolution started! Task ID: {task.id}")
 
-            # In the right column, show task status and results
-            with col2:
-                if st.session_state.deconv_task_id:
-                    st.subheader("Task Status")
+            # Display task status and results
+            if st.session_state.deconv_task_id:
+    
                     task_id = st.session_state.deconv_task_id
                     
                     # Check if we already have results
@@ -818,9 +808,9 @@ def app():
                                     name=variant_name
                                 ))
                                 
-                                # Add shaded confidence interval
-                                # Convert hex color to rgba with opacity
+                                # Add shaded confidence interval using the exact same color as the line
                                 color = colors[color_idx]
+                                # Convert to rgba with 0.2 opacity - keeping the exact same color
                                 if color.startswith('#'):
                                     # Convert hex to rgb
                                     r = int(color[1:3], 16) / 255
@@ -828,8 +818,21 @@ def app():
                                     b = int(color[5:7], 16) / 255
                                     rgba_color = f'rgba({r:.3f}, {g:.3f}, {b:.3f}, 0.2)'
                                 else:
-                                    # Default case if color format is unknown
-                                    rgba_color = f'rgba(0, 0, 0, 0.2)'
+                                    # Handle other color formats (rgb, rgba, etc.)
+                                    # Strip any existing rgba/rgb format and extract the color values
+                                    if color.startswith('rgb'):
+                                        # Extract the RGB values from the string
+                                        rgb_values = color.replace('rgb(', '').replace('rgba(', '').replace(')', '').split(',')
+                                        if len(rgb_values) >= 3:
+                                            r = float(rgb_values[0].strip()) / 255 if float(rgb_values[0].strip()) > 1 else float(rgb_values[0].strip())
+                                            g = float(rgb_values[1].strip()) / 255 if float(rgb_values[1].strip()) > 1 else float(rgb_values[1].strip())
+                                            b = float(rgb_values[2].strip()) / 255 if float(rgb_values[2].strip()) > 1 else float(rgb_values[2].strip())
+                                            rgba_color = f'rgba({r:.3f}, {g:.3f}, {b:.3f}, 0.2)'
+                                        else:
+                                            rgba_color = f'rgba(0, 0, 0, 0.2)'  # Default as fallback
+                                    else:
+                                        # For any other format, use a default transparency
+                                        rgba_color = f'{color.split(")")[0]}, 0.2)' if ')' in color else f'rgba(0, 0, 0, 0.2)'
                                 
                                 fig.add_trace(go.Scatter(
                                     x=dates + dates[::-1],  # Forward then backwards
@@ -894,35 +897,81 @@ def app():
                         else:
                             st.warning("No results data available to visualize.")
                     else:
-                        # Check task status
-                        progress_key = f"task_progress:{task_id}"
-                        progress_data = redis_client.get(progress_key)
-                        
-                        if progress_data:
-                            # Parse progress data from Redis
-                            progress_info = json.loads(progress_data)
-                            current = progress_info.get('current', 0)
-                            total = progress_info.get('total', 1) 
-                            status = progress_info.get('status', 'Processing...')
+                        # Check task status with spinner
+                        with st.spinner("Checking deconvolution task status..."):
+                            progress_key = f"task_progress:{task_id}"
+                            progress_data = redis_client.get(progress_key)
                             
-                            # Display progress bar
-                            st.progress(current / total)
-                            st.write(f"Status: {status}")
+                            if progress_data:
+                                # Parse progress data from Redis
+                                progress_info = json.loads(progress_data)
+                                current = progress_info.get('current', 0)
+                                total = progress_info.get('total', 1) 
+                                status = progress_info.get('status', 'Processing...')
+                                
+                                # Display progress bar
+                                st.progress(current / total)
+                                st.write(f"Status: {status}")
+                        
+                        # Task status checking section
+                        st.subheader("Check Task Status")
+                        st.write("You can check if the deconvolution task has completed.")
+                        
+                        # Add information about auto-refresh
+                        st.write("""
+                        The page will automatically check for results every few seconds.
+                        You can also manually check if the results are ready using the button below.
+                        """)
+                        
+                        # Auto-refresh script using Streamlit's script_runner
+                        # This will automatically rerun the app every 5 seconds to check for results
+                        st.markdown("""
+                        <script>
+                            // Auto-refresh function
+                            function autoRefresh() {
+                                if (window.streamlitRunning) {
+                                    const time = 5000; // Refresh every 5 seconds
+                                    setTimeout(function() {
+                                        if (document.visibilityState === 'visible') {
+                                            const streamlitDoc = window.parent.document;
+                                            const rerunButton = streamlitDoc.querySelector('.stApp button[kind="secondaryFormSubmit"]:first-of-type');
+                                            if (rerunButton) {
+                                                rerunButton.click();
+                                            }
+                                        }
+                                        autoRefresh();
+                                    }, time);
+                                }
+                            }
+                            
+                            // Start the auto-refresh
+                            window.streamlitRunning = true;
+                            autoRefresh();
+                            
+                            // Stop refreshing if the page is hidden
+                            document.addEventListener("visibilitychange", function() {
+                                window.streamlitRunning = document.visibilityState === 'visible';
+                            });
+                        </script>
+                        """, unsafe_allow_html=True)
                         
                         # Check result button
-                        if st.button("Check Result"):
-                            task = celery_app.AsyncResult(task_id)
-                            if task.ready():
-                                try:
-                                    result = task.get()
-                                    st.session_state.deconv_result = result
-                                    st.success("Deconvolution completed!")
-                                    # The visualization will be shown on the next rerun
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Error retrieving result: {str(e)}")
-                            else:
-                                st.info("Task is still running. Please check again later.")
+                        check_col1, check_col2 = st.columns([1, 3])
+                        with check_col1:
+                            if st.button("Check Result"):
+                                with st.spinner('Checking if results are ready...'):
+                                    task = celery_app.AsyncResult(task_id)
+                                    if task.ready():
+                                        try:
+                                            result = task.get()
+                                            st.session_state.deconv_result = result
+                                            st.success("Deconvolution completed!")
+                                            # The visualization will be shown on the next rerun
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Error retrieving result: {str(e)}")
+                                    else:
+                                        st.info("Task is still running. Please check again later.")
             
             # Clear results button
             if st.session_state.deconv_task_id:
