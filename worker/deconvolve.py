@@ -44,6 +44,8 @@ def devconvolve(
 
     print(f"Dataframe mutation_variant_matrix_df: {mutation_variant_matrix_df.head()}")
 
+    print(f"Bootstraps: {bootstraps}")
+
 
     with TemporaryDirectory() as tmpdir:
         # make the temporary directory

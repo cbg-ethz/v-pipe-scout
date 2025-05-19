@@ -863,14 +863,6 @@ def app():
                             # Display the plot
                             st.plotly_chart(fig, use_container_width=True)
                             
-                            # Add download button for the JSON data
-                            json_data = json.dumps(result_data, indent=2)
-                            st.download_button(
-                                label="Download Results as JSON",
-                                data=json_data,
-                                file_name='deconvolution_results.json',
-                                mime='application/json',
-                            )
                             
                             # Optionally add CSV download for the timeseries data
                             st.write("Download variant timeseries data:")
@@ -888,13 +880,24 @@ def app():
                                     })
                             
                             if all_variant_data:
-                                csv_data = pd.DataFrame(all_variant_data).to_csv(index=False)
-                                st.download_button(
-                                    label="Download Results as CSV",
-                                    data=csv_data,
-                                    file_name='deconvolution_results.csv',
-                                    mime='text/csv',
-                                )
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                        csv_data = pd.DataFrame(all_variant_data).to_csv(index=False)
+                                        st.download_button(
+                                            label="Download Results as CSV",
+                                            data=csv_data,
+                                            file_name='deconvolution_results.csv',
+                                            mime='text/csv',
+                                        )
+                                with col2:
+                                    # Add download button for the JSON data
+                                    json_data = json.dumps(result_data, indent=2)
+                                    st.download_button(
+                                        label="Download Results as JSON",
+                                        data=json_data,
+                                        file_name='deconvolution_results.json',
+                                        mime='application/json',
+                                    )
                         else:
                             st.warning("No results data available to visualize.")
                     else:
