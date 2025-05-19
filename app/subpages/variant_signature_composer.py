@@ -21,6 +21,7 @@ import re
 import logging
 import os
 import json
+import time
 from celery import Celery
 import redis
 from matplotlib.colors import to_rgba  # Added for color conversion
@@ -913,47 +914,40 @@ def app():
                                 st.progress(current / total)
                                 st.write(f"Status: {status}")
                         
-                        # Task status checking section
-                        st.subheader("Check Task Status")
                         st.write("You can check if the deconvolution task has completed.")
                         
                         # Add information about auto-refresh
                         st.write("""
-                        The page will automatically check for results every few seconds.
+                        The page will automatically check for results every 5 seconds.
                         You can also manually check if the results are ready using the button below.
                         """)
                         
-                        # Auto-refresh script using Streamlit's script_runner
-                        # This will automatically rerun the app every 5 seconds to check for results
-                        st.markdown("""
-                        <script>
-                            // Auto-refresh function
-                            function autoRefresh() {
-                                if (window.streamlitRunning) {
-                                    const time = 5000; // Refresh every 5 seconds
-                                    setTimeout(function() {
-                                        if (document.visibilityState === 'visible') {
-                                            const streamlitDoc = window.parent.document;
-                                            const rerunButton = streamlitDoc.querySelector('.stApp button[kind="secondaryFormSubmit"]:first-of-type');
-                                            if (rerunButton) {
-                                                rerunButton.click();
-                                            }
-                                        }
-                                        autoRefresh();
-                                    }, time);
-                                }
-                            }
+                        # Set up auto-refresh using st.empty() and time.sleep
+                        # Initialize a timestamp for auto-refresh if not present
+                        if 'last_refresh_time' not in st.session_state:
+                            st.session_state.last_refresh_time = time.time()
+                        
+                        # Auto-refresh logic
+                        current_time = time.time()
+                        time_since_refresh = current_time - st.session_state.last_refresh_time
+                        
+                        if time_since_refresh > 5:  # Auto-refresh every 5 seconds
+                            st.session_state.last_refresh_time = current_time
                             
-                            // Start the auto-refresh
-                            window.streamlitRunning = true;
-                            autoRefresh();
+                            # Check task status automatically
+                            task = celery_app.AsyncResult(task_id)
+                            if task.ready():
+                                try:
+                                    result = task.get()
+                                    st.session_state.deconv_result = result
+                                    st.rerun()  # Refresh the page to show results
+                                except Exception:
+                                    pass  # Silently continue if there's an error
                             
-                            // Stop refreshing if the page is hidden
-                            document.addEventListener("visibilitychange", function() {
-                                window.streamlitRunning = document.visibilityState === 'visible';
-                            });
-                        </script>
-                        """, unsafe_allow_html=True)
+                        # Show countdown to next refresh
+                        refresh_placeholder = st.empty()
+                        next_refresh = max(0, 5 - time_since_refresh)
+                        refresh_placeholder.write(f"Next automatic check in {next_refresh:.1f} seconds...")
                         
                         # Check result button
                         check_col1, check_col2 = st.columns([1, 3])
@@ -973,11 +967,40 @@ def app():
                                     else:
                                         st.info("Task is still running. Please check again later.")
             
-            # Clear results button
+            # Clear results button - only show when data has been changed
             if st.session_state.deconv_task_id:
-                if st.button("Start New Deconvolution"):
+                # Track if the data source has changed
+                if 'last_data_hash' not in st.session_state:
+                    # Store a hash of the current data for comparison
+                    try:
+                        import hashlib
+                        combined_hash = hashlib.md5(
+                            (pickle.dumps(mutation_counts_df) + pickle.dumps(mutation_variant_matrix_df))
+                        ).hexdigest()
+                        st.session_state.last_data_hash = combined_hash
+                    except Exception:
+                        st.session_state.last_data_hash = None
+                
+                # Check if data has changed
+                show_new_button = False
+                try:
+                    import hashlib
+                    current_hash = hashlib.md5(
+                        (pickle.dumps(mutation_counts_df) + pickle.dumps(mutation_variant_matrix_df))
+                    ).hexdigest()
+                    if st.session_state.last_data_hash != current_hash:
+                        show_new_button = True
+                except Exception:
+                    show_new_button = True  # Show button on error as fallback
+                
+                if show_new_button and st.button("Start New Deconvolution", help="Data source has changed. Start a new deconvolution with the updated data."):
                     st.session_state.deconv_task_id = None
                     st.session_state.deconv_result = None
+                    # Update the data hash
+                    try:
+                        st.session_state.last_data_hash = current_hash
+                    except Exception:
+                        pass
                     st.rerun()
     
 
