@@ -14,6 +14,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
 import plotly.graph_objects as go
+import plotly.express as px  # Added for color palettes
 from pydantic import BaseModel, Field
 from typing import List
 import re
@@ -22,6 +23,7 @@ import os
 import json
 from celery import Celery
 import redis
+from matplotlib.colors import to_rgba  # Added for color conversion
 
 
 
@@ -766,7 +768,131 @@ def app():
                     # Check if we already have results
                     if st.session_state.deconv_result is not None:
                         st.success("Deconvolution completed!")
-                        st.json(st.session_state.deconv_result)
+                        
+                        # Parse and visualize the deconvolution results
+                        result_data = st.session_state.deconv_result
+                        
+                        # Get the location (for now, we just use the first location key)
+                        if result_data and len(result_data) > 0:
+                            location = list(result_data.keys())[0]
+                            variants_data = result_data[location]
+                            
+                            # Create a figure for visualization
+                            fig = go.Figure()
+                            
+                            # Color palette for variants
+                            colors = px.colors.qualitative.Bold if hasattr(px.colors.qualitative, 'Bold') else [
+                                "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", 
+                                "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
+                            ]
+                            
+                            # Ensure we have enough colors
+                            if len(variants_data) > len(colors):
+                                # Extend by cycling through the list
+                                colors = colors * (len(variants_data) // len(colors) + 1)
+                            
+                            # Track the max time range for x-axis limits
+                            all_dates = []
+                            
+                            # Plot each variant
+                            for i, (variant_name, variant_data) in enumerate(variants_data.items()):
+                                timeseries = variant_data.get('timeseriesSummary', [])
+                                if not timeseries:
+                                    continue
+                                
+                                # Extract dates and proportions
+                                dates = [pd.to_datetime(point['date']) for point in timeseries]
+                                all_dates.extend(dates)
+                                proportions = [point['proportion'] for point in timeseries]
+                                lower_bounds = [point.get('proportionLower', point['proportion']) for point in timeseries]
+                                upper_bounds = [point.get('proportionUpper', point['proportion']) for point in timeseries]
+                                
+                                color_idx = i % len(colors)
+                                
+                                # Add line plot for this variant
+                                fig.add_trace(go.Scatter(
+                                    x=dates,
+                                    y=proportions,
+                                    mode='lines+markers',
+                                    line=dict(color=colors[color_idx], width=2),
+                                    name=variant_name
+                                ))
+                                
+                                # Add shaded confidence interval
+                                # Convert hex color to rgba with opacity
+                                color = colors[color_idx]
+                                if color.startswith('#'):
+                                    # Convert hex to rgb
+                                    r = int(color[1:3], 16) / 255
+                                    g = int(color[3:5], 16) / 255
+                                    b = int(color[5:7], 16) / 255
+                                    rgba_color = f'rgba({r:.3f}, {g:.3f}, {b:.3f}, 0.2)'
+                                else:
+                                    # Default case if color format is unknown
+                                    rgba_color = f'rgba(0, 0, 0, 0.2)'
+                                
+                                fig.add_trace(go.Scatter(
+                                    x=dates + dates[::-1],  # Forward then backwards
+                                    y=upper_bounds + lower_bounds[::-1],  # Upper then lower bounds
+                                    fill='toself',
+                                    fillcolor=rgba_color,
+                                    line=dict(color='rgba(0,0,0,0)'),
+                                    hoverinfo="skip",
+                                    showlegend=False
+                                ))
+                            
+                            # Update layout
+                            fig.update_layout(
+                                title=f"Variant Proportion Estimates",
+                                xaxis_title="Date",
+                                yaxis_title="Estimated Proportion",
+                                yaxis=dict(
+                                    tickformat='.0%',  # Format as percentage
+                                    range=[0, 1]
+                                ),
+                                legend_title="Variants",
+                                height=500,
+                                template="plotly_white",
+                                hovermode="x unified"
+                            )
+                            
+                            # Display the plot
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Add download button for the JSON data
+                            json_data = json.dumps(result_data, indent=2)
+                            st.download_button(
+                                label="Download Results as JSON",
+                                data=json_data,
+                                file_name='deconvolution_results.json',
+                                mime='application/json',
+                            )
+                            
+                            # Optionally add CSV download for the timeseries data
+                            st.write("Download variant timeseries data:")
+                            
+                            # Prepare data for CSV export
+                            all_variant_data = []
+                            for variant_name, variant_data in variants_data.items():
+                                for point in variant_data.get('timeseriesSummary', []):
+                                    all_variant_data.append({
+                                        'variant': variant_name,
+                                        'date': point['date'],
+                                        'proportion': point['proportion'],
+                                        'proportionLower': point.get('proportionLower', ''),
+                                        'proportionUpper': point.get('proportionUpper', '')
+                                    })
+                            
+                            if all_variant_data:
+                                csv_data = pd.DataFrame(all_variant_data).to_csv(index=False)
+                                st.download_button(
+                                    label="Download Results as CSV",
+                                    data=csv_data,
+                                    file_name='deconvolution_results.csv',
+                                    mime='text/csv',
+                                )
+                        else:
+                            st.warning("No results data available to visualize.")
                     else:
                         # Check task status
                         progress_key = f"task_progress:{task_id}"
@@ -791,7 +917,8 @@ def app():
                                     result = task.get()
                                     st.session_state.deconv_result = result
                                     st.success("Deconvolution completed!")
-                                    st.json(result)
+                                    # The visualization will be shown on the next rerun
+                                    st.rerun()
                                 except Exception as e:
                                     st.error(f"Error retrieving result: {str(e)}")
                             else:
