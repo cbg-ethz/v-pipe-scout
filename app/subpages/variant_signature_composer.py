@@ -933,7 +933,8 @@ def app():
                             
                             if progress_data:
                                 # Parse progress data from Redis
-                                progress_info = json.loads(progress_data)
+                                progress_info = json.loads(progress_data) # type: ignore
+                                # ignore as redis 5.0.1 typing sucks, see https://github.com/redis/redis-py/issues/2933
                                 current = progress_info.get('current', 0)
                                 total = progress_info.get('total', 1) 
                                 status = progress_info.get('status', 'Processing...')
