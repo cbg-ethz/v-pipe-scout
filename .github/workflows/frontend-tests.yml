@@ -16,18 +16,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Set up Python & Conda
+      - uses: conda-incubator/setup-miniconda@v3
         with:
-          python-version: '3.9'
+          environment-file: environment.yml
+          activate-environment: v-pipe-scout
+          auto-activate-base: false
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r app/environment.yml
-
-      - name: Run frontend tests
-        run: pytest app/tests
-
-      - name: Run smoke tests
-        run: pytest app/tests/st_smoke_test.py
+      - name: Testing – Smoke & Unit Tests
+        run: conda run -n v-pipe-scout pytest
+        env:
+          PYTHONPATH: ${{ github.workspace }}

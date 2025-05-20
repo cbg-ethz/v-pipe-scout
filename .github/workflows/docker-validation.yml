@@ -17,13 +17,46 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Set up Docker Compose
+        uses: docker/setup-compose-action@v1
+
+      - name: Set up Docker Compose
         run: |
           docker-compose up -d
-
-      - name: Wait for services to be healthy
-        run: |
-          sleep 30
-          docker-compose ps
+          - name: Wait for services to be healthy
+            run: |
+              # Maximum number of attempts
+              max_attempts=30
+              # Wait time between attempts in seconds
+              wait_time=10
+              
+              for ((i=1; i<=max_attempts; i++)); do
+            echo "Checking service health (attempt $i of $max_attempts)..."
+            
+            # Check if any services failed
+            if docker-compose ps | grep -q "Exit\|exited"; then
+              echo "Some services have exited unexpectedly:"
+              docker-compose ps
+              exit 1
+            fi
+            
+            # Check if all services with health checks are healthy
+            unhealthy=$(docker-compose ps | grep -c "unhealthy" || true)
+            still_starting=$(docker-compose ps | grep -c "starting" || true)
+            
+            if [[ "$unhealthy" -eq 0 && "$still_starting" -eq 0 ]]; then
+              echo "All services are running and healthy!"
+              docker-compose ps
+              exit 0
+            fi
+            
+            echo "Services still starting. Waiting $wait_time seconds..."
+            sleep $wait_time
+              done
+              
+              echo "Timed out waiting for services to be healthy"
+              docker-compose ps
+              docker-compose logs
+              exit 1
 
       - name: Tear down Docker Compose
         if: always()
