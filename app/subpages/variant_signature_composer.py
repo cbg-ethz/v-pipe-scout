@@ -14,14 +14,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
 import plotly.graph_objects as go
-import plotly.express as px  # Added for color palettes
+import plotly.express as px 
 from pydantic import BaseModel, Field
 from typing import List
 import re
 import logging
 import os
 import json
-import time
 import pickle  
 import base64 
 from celery import Celery
