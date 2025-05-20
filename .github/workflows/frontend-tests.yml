@@ -28,4 +28,4 @@ jobs:
         working-directory: ./app
         env:
           PYTHONPATH: ${{ github.workspace }}
-          APP_PATH: app/app.py
+          APP_PATH: app.py
