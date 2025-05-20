@@ -1,0 +1,30 @@
+name: Docker Validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-docker:
+    name: Validate Docker Compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Compose
+        run: |
+          docker-compose up -d
+
+      - name: Wait for services to be healthy
+        run: |
+          sleep 30
+          docker-compose ps
+
+      - name: Tear down Docker Compose
+        if: always()
+        run: docker-compose down

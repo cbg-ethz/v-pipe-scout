@@ -1,0 +1,17 @@
+name: Worker Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-worker:
+    name: Placeholder for Worker Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "Worker tests will be added here."
