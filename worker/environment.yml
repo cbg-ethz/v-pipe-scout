@@ -27,10 +27,11 @@ dependencies:
 
   # Optional: for your workflow/testing
   - pytest
+  - pytest-mock # Added pytest-mock for the mocker fixture
 
   # Celery worker dependencies
   - celery=5.3.6
   
   - pip
   - pip:
-      - redis==5.0.1 
+      - redis==5.0.1
