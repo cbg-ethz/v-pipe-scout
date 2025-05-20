@@ -16,6 +16,7 @@ dependencies:
   - zstandard>=0.20
   - click>=8.0
   - click-option-group>=0.5
+  - lollipop>=0.5.3
   
   # CLI tools - for tallymut assembly
   - xsv=0.13.0
@@ -30,9 +31,6 @@ dependencies:
   # Celery worker dependencies
   - celery=5.3.6
   
-  # TODO: remove lollipop to proper conda install with next version
-  # remove all above lollipop dependencies
   - pip
   - pip:
       - redis==5.0.1 
-      - git+https://github.com/cbg-ethz/LolliPop.git
