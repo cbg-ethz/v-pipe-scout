@@ -2,12 +2,16 @@
 
 from streamlit.testing.v1 import AppTest
 from pathlib import Path
+import os
+import sys
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+APP_PATH = os.getenv("APP_PATH", default="app.py")
 
 def test_navigation_links():
     """Test that all navigation links are present in the sidebar."""
-    app_path = Path(__file__).parent.parent / "app.py"
-    at = AppTest.from_file(str(app_path))
+    at = AppTest.from_file(APP_PATH)
     at.run()
     
     # Get all page links from the sidebar
