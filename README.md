@@ -49,60 +49,35 @@ This application relies on two other repos as connecting infrastructure:
 The current deployment of this project can be accessed at [dev.vpipe.ethz.ch](http://dev.vpipe.ethz.ch).
 _Only accessible within ETH Zürich Networks._
 
-
 ### Installation
 
 1. Clone the repository:
     ```sh
-    git clone https://github.com/cbg-ethz/vpipe-biohack24-frontend.git
-    cd vpipe-biohack24-frontend
+    git clone https://github.com/cbg-ethz/v-pipe-scout.git
+    cd v-pipe-scout
     ```
 
-2. Configure the Wise Loculus to LAPIS APIs for clinical and wastewater data in `config.yaml` including ports:
+2. Configure the Wise Loculus to LAPIS APIs for clinical and wastewater data in `app/config.yaml` including ports:
     ```yaml
     server:
       lapis_address: "http://88.198.54.174:80"
       cov_sprectrum_api: "https://lapis.cov-spectrum.org"
     ```
 
-3. Choose one of the following installation methods:
+3. Run the application using Docker Compose:
+    ```sh
+    docker-compose up --build
+    ```
 
-#### Option A: Using Makefile (Recommended)
+### Architecture Overview
 
-The project includes a Makefile to simplify setup and execution:
+The application is built using a microservices architecture managed by Docker Compose. The key components include:
 
-```sh
-# View available commands
-make help
+- **Streamlit Frontend**: A web application for interactive exploration of viral variants.
+- **Celery Worker**: Handles background tasks such as deconvolution and data processing.
+- **Redis**: Acts as both the message broker and result backend for Celery.
 
-# Set up the conda environment and install dependencies
-make setup
-
-# Run the application
-make run
-```
-
-#### Option B: Manual Setup
-
-```sh
-# Create and activate conda environment
-conda env create -f environment.yml
-conda activate v-pipe-scout
-
-# Run the application
-streamlit run app.py
-```
-
-#### Option C: Using Docker
-
-```sh
-# Build and run with one command
-make docker
-
-# Or manually
-docker build -t v-pipe-scout .
-docker run -d -p 80:8000 v-pipe-scout
-```
+The `docker-compose.yml` file orchestrates these services, ensuring seamless communication between components.
 
 
 ## Project Origin
