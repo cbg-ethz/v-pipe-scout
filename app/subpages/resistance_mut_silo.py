@@ -6,6 +6,7 @@ import asyncio
 import yaml
 import streamlit.components.v1 as components
 import plotly.graph_objects as go 
+import pathlib
 
 from api.wiseloculus import WiseLoculusLapis
 
@@ -13,7 +14,8 @@ pd.set_option('future.no_silent_downcasting', True)
 
 
 # Load configuration from config.yaml
-with open('config.yaml', 'r') as file:
+CONFIG_PATH = pathlib.Path(__file__).parent.parent / "config.yaml"
+with open(CONFIG_PATH, 'r') as file:
     config = yaml.safe_load(file)
 
 
