@@ -972,10 +972,5 @@ def app():
                                     else:
                                         st.info("Task is still running. Please check again later.")
             
-            # We've removed the duplicate "Start New Deconvolution" button
-            # The button logic is already handled above in the workflow
-    
-
-
 if __name__ == "__main__":
     app()
