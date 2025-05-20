@@ -22,14 +22,14 @@ jobs:
       - name: Set up Docker Compose
         run: |
           docker compose up -d
-          - name: Wait for services to be healthy
-            run: |
-              # Maximum number of attempts
-              max_attempts=30
-              # Wait time between attempts in seconds
-              wait_time=10
-              
-              for ((i=1; i<=max_attempts; i++)); do
+      - name: Wait for services to be healthy
+        run: |
+          # Maximum number of attempts
+          max_attempts=30
+          # Wait time between attempts in seconds
+          wait_time=10
+          
+          for ((i=1; i<=max_attempts; i++)); do
             echo "Checking service health (attempt $i of $max_attempts)..."
             
             # Check if any services failed
