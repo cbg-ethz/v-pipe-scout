@@ -19,11 +19,11 @@ jobs:
       - name: Set up Python & Conda
         uses: conda-incubator/setup-miniconda@v3
         with:
-          environment-file: environment.yml
-          activate-environment: v-pipe-scout
+          environment-file: app/environment.yml
+          activate-environment: v-pipe-scout-app
           auto-activate-base: false
 
       - name: Testing – Smoke & Unit Tests
-        run: conda run -n v-pipe-scout pytest
+        run: conda run -n v-pipe-scout-app pytest
         env:
           PYTHONPATH: ${{ github.workspace }}
