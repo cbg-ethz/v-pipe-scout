@@ -1,4 +1,4 @@
-name: Docker Validation
+name: Docker Compose Validation
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
 
       - name: Set up Docker Compose
         run: |
-          docker-compose up -d
+          docker compose up -d
           - name: Wait for services to be healthy
             run: |
               # Maximum number of attempts
@@ -33,19 +33,19 @@ jobs:
             echo "Checking service health (attempt $i of $max_attempts)..."
             
             # Check if any services failed
-            if docker-compose ps | grep -q "Exit\|exited"; then
+            if docker compose ps | grep -q "Exit\|exited"; then
               echo "Some services have exited unexpectedly:"
-              docker-compose ps
+              docker compose ps
               exit 1
             fi
             
             # Check if all services with health checks are healthy
-            unhealthy=$(docker-compose ps | grep -c "unhealthy" || true)
-            still_starting=$(docker-compose ps | grep -c "starting" || true)
+            unhealthy=$(docker compose ps | grep -c "unhealthy" || true)
+            still_starting=$(docker compose ps | grep -c "starting" || true)
             
             if [[ "$unhealthy" -eq 0 && "$still_starting" -eq 0 ]]; then
               echo "All services are running and healthy!"
-              docker-compose ps
+              docker compose ps
               exit 0
             fi
             
@@ -54,10 +54,10 @@ jobs:
               done
               
               echo "Timed out waiting for services to be healthy"
-              docker-compose ps
-              docker-compose logs
+              docker compose ps
+              docker compose logs
               exit 1
 
       - name: Tear down Docker Compose
         if: always()
-        run: docker-compose down
+        run: docker compose down
