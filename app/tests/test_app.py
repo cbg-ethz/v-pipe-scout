@@ -24,7 +24,7 @@ def test_navigation_links():
     expected_pages = ["Home", "Resistance Mutations", "Dynamic Mutation Heatmap", 
                      "Variant Signature Explorer", "Variant Signature Composer"]
     
-    page_titles = [link.label for link in page_links]
+    page_titles = [link.label for link in page_links] # type: ignore
     for expected_page in expected_pages:
         assert any(expected_page in title for title in page_titles)
 
