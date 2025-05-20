@@ -709,6 +709,10 @@ def app():
 
         st.subheader("Estimate Variant Abundances")
         
+        # Add information about LolliPop
+        st.markdown("Processing is done with **LolliPop - a tool for Deconvolution for Wastewater Genomics**", 
+            help="LolliPop has been developed to improve wastewater-based genomic surveillance as the number of variants of concern increased and to account for shared mutations among variants. It relies on a kernel-based deconvolution, and leverages the time series nature of the samples. This approach enables to generate higher confidence relative abundance curves despite the very high noise and overdispersion present in wastewater samples.")
+        
         # Check if data has been fetched
         if 'counts_df3d' not in st.session_state or st.session_state.counts_df3d is None:
             st.warning("Please fetch mutation counts and coverage data first in the section above before estimating variant abundances.")
