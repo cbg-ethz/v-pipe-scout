@@ -1,4 +1,3 @@
-# Fixed the missing closing quote for the interval value
 version: 2
 updates:
   - package-ecosystem: "github-actions"
