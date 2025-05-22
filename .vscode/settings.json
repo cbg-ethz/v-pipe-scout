@@ -12,7 +12,7 @@
         "${workspaceFolder}/worker"
     ],
     "python.testing.pytestArgs": [
-        "tests"
+        "${workspaceFolder}"
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
