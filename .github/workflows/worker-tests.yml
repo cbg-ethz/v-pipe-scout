@@ -27,4 +27,4 @@ jobs:
         run: conda run -n v-pipe-scout-worker pytest
         working-directory: ./worker
         env:
-          PYTHONPATH: ${{ github.workspace }}
+          PYTHONPATH: ${{ github.workspace }}/worker:${{ github.workspace }}
