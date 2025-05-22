@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 if __name__ == "__main__":
     st.set_page_config(
-        page_title="V-Pipe Online",
+        page_title="V-Pipe Scout",
         page_icon="https://cbg-ethz.github.io/V-pipe/favicon-32x32.png",
         layout="wide"
     )

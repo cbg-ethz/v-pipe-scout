@@ -1,4 +1,4 @@
-"""test_app.py - Tests for the V-Pipe Online Streamlit application"""
+"""test_app.py - Tests for the V-Pipe Scout Streamlit application"""
 
 from streamlit.testing.v1 import AppTest
 from pathlib import Path

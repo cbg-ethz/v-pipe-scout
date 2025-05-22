@@ -1,7 +1,7 @@
 import streamlit as st
 
 def app():
-    st.title("POC: Fast Short Read Querying 1-Month")
+    st.title("POC: Rapid Variant Abundance Estimation 1-Month")
     
     st.image("images/1Month_POC_FastQueryReads.png", caption="POC Technical Setup")
     
