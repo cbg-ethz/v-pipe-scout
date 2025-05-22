@@ -3,7 +3,7 @@ import streamlit as st
 def app():
     st.title("POC: Rapid Variant Abundance Estimation 1-Month")
     
-    st.image("app/images/POC_Rapid_Variant_Abundance_1Month.png", caption="POC Technical Setup")
+    st.image("images/POC_Rapid_Variant_Abundance_1Month.png", caption="POC Technical Setup")
     
     st.write("## Overview")
     st.write("This is a Proof-Of-Concept for the FAIR-CBG Grant Objective: Fast querying of short reads.")
