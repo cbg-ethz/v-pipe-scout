@@ -6,7 +6,7 @@ import redis
 import pickle
 import base64
 import pandas as pd
-from deconvolve import devconvolve
+from worker.deconvolve import devconvolve
 
 # Initialize Celery
 app = Celery(
@@ -22,6 +22,7 @@ redis_client = redis.Redis(
     db=0
 )
 
+# EXAMPLE TASK: that progressively updates its status in Redis
 @app.task(bind=True)
 def long_running_task(self, n_iterations, sleep_time):
     """
