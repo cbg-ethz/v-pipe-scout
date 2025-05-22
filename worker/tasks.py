@@ -1,3 +1,4 @@
+
 from celery import Celery
 import os
 import json
@@ -6,7 +7,7 @@ import redis
 import pickle
 import base64
 import pandas as pd
-from worker.deconvolve import devconvolve
+from deconvolve import devconvolve
 
 # Initialize Celery
 app = Celery(
