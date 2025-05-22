@@ -10,21 +10,13 @@ requires the command line tools:
 
 """
 
-##### imports
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Dict
 import yaml
 import subprocess
 import json
 import pandas as pd
-
-# load the data
-mutation_counts = Path("data/mutation_counts_coverage.csv")
-mutation_variant_matrix = Path("data/mutation_variant_matrix.csv")
-
-# read in the data
-mutation_counts_df = pd.read_csv(mutation_counts)
-mutation_variant_matrix_df = pd.read_csv(mutation_variant_matrix)
 
 
 def devconvolve(
@@ -35,7 +27,7 @@ def devconvolve(
     regressor: str = "robust",
     regressor_params: dict = {"f_scale": 0.01},
     deconv_params: dict = {"min_tol": 1e-3},
-):
+) -> Dict:
     """
     This function runs lollipop on the input data and returns the deconvoluted data.
     """
@@ -141,7 +133,7 @@ def devconvolve(
 
         # Create output filename with descriptive suffix
         matrix_pos_base_file = output_dir / (
-            mutation_variant_matrix.stem + "_pos_base.csv"
+            mutations_variant_matrix_fp.stem + "_pos_base.csv"
         )
 
         try:
@@ -342,6 +334,8 @@ def devconvolve(
             "--namefield",
             "mutation",
             str(tallymut_file),
+            "--seed",
+            str(42),
         ]
 
         try:
@@ -376,18 +370,3 @@ def devconvolve(
 
     return deconvoluted_data
 
-
-if __name__ == "__main__":
-    # Example usage
-    deconvoluted_data = devconvolve(
-        mutation_counts_df,
-        mutation_variant_matrix_df,
-        bootstraps=100,
-        bandwidth=30,
-        regressor="robust",
-        regressor_params={"f_scale": 0.01},
-        deconv_params={"min_tol": 1e-3},
-    )
-
-    # Print the deconvoluted data
-    print(deconvoluted_data)
