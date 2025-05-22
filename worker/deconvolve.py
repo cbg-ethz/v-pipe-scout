@@ -32,13 +32,6 @@ def devconvolve(
     This function runs lollipop on the input data and returns the deconvoluted data.
     """
 
-    print(f"Dataframe mutation_counts_df: {mutation_counts_df.head()}")
-
-    print(f"Dataframe mutation_variant_matrix_df: {mutation_variant_matrix_df.head()}")
-
-    print(f"Bootstraps: {bootstraps}")
-
-
     with TemporaryDirectory() as tmpdir:
         # make the temporary directory
         tmpdir = Path(tmpdir)
