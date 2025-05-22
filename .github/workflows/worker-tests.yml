@@ -10,8 +10,21 @@ on:
 
 jobs:
   test-worker:
-    name: Placeholder for Worker Tests
+    name: Test Worker
     runs-on: ubuntu-latest
     steps:
-      - name: Placeholder
-        run: echo "Worker tests will be added here."
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python & Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          environment-file: worker/environment.yml
+          activate-environment: v-pipe-scout-worker
+          auto-activate-base: false
+
+      - name: Unit Tests
+        run: conda run -n v-pipe-scout-worker pytest
+        working-directory: ./worker
+        env:
+          PYTHONPATH: ${{ github.workspace }}
