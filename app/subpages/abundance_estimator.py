@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 import plotly.graph_objects as go
 import plotly.express as px 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List
 import re
 import logging
@@ -116,10 +116,11 @@ def app():
         all_curated_variants = cached_get_variant_list().variants
         curated_variant_map = {v.name: v for v in all_curated_variants}
         
+        from state import VariantSource
         for name in selected_names:
             if name in curated_variant_map and not AbundanceEstimatorState.is_variant_registered(name):
                 variant_to_add = curated_variant_map[name]
-                from state import VariantSource
+
                 AbundanceEstimatorState.register_variant(
                     name=variant_to_add.name,
                     signature_mutations=variant_to_add.signature_mutations,

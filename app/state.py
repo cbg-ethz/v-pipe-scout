@@ -74,6 +74,12 @@ class AbundanceEstimatorState:
                 except Exception as e:
                     # Don't fail initialization if data loading fails
                     # This can happen during imports or startup before API is ready
+                    st.radio(
+                        f"Error loading curated variants. Please try again later: {e}",
+                        options=["OK"],
+                        index=0,
+                        key="error_loading_curated_variants"
+                    )
                     pass
     
     # ============== UNIFIED VARIANT MANAGEMENT ==============
