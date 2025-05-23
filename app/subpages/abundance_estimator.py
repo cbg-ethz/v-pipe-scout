@@ -136,7 +136,7 @@ def app():
     st.write("This page allows you to select variants of interest and their respective signature mutations.")
     st.write("You can either select from a curated list, compose a custom variant signature with live queries to CovSpectrum or manually input the mutations.")
     st.write("The selected variants will be used to build a mutation-variant matrix.")
-    st.write("Fetch counts and coverage for these mutaitons.")
+    st.write("Fetch counts and coverage for these mutations.")
     st.write("And finally, estimate the abundance of the variants in the wastewater data.")
 
     st.markdown("---")
