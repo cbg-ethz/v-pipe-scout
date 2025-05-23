@@ -2,7 +2,7 @@
 Session state management for the Multi Variant Signature Composer page.
 """
 import streamlit as st
-from typing import List
+from typing import List, Dict, Any
 
 class VariantSignatureComposerState:
     """
@@ -34,6 +34,10 @@ class VariantSignatureComposerState:
             from subpages.variant_signature_composer import cached_get_variant_names
             available_curated_names_init = cached_get_variant_names()
             st.session_state.ui_selected_curated_names = ["LP.8"] if "LP.8" in available_curated_names_init else []
+        
+        # Custom variants (added by users)
+        if 'custom_variants' not in st.session_state:
+            st.session_state.custom_variants = []
     
     @staticmethod
     def get_combined_variants():
@@ -49,6 +53,22 @@ class VariantSignatureComposerState:
     def set_selected_curated_names(names: List[str]):
         """Update the selected curated variant names."""
         st.session_state.ui_selected_curated_names = names
+    
+    @staticmethod
+    def get_custom_variants() -> List[Dict[str, Any]]:
+        """Get the list of custom variants."""
+        return st.session_state.custom_variants
+    
+    @staticmethod
+    def add_custom_variant(variant_dict: Dict[str, Any]):
+        """Add a custom variant to the session state."""
+        st.session_state.custom_variants.append(variant_dict)
+    
+    @staticmethod
+    def remove_custom_variant(variant_name: str):
+        """Remove a custom variant from session state."""
+        st.session_state.custom_variants = [v for v in st.session_state.custom_variants 
+                                           if v['name'] != variant_name]
     
     @staticmethod
     def clear_manual_inputs():

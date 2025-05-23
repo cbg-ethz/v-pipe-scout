@@ -116,6 +116,21 @@ def app():
     # Create a reference to the persistent variant list
     combined_variants = VariantSignatureComposerState.get_combined_variants()
     
+    # Restore any custom variants from session state
+    # This ensures custom variants persist between reruns, including when fetching data
+    custom_variants = VariantSignatureComposerState.get_custom_variants()
+    existing_variant_names = {v.name for v in combined_variants.variants}
+    
+    for custom_var in custom_variants:
+        if custom_var['name'] not in existing_variant_names:
+            # Create and add the variant
+            custom_variant = Variant(
+                name=custom_var['name'],
+                signature_mutations=custom_var['signature_mutations']
+            )
+            combined_variants.add_variant(custom_variant)
+            logging.info(f"Restored custom variant '{custom_var['name']}' from session state")
+
     # Now start the UI
     st.title("Variant Signature Composer")
     st.subheader("Compose the list of variants and their respective mutational signatures.")
@@ -163,11 +178,15 @@ def app():
     all_curated_variants = cached_get_variant_list().variants
     curated_names = {v.name for v in all_curated_variants}
     
+    # Get custom variant names to avoid removing them
+    custom_variant_names = {v['name'] for v in VariantSignatureComposerState.get_custom_variants()}
+    
     # Create a copy of the list to safely iterate and remove
     variants_to_remove = []
     for v in combined_variants.variants:
-        # If it's a curated variant (by checking name) and not in current selection, mark for removal
-        if v.name in curated_names and v.name not in selected_curated_variants:
+        # Only remove curated variants that are no longer selected
+        # Make sure NOT to remove custom variants here
+        if v.name in curated_names and v.name not in selected_curated_variants and v.name not in custom_variant_names:
             variants_to_remove.append(v)
     
     # Now perform the removal
@@ -238,6 +257,13 @@ def app():
             else:
                 # Add the custom variant to the combined list
                 combined_variants.add_variant(custom_variant)
+                
+                # Also add to the session state's custom variants list for persistence
+                VariantSignatureComposerState.add_custom_variant({
+                    'name': variant_query,
+                    'signature_mutations': selected_mutations
+                })
+                
                 logging.info(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations.")
                 
                 # Show confirmation
@@ -298,6 +324,12 @@ def app():
                         )
                         combined_variants.add_variant(new_manual_variant)
                         
+                        # Also add to the session state's custom variants list for persistence
+                        VariantSignatureComposerState.add_custom_variant({
+                            'name': manual_variant_name,
+                            'signature_mutations': validated_signature_mutations
+                        })
+                        
                         st.success(f"Added manual variant '{manual_variant_name}' with {len(validated_signature_mutations)} mutations.")
                         # Set flag to clear inputs on next rerun
                         VariantSignatureComposerState.clear_manual_inputs()
@@ -331,6 +363,8 @@ def app():
     # Now perform the removal
     for variant in variants_to_remove:
         combined_variants.remove_variant(variant)
+        # Also remove from custom variants if it's a custom variant
+        VariantSignatureComposerState.remove_custom_variant(variant.name)
         st.success(f"Removed variant '{variant.name}' from the list.")
     
     # If variants were removed, rerun to update the UI
