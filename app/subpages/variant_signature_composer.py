@@ -88,14 +88,6 @@ class VariantList(BaseModel):
         self.variants.remove(variant)
 
 
-class ShowVariantList(BaseModel):
-    """Model for showing and selecting variants from the available list."""
-    variant_list: List[str] = Field(
-        default=["LP.8", "XEC"], 
-        description="Select Variants"
-    )
-
-
 @st.cache_data(ttl=3600)  # Cache for 1 hour
 def cached_get_variant_list():
     """Cached version of get_variant_list to avoid repeated API calls."""
@@ -249,7 +241,6 @@ def app():
                     signature_mutations=signature_variant.signature_mutations,
                     source=VariantSource.CURATED
                 )
-                # No need to add to combined_variants as it's generated from the registry
     
     # ============== CUSTOM VARIANT CREATION ==============
     st.markdown("#### Compose Custom Variant")
@@ -301,11 +292,6 @@ def app():
             if VariantSignatureComposerState.is_variant_registered(variant_query):
                 st.warning(f"Variant '{variant_query}' already exists in the list. Please choose a different name.")
             else:
-                # Create the variant object for validation
-                custom_variant = Variant(
-                    name=variant_query,
-                    signature_mutations=selected_mutations
-                )
                 
                 # Register directly in the variant registry
                 from state import VariantSource
@@ -464,8 +450,8 @@ def app():
         st.info("No variants are currently selected. Select variants from the Curated Variant List or create Custom Variants above.")
     
     # ============== VARIANT DEBUG INFO (EXPANDABLE) ==============
-    with st.expander("🔍 Variant Registry Information", expanded=False):
-        st.write("**Current Variant Registry Status:**")
+    with st.expander("🔍 Variant Selection Information", expanded=False):
+        st.write("**Currently Selected Variants:**")
         
         registered_variants = VariantSignatureComposerState.get_registered_variants()
         if registered_variants:
@@ -482,9 +468,6 @@ def app():
         else:
             st.write("No custom variants registered")
         
-        st.write(f"**Combined Variants Object:** {len(combined_variants.variants)} variants loaded")
-        st.write(f"**Selected Curated:** {VariantSignatureComposerState.get_selected_curated_names()}")
-
     # ============== MUTATION-VARIANT MATRIX ==============
     st.markdown("---")
     
