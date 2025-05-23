@@ -32,7 +32,7 @@ from api.signatures import Mutation
 from api.covspectrum import CovSpectrumLapis
 from api.wiseloculus import WiseLoculusLapis
 from components.variant_signature_component import render_signature_composer
-from state import VariantSignatureComposerState
+from state import AbundanceEstimatorState
 from api.signatures import Variant as SignatureVariant
 from api.signatures import VariantList as SignatureVariantList
 
@@ -101,33 +101,33 @@ def cached_get_variant_names():
 def app():
     # ============== INITIALIZATION ==============
     # Initialize all session state variables
-    VariantSignatureComposerState.initialize()
+    AbundanceEstimatorState.initialize()
     
     # Apply clearing flag for manual inputs if needed
-    VariantSignatureComposerState.apply_clear_flag()
+    AbundanceEstimatorState.apply_clear_flag()
     
     # Create a reference to the persistent variant list
-    combined_variants = VariantSignatureComposerState.get_combined_variants()
+    combined_variants = AbundanceEstimatorState.get_combined_variants()
     
     # Check if we need to handle first-time loading of variants
     # If the combined list is empty and we have selected curated names, register them
-    if not combined_variants.variants and VariantSignatureComposerState.get_selected_curated_names():
-        selected_names = VariantSignatureComposerState.get_selected_curated_names()
+    if not combined_variants.variants and AbundanceEstimatorState.get_selected_curated_names():
+        selected_names = AbundanceEstimatorState.get_selected_curated_names()
         all_curated_variants = cached_get_variant_list().variants
         curated_variant_map = {v.name: v for v in all_curated_variants}
         
         for name in selected_names:
-            if name in curated_variant_map and not VariantSignatureComposerState.is_variant_registered(name):
+            if name in curated_variant_map and not AbundanceEstimatorState.is_variant_registered(name):
                 variant_to_add = curated_variant_map[name]
                 from state import VariantSource
-                VariantSignatureComposerState.register_variant(
+                AbundanceEstimatorState.register_variant(
                     name=variant_to_add.name,
                     signature_mutations=variant_to_add.signature_mutations,
                     source=VariantSource.CURATED
                 )
         
         # Refresh the combined variants after registering
-        combined_variants = VariantSignatureComposerState.get_combined_variants()
+        combined_variants = AbundanceEstimatorState.get_combined_variants()
     
     # ============== UI HEADER ==============
     # Now start the UI
@@ -165,13 +165,13 @@ def app():
     selected_curated_variants = st.multiselect(
         "Select known variants of interest – curated by the V-Pipe team",
         options=available_variants,
-        default=VariantSignatureComposerState.get_selected_curated_names(),
+        default=AbundanceEstimatorState.get_selected_curated_names(),
         help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team (see https://github.com/cbg-ethz/cowwid/tree/master/voc)"
     )
     
     # Update the session state if the selection has changed
-    if selected_curated_variants != VariantSignatureComposerState.get_selected_curated_names():
-        VariantSignatureComposerState.set_selected_curated_names(selected_curated_variants)
+    if selected_curated_variants != AbundanceEstimatorState.get_selected_curated_names():
+        AbundanceEstimatorState.set_selected_curated_names(selected_curated_variants)
         
         # Force immediate registration of selected variants
         all_curated_variants = cached_get_variant_list().variants
@@ -179,17 +179,17 @@ def app():
         
         # First, unregister any curated variants that are no longer selected
         from state import VariantSource
-        registered_variants = VariantSignatureComposerState.get_registered_variants()
+        registered_variants = AbundanceEstimatorState.get_registered_variants()
         for variant_name, variant_data in list(registered_variants.items()):
             if variant_data['source'] == VariantSource.CURATED and variant_name not in selected_curated_variants:
-                VariantSignatureComposerState.unregister_variant(variant_name)
+                AbundanceEstimatorState.unregister_variant(variant_name)
         
         # Then register all newly selected variants
         for name in selected_curated_variants:
-            if name in curated_variant_map and not VariantSignatureComposerState.is_variant_registered(name):
+            if name in curated_variant_map and not AbundanceEstimatorState.is_variant_registered(name):
                 variant_to_add = curated_variant_map[name]
                 signature_variant = Variant.from_signature_variant(variant_to_add)
-                VariantSignatureComposerState.register_variant(
+                AbundanceEstimatorState.register_variant(
                     name=signature_variant.name,
                     signature_mutations=signature_variant.signature_mutations,
                     source=VariantSource.CURATED
@@ -206,7 +206,7 @@ def app():
     from state import VariantSource
     custom_variant_names = {
         variant_data['name'] 
-        for variant_data in VariantSignatureComposerState.get_registered_variants().values()
+        for variant_data in AbundanceEstimatorState.get_registered_variants().values()
         if variant_data['source'] in [VariantSource.CUSTOM_COVSPECTRUM, VariantSource.CUSTOM_MANUAL]
     }
     
@@ -221,7 +221,7 @@ def app():
     # Now perform the removal
     for v in variants_to_remove:
         # Remove from the registry first - this is the single source of truth
-        VariantSignatureComposerState.unregister_variant(v.name)
+        AbundanceEstimatorState.unregister_variant(v.name)
         
     # Then add newly selected curated variants if they're not already in the combined list
     if selected_curated_variants:
@@ -236,7 +236,7 @@ def app():
                 
                 # Register in the unified registry first
                 from state import VariantSource
-                VariantSignatureComposerState.register_variant(
+                AbundanceEstimatorState.register_variant(
                     name=signature_variant.name,
                     signature_mutations=signature_variant.signature_mutations,
                     source=VariantSource.CURATED
@@ -289,23 +289,23 @@ def app():
             variant_query = st.session_state.get("custom_variant_variantQuery", "Custom Variant")
             
             # Check if the variant is already registered
-            if VariantSignatureComposerState.is_variant_registered(variant_query):
+            if AbundanceEstimatorState.is_variant_registered(variant_query):
                 st.warning(f"Variant '{variant_query}' already exists in the list. Please choose a different name.")
             else:
                 
                 # Register directly in the variant registry
                 from state import VariantSource
-                VariantSignatureComposerState.register_variant(
+                AbundanceEstimatorState.register_variant(
                     name=variant_query,
                     signature_mutations=selected_mutations,
                     source=VariantSource.CUSTOM_COVSPECTRUM
                 )
                 
                 # Add to the UI tracking for custom variants
-                custom_selected = VariantSignatureComposerState.get_selected_custom_names()
+                custom_selected = AbundanceEstimatorState.get_selected_custom_names()
                 if variant_query not in custom_selected:
                     custom_selected.append(variant_query)
-                    VariantSignatureComposerState.set_selected_custom_names(custom_selected)
+                    AbundanceEstimatorState.set_selected_custom_names(custom_selected)
                 
                 logging.info(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations.")
                 
@@ -358,33 +358,33 @@ def app():
 
                 if all_mutations_valid:
                     # Check if the variant is already registered
-                    if VariantSignatureComposerState.is_variant_registered(manual_variant_name):
+                    if AbundanceEstimatorState.is_variant_registered(manual_variant_name):
                         st.warning(f"Variant '{manual_variant_name}' already exists in the list. Please choose a different name.")
                     else:
                         
                         # Register directly in the variant registry
                         from state import VariantSource
-                        VariantSignatureComposerState.register_variant(
+                        AbundanceEstimatorState.register_variant(
                             name=manual_variant_name,
                             signature_mutations=validated_signature_mutations,
                             source=VariantSource.CUSTOM_MANUAL
                         )
                         
                         # Add to the UI tracking for custom variants
-                        custom_selected = VariantSignatureComposerState.get_selected_custom_names()
+                        custom_selected = AbundanceEstimatorState.get_selected_custom_names()
                         if manual_variant_name not in custom_selected:
                             custom_selected.append(manual_variant_name)
-                            VariantSignatureComposerState.set_selected_custom_names(custom_selected)
+                            AbundanceEstimatorState.set_selected_custom_names(custom_selected)
                         
                         st.success(f"Added manual variant '{manual_variant_name}' with {len(validated_signature_mutations)} mutations.")
                         # Set flag to clear inputs on next rerun
-                        VariantSignatureComposerState.clear_manual_inputs()
+                        AbundanceEstimatorState.clear_manual_inputs()
                         st.rerun() # Trigger rerun
     
     # ============== VARIANT VALIDATION AND PROCESSING ==============
     
     # Only show warning if combined_variants.variants is empty AND we've already loaded data
-    if not combined_variants.variants and VariantSignatureComposerState.get_registered_variants():
+    if not combined_variants.variants and AbundanceEstimatorState.get_registered_variants():
         st.warning("Please select at least one variant from either the curated list or create a custom variant")
     
     st.markdown("---")
@@ -409,22 +409,22 @@ def app():
         all_removed = False
         
         # Get reference to state for tracking
-        curated_selected = VariantSignatureComposerState.get_selected_curated_names()
-        custom_selected = VariantSignatureComposerState.get_selected_custom_names()
+        curated_selected = AbundanceEstimatorState.get_selected_curated_names()
+        custom_selected = AbundanceEstimatorState.get_selected_custom_names()
         
         for variant in combined_variants.variants:
             if variant.name not in displayed_variant_names:
                 # Remove from unified variant registry
-                VariantSignatureComposerState.unregister_variant(variant.name)
+                AbundanceEstimatorState.unregister_variant(variant.name)
                 
                 # Also remove from UI tracking lists
                 if variant.name in curated_selected:
                     curated_selected.remove(variant.name)
-                    VariantSignatureComposerState.set_selected_curated_names(curated_selected)
+                    AbundanceEstimatorState.set_selected_curated_names(curated_selected)
                 
                 if variant.name in custom_selected:
                     custom_selected.remove(variant.name)
-                    VariantSignatureComposerState.set_selected_custom_names(custom_selected)
+                    AbundanceEstimatorState.set_selected_custom_names(custom_selected)
                 
                 st.success(f"Removed variant '{variant.name}' from the list.")
                 variants_removed = True
@@ -434,11 +434,11 @@ def app():
             all_removed = True
             # Clear all registries
             for name in current_variant_names:
-                VariantSignatureComposerState.unregister_variant(name)
+                AbundanceEstimatorState.unregister_variant(name)
             
             # Clear UI tracking lists
-            VariantSignatureComposerState.set_selected_curated_names([])
-            VariantSignatureComposerState.set_selected_custom_names([])
+            AbundanceEstimatorState.set_selected_curated_names([])
+            AbundanceEstimatorState.set_selected_custom_names([])
             st.warning("All variants were removed. Please select new variants from the curated list or create custom variants.")
         
         # If variants were removed, rerun to update the UI
@@ -451,7 +451,7 @@ def app():
     with st.expander("🔍 Variant Selection Information", expanded=False):
         st.write("**Currently Selected Variants:**")
         
-        registered_variants = VariantSignatureComposerState.get_registered_variants()
+        registered_variants = AbundanceEstimatorState.get_registered_variants()
         if registered_variants:
             for variant_name, variant_data in registered_variants.items():
                 col1, col2, col3 = st.columns([2, 1, 3])

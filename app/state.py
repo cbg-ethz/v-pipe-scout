@@ -11,7 +11,7 @@ class VariantSource(Enum):
     CUSTOM_COVSPECTRUM = "custom_covspectrum"
     CUSTOM_MANUAL = "custom_manual"
 
-class VariantSignatureComposerState:
+class AbundanceEstimatorState:
     """
     Manages the session state for the Multi Variant Signature Composer page.
     Centralizes access to all session variables related to variant selection,
@@ -38,7 +38,7 @@ class VariantSignatureComposerState:
             
         # Selected curated variants (for backward compatibility and UI state)
         if 'ui_selected_curated_names' not in st.session_state:
-            from subpages.variant_signature_composer import cached_get_variant_names
+            from subpages.abundance_estimator import cached_get_variant_names
             available_curated_names_init = cached_get_variant_names()
             # Set a default variant if available - LP.8 is preferred but any will do
             if "LP.8" in available_curated_names_init:
@@ -59,14 +59,14 @@ class VariantSignatureComposerState:
             selected_curated = st.session_state.ui_selected_curated_names
             if selected_curated:
                 try:
-                    from subpages.variant_signature_composer import cached_get_variant_list
+                    from subpages.abundance_estimator import cached_get_variant_list
                     curated_variants = cached_get_variant_list().variants
                     curated_variant_map = {v.name: v for v in curated_variants}
                     
                     for name in selected_curated:
                         if name in curated_variant_map:
                             variant = curated_variant_map[name]
-                            VariantSignatureComposerState.register_variant(
+                            AbundanceEstimatorState.register_variant(
                                 name=variant.name,
                                 signature_mutations=variant.signature_mutations,
                                 source=VariantSource.CURATED
@@ -118,7 +118,7 @@ class VariantSignatureComposerState:
         This method dynamically constructs a VariantList from the variant registry,
         eliminating the need for redundant storage.
         """
-        from subpages.variant_signature_composer import Variant, VariantList
+        from subpages.abundance_estimator import Variant, VariantList
         
         # Create a new VariantList instance
         combined_variants = VariantList()
