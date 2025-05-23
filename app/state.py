@@ -83,7 +83,15 @@ class VariantSignatureComposerState:
     
     @staticmethod
     def get_combined_variants():
-        """Get the current combined variants object."""
+        """
+        Get the current combined variants object.
+        
+        It provides access to the VariantList object that contains all selected variants
+        (both curated and custom) which is directly manipulated by the UI.
+        
+        The unified variant registry (get_registered_variants) provides metadata about variant sources,
+        while this method gives access to the core variant data structure used for processing.
+        """
         return st.session_state.combined_variants_object
     
     @staticmethod
@@ -95,31 +103,6 @@ class VariantSignatureComposerState:
     def set_selected_curated_names(names: List[str]):
         """Update the selected curated variant names."""
         st.session_state.ui_selected_curated_names = names
-    
-    @staticmethod
-    def get_custom_variants() -> List[Dict[str, Any]]:
-        """Get the list of custom variants (legacy method)."""
-        return [variant for variant in st.session_state.variant_registry.values() 
-                if variant['source'] in [VariantSource.CUSTOM_COVSPECTRUM, VariantSource.CUSTOM_MANUAL]]
-    
-    @staticmethod
-    def add_custom_variant(variant_dict: Dict[str, Any]):
-        """Add a custom variant to the session state (legacy method)."""
-        # Determine source based on provided information or default to manual
-        source = VariantSource.CUSTOM_MANUAL
-        if 'source' in variant_dict:
-            source = variant_dict['source']
-            
-        VariantSignatureComposerState.register_variant(
-            name=variant_dict['name'],
-            signature_mutations=variant_dict['signature_mutations'],
-            source=source
-        )
-    
-    @staticmethod
-    def remove_custom_variant(variant_name: str):
-        """Remove a custom variant from session state (legacy method)."""
-        VariantSignatureComposerState.unregister_variant(variant_name)
     
     # ============== MANUAL INPUT MANAGEMENT ==============
     

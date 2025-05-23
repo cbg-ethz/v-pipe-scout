@@ -384,8 +384,8 @@ def app():
     # Now perform the removal
     for variant in variants_to_remove:
         combined_variants.remove_variant(variant)
-        # Also remove from custom variants if it's a custom variant
-        VariantSignatureComposerState.remove_custom_variant(variant.name)
+        # Remove from unified variant registry
+        VariantSignatureComposerState.unregister_variant(variant.name)
         st.success(f"Removed variant '{variant.name}' from the list.")
     
     # If variants were removed, rerun to update the UI
