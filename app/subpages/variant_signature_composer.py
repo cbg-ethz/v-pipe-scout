@@ -107,6 +107,7 @@ def cached_get_variant_names():
     return get_variant_names()
 
 def app():
+    # ============== INITIALIZATION ==============
     # Initialize all session state variables
     VariantSignatureComposerState.initialize()
     
@@ -118,19 +119,23 @@ def app():
     
     # Restore any custom variants from session state
     # This ensures custom variants persist between reruns, including when fetching data
-    custom_variants = VariantSignatureComposerState.get_custom_variants()
+    registered_variants = VariantSignatureComposerState.get_registered_variants()
     existing_variant_names = {v.name for v in combined_variants.variants}
     
-    for custom_var in custom_variants:
-        if custom_var['name'] not in existing_variant_names:
+    for variant_name, variant_data in registered_variants.items():
+        # Only restore custom variants (not curated ones, which are handled separately)
+        from state import VariantSource
+        if (variant_data['source'] in [VariantSource.CUSTOM_COVSPECTRUM, VariantSource.CUSTOM_MANUAL] 
+            and variant_name not in existing_variant_names):
             # Create and add the variant
             custom_variant = Variant(
-                name=custom_var['name'],
-                signature_mutations=custom_var['signature_mutations']
+                name=variant_data['name'],
+                signature_mutations=variant_data['signature_mutations']
             )
             combined_variants.add_variant(custom_variant)
-            logging.info(f"Restored custom variant '{custom_var['name']}' from session state")
+            logging.info(f"Restored {variant_data['source'].value} variant '{variant_name}' from session state")
 
+    # ============== UI HEADER ==============
     # Now start the UI
     st.title("Variant Signature Composer")
     st.subheader("Compose the list of variants and their respective mutational signatures.")
@@ -142,6 +147,7 @@ def app():
 
     st.markdown("---")
 
+    # ============== CONFIGURATION ==============
     # Load configuration from config.yaml
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
@@ -150,6 +156,7 @@ def app():
     cov_spectrum_api = config.get('server', {}).get('cov_spectrum_api', 'https://lapis.cov-spectrum.org')
     covSpectrum = CovSpectrumLapis(cov_spectrum_api)
 
+    # ============== VARIANT SELECTION ==============
     st.subheader("Variant Selection")
     st.write("Select the variants of interest from either the curated list or compose new signature on the fly from CovSpectrum.")
     
@@ -179,7 +186,12 @@ def app():
     curated_names = {v.name for v in all_curated_variants}
     
     # Get custom variant names to avoid removing them
-    custom_variant_names = {v['name'] for v in VariantSignatureComposerState.get_custom_variants()}
+    from state import VariantSource
+    custom_variant_names = {
+        variant_data['name'] 
+        for variant_data in VariantSignatureComposerState.get_registered_variants().values()
+        if variant_data['source'] in [VariantSource.CUSTOM_COVSPECTRUM, VariantSource.CUSTOM_MANUAL]
+    }
     
     # Create a copy of the list to safely iterate and remove
     variants_to_remove = []
@@ -204,6 +216,7 @@ def app():
                 variant_to_add = curated_variant_map[name]
                 combined_variants.add_variant(Variant.from_signature_variant(variant_to_add))
     
+    # ============== CUSTOM VARIANT CREATION ==============
     st.markdown("#### Compose Custom Variant")
     st.markdown("##### by selecting Signature Mutations from CovSpectrum")
     # Configure the component with compact functionality
@@ -258,20 +271,21 @@ def app():
                 # Add the custom variant to the combined list
                 combined_variants.add_variant(custom_variant)
                 
-                # Also add to the session state's custom variants list for persistence
-                VariantSignatureComposerState.add_custom_variant({
-                    'name': variant_query,
-                    'signature_mutations': selected_mutations
-                })
+                # Also add to the session state's unified variant registry
+                from state import VariantSource
+                VariantSignatureComposerState.register_variant(
+                    name=variant_query,
+                    signature_mutations=selected_mutations,
+                    source=VariantSource.CUSTOM_COVSPECTRUM,
+                    metadata={'from_covspectrum': True}
+                )
                 
                 logging.info(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations.")
                 
                 # Show confirmation
                 st.success(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations")
     
-    # Combine all selected variants for processing
-    selected_variants = [variant.name for variant in combined_variants.variants]
-
+    # --- Manual Input Section ---
     with st.expander("##### Or Manual Input", expanded=False):
         manual_variant_name = st.text_input(
             "Variant Name", 
@@ -324,21 +338,30 @@ def app():
                         )
                         combined_variants.add_variant(new_manual_variant)
                         
-                        # Also add to the session state's custom variants list for persistence
-                        VariantSignatureComposerState.add_custom_variant({
-                            'name': manual_variant_name,
-                            'signature_mutations': validated_signature_mutations
-                        })
+                        # Also add to the session state's unified variant registry
+                        from state import VariantSource
+                        VariantSignatureComposerState.register_variant(
+                            name=manual_variant_name,
+                            signature_mutations=validated_signature_mutations,
+                            source=VariantSource.CUSTOM_MANUAL,
+                            metadata={'manually_entered': True}
+                        )
                         
                         st.success(f"Added manual variant '{manual_variant_name}' with {len(validated_signature_mutations)} mutations.")
                         # Set flag to clear inputs on next rerun
                         VariantSignatureComposerState.clear_manual_inputs()
                         st.rerun() # Trigger rerun
     
+    # ============== VARIANT VALIDATION AND PROCESSING ==============
+    # Combine all selected variants for processing
+    selected_variants = [variant.name for variant in combined_variants.variants]
+    
     if not selected_variants:
         st.warning("Please select at least one variant from either the curated list or create a custom variant")
     
     st.markdown("---")
+    
+    # ============== SELECTED VARIANTS MANAGEMENT ==============
     st.subheader("Selected Variants")
     
     # Get the current variants for display
@@ -371,6 +394,28 @@ def app():
     if variants_removed:
         st.rerun()
 
+    # ============== VARIANT DEBUG INFO (EXPANDABLE) ==============
+    with st.expander("🔍 Variant Registry Information", expanded=False):
+        st.write("**Current Variant Registry Status:**")
+        
+        registered_variants = VariantSignatureComposerState.get_registered_variants()
+        if registered_variants:
+            for variant_name, variant_data in registered_variants.items():
+                col1, col2, col3 = st.columns([2, 1, 3])
+                with col1:
+                    st.write(f"**{variant_name}**")
+                with col2:
+                    source_display = variant_data['source'].value.replace('_', ' ').title()
+                    st.write(f"*{source_display}*")
+                with col3:
+                    st.write(f"{len(variant_data['signature_mutations'])} mutations")
+        else:
+            st.write("No custom variants registered")
+        
+        st.write(f"**Combined Variants Object:** {len(combined_variants.variants)} variants loaded")
+        st.write(f"**Selected Curated:** {VariantSignatureComposerState.get_selected_curated_names()}")
+
+    # ============== MUTATION-VARIANT MATRIX ==============
     st.markdown("---")
     # Build the mutation-variant matrix
     if combined_variants.variants:
@@ -415,6 +460,8 @@ def app():
         matrix_df = pd.DataFrame(matrix_data, columns=columns)
         
         # Create a section with two visualizations side by side
+        
+        # ============== VARIANT SIGNATURE COMPARISON ==============
         st.subheader("Variant Signature Comparison")
 
         # Visualize the data in different ways
@@ -656,6 +703,7 @@ def app():
         else:
             st.warning("At least two variants are required to visualize the mutation-variant matrix.")
     
+        # ============== EXPORT FUNCTIONALITY ==============
         # Export functionality
         st.subheader("Export Variant Signatures")
         
@@ -670,6 +718,7 @@ def app():
         
         st.markdown("---")
 
+        # ============== DATA FETCHING ==============
         st.subheader("Download Mutation Counts and Coverage")
 
         with st.expander("Fetch and download mutation counts and coverage data", expanded=False):
@@ -741,6 +790,7 @@ def app():
         # Create a separate section for Variant Abundance Estimation
         st.markdown("---")
 
+        # ============== VARIANT ABUNDANCE ESTIMATION ==============
         st.subheader("Estimate Variant Abundances")
         
         # Add information about LolliPop

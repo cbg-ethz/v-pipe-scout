@@ -2,7 +2,14 @@
 Session state management for the Multi Variant Signature Composer page.
 """
 import streamlit as st
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from enum import Enum
+
+class VariantSource(Enum):
+    """Enum to identify the source of a variant."""
+    CURATED = "curated"
+    CUSTOM_COVSPECTRUM = "custom_covspectrum"
+    CUSTOM_MANUAL = "custom_manual"
 
 class VariantSignatureComposerState:
     """
@@ -29,15 +36,50 @@ class VariantSignatureComposerState:
             from subpages.variant_signature_composer import VariantList
             st.session_state.combined_variants_object = VariantList()
             
-        # Selected curated variants
+        # Unified variant tracking with source information
+        if 'variant_registry' not in st.session_state:
+            st.session_state.variant_registry = {}
+            
+        # Selected curated variants (for backward compatibility and UI state)
         if 'ui_selected_curated_names' not in st.session_state:
             from subpages.variant_signature_composer import cached_get_variant_names
             available_curated_names_init = cached_get_variant_names()
             st.session_state.ui_selected_curated_names = ["LP.8"] if "LP.8" in available_curated_names_init else []
-        
-        # Custom variants (added by users)
-        if 'custom_variants' not in st.session_state:
-            st.session_state.custom_variants = []
+    
+    # ============== UNIFIED VARIANT MANAGEMENT ==============
+    
+    @staticmethod
+    def register_variant(name: str, signature_mutations: List[str], source: VariantSource):
+        """Register a variant in the unified registry with source tracking."""
+        st.session_state.variant_registry[name] = {
+            'name': name,
+            'signature_mutations': signature_mutations,
+            'source': source
+        }
+    
+    @staticmethod
+    def unregister_variant(name: str):
+        """Remove a variant from the unified registry."""
+        if name in st.session_state.variant_registry:
+            del st.session_state.variant_registry[name]
+    
+    @staticmethod
+    def get_registered_variants() -> Dict[str, Dict[str, Any]]:
+        """Get all registered variants with their metadata."""
+        return st.session_state.variant_registry
+    
+    @staticmethod
+    def get_variants_by_source(source: VariantSource) -> List[Dict[str, Any]]:
+        """Get variants filtered by source."""
+        return [variant for variant in st.session_state.variant_registry.values() 
+                if variant['source'] == source]
+    
+    @staticmethod
+    def is_variant_registered(name: str) -> bool:
+        """Check if a variant is already registered."""
+        return name in st.session_state.variant_registry
+    
+    # ============== LEGACY COMPATIBILITY METHODS ==============
     
     @staticmethod
     def get_combined_variants():
@@ -56,19 +98,33 @@ class VariantSignatureComposerState:
     
     @staticmethod
     def get_custom_variants() -> List[Dict[str, Any]]:
-        """Get the list of custom variants."""
-        return st.session_state.custom_variants
+        """Get the list of custom variants (legacy method)."""
+        return [variant for variant in st.session_state.variant_registry.values() 
+                if variant['source'] in [VariantSource.CUSTOM_COVSPECTRUM, VariantSource.CUSTOM_MANUAL]]
     
     @staticmethod
     def add_custom_variant(variant_dict: Dict[str, Any]):
-        """Add a custom variant to the session state."""
-        st.session_state.custom_variants.append(variant_dict)
+        """Add a custom variant to the session state (legacy method)."""
+        # Determine source based on metadata or default to manual
+        source = VariantSource.CUSTOM_MANUAL
+        if 'source' in variant_dict:
+            source = variant_dict['source']
+        elif 'from_covspectrum' in variant_dict.get('metadata', {}):
+            source = VariantSource.CUSTOM_COVSPECTRUM
+            
+        VariantSignatureComposerState.register_variant(
+            name=variant_dict['name'],
+            signature_mutations=variant_dict['signature_mutations'],
+            source=source,
+            metadata=variant_dict.get('metadata', {})
+        )
     
     @staticmethod
     def remove_custom_variant(variant_name: str):
-        """Remove a custom variant from session state."""
-        st.session_state.custom_variants = [v for v in st.session_state.custom_variants 
-                                           if v['name'] != variant_name]
+        """Remove a custom variant from session state (legacy method)."""
+        VariantSignatureComposerState.unregister_variant(variant_name)
+    
+    # ============== MANUAL INPUT MANAGEMENT ==============
     
     @staticmethod
     def clear_manual_inputs():
