@@ -24,7 +24,7 @@ if __name__ == "__main__":
         {"app": resistance_mut_silo.app, "title": "Resistance Mutations", "icon": "🧬", "url_path": "resistance"},
         {"app": dynamic_mutations.app, "title": "Dynamic Mutation Heatmap", "icon": "🧮", "url_path": "dynamic-mutations"},
         {"app": signature_explorer.app, "title": "Variant Signature Explorer", "icon": "🔍", "url_path": "signature-explorer"},
-        {"app": abundance_estimator.app, "title": "Variant Abundances", "icon": "🧩", "url_path": "variant-abundance"}
+        {"app": abundance_estimator.app, "title": "Variant Abundances", "icon": "🧩", "url_path": "abundance-estimator"}
     ]
     
     # Create pages dynamically from configurations
