@@ -276,8 +276,7 @@ def app():
                 VariantSignatureComposerState.register_variant(
                     name=variant_query,
                     signature_mutations=selected_mutations,
-                    source=VariantSource.CUSTOM_COVSPECTRUM,
-                    metadata={'from_covspectrum': True}
+                    source=VariantSource.CUSTOM_COVSPECTRUM
                 )
                 
                 logging.info(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations.")
@@ -343,8 +342,7 @@ def app():
                         VariantSignatureComposerState.register_variant(
                             name=manual_variant_name,
                             signature_mutations=validated_signature_mutations,
-                            source=VariantSource.CUSTOM_MANUAL,
-                            metadata={'manually_entered': True}
+                            source=VariantSource.CUSTOM_MANUAL
                         )
                         
                         st.success(f"Added manual variant '{manual_variant_name}' with {len(validated_signature_mutations)} mutations.")
@@ -405,6 +403,7 @@ def app():
                 with col1:
                     st.write(f"**{variant_name}**")
                 with col2:
+                    # Display the source as a nicely formatted string
                     source_display = variant_data['source'].value.replace('_', ' ').title()
                     st.write(f"*{source_display}*")
                 with col3:

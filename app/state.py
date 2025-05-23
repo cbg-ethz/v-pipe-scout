@@ -65,7 +65,7 @@ class VariantSignatureComposerState:
     
     @staticmethod
     def get_registered_variants() -> Dict[str, Dict[str, Any]]:
-        """Get all registered variants with their metadata."""
+        """Get all registered variants with their source and mutation information."""
         return st.session_state.variant_registry
     
     @staticmethod
@@ -105,18 +105,15 @@ class VariantSignatureComposerState:
     @staticmethod
     def add_custom_variant(variant_dict: Dict[str, Any]):
         """Add a custom variant to the session state (legacy method)."""
-        # Determine source based on metadata or default to manual
+        # Determine source based on provided information or default to manual
         source = VariantSource.CUSTOM_MANUAL
         if 'source' in variant_dict:
             source = variant_dict['source']
-        elif 'from_covspectrum' in variant_dict.get('metadata', {}):
-            source = VariantSource.CUSTOM_COVSPECTRUM
             
         VariantSignatureComposerState.register_variant(
             name=variant_dict['name'],
             signature_mutations=variant_dict['signature_mutations'],
-            source=source,
-            metadata=variant_dict.get('metadata', {})
+            source=source
         )
     
     @staticmethod
