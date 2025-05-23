@@ -70,7 +70,7 @@ class Variant(BaseModel):
 
 
 class VariantList(BaseModel):
-    """Model for a list of variants."""
+    """Model for a simplified list of variants."""
     variants: List[Variant] = []
     
     @classmethod
@@ -131,13 +131,13 @@ def app():
     
     # ============== UI HEADER ==============
     # Now start the UI
-    st.title("Variant Signature Composer")
-    st.subheader("Compose the list of variants and their respective mutational signatures.")
+    st.title("Rapid Variant Abundance Estimation")
+    st.subheader("Compose the list of variants and their respective mutational signatures, then estimate their abundance in recent wastewater.")
     st.write("This page allows you to select variants of interest and their respective signature mutations.")
     st.write("You can either select from a curated list, compose a custom variant signature with live queries to CovSpectrum or manually input the mutations.")
     st.write("The selected variants will be used to build a mutation-variant matrix.")
-
-    st.write("This is one of the inputs that requires human judgment for finding the abundance of the variants in the wastewater data.")
+    st.write("Fetch counts and coverage for these mutaitons.")
+    st.write("And finally, estimate the abundance of the variants in the wastewater data.")
 
     st.markdown("---")
 
@@ -382,8 +382,6 @@ def app():
                         st.rerun() # Trigger rerun
     
     # ============== VARIANT VALIDATION AND PROCESSING ==============
-    # Combine all selected variants for processing
-    selected_variants = [variant.name for variant in combined_variants.variants]
     
     # Only show warning if combined_variants.variants is empty AND we've already loaded data
     if not combined_variants.variants and VariantSignatureComposerState.get_registered_variants():

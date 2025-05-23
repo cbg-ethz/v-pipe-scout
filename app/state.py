@@ -2,7 +2,7 @@
 Session state management for the Multi Variant Signature Composer page.
 """
 import streamlit as st
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from enum import Enum
 
 class VariantSource(Enum):
@@ -109,16 +109,14 @@ class VariantSignatureComposerState:
         """Check if a variant is already registered."""
         return name in st.session_state.variant_registry
     
-    # ============== LEGACY COMPATIBILITY METHODS ==============
-    
+
     @staticmethod
     def get_combined_variants():
         """
         Get the current combined variants object.
         
         This method dynamically constructs a VariantList from the variant registry,
-        eliminating the need for redundant storage while maintaining backward compatibility
-        with code that expects a VariantList object.
+        eliminating the need for redundant storage.
         """
         from subpages.variant_signature_composer import Variant, VariantList
         
