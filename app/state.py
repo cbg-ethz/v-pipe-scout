@@ -30,11 +30,6 @@ class VariantSignatureComposerState:
         
         if "clear_manual_inputs_flag" not in st.session_state:
             st.session_state.clear_manual_inputs_flag = False
-        
-        # Main variant list
-        if 'combined_variants_object' not in st.session_state:
-            from subpages.variant_signature_composer import VariantList
-            st.session_state.combined_variants_object = VariantList()
             
         # Unified variant tracking with source information
         if 'variant_registry' not in st.session_state:
@@ -86,13 +81,24 @@ class VariantSignatureComposerState:
         """
         Get the current combined variants object.
         
-        It provides access to the VariantList object that contains all selected variants
-        (both curated and custom) which is directly manipulated by the UI.
-        
-        The unified variant registry (get_registered_variants) provides metadata about variant sources,
-        while this method gives access to the core variant data structure used for processing.
+        This method dynamically constructs a VariantList from the variant registry,
+        eliminating the need for redundant storage while maintaining backward compatibility
+        with code that expects a VariantList object.
         """
-        return st.session_state.combined_variants_object
+        from subpages.variant_signature_composer import Variant, VariantList
+        
+        # Create a new VariantList instance
+        combined_variants = VariantList()
+        
+        # Add all variants from the registry to the combined variants list
+        for variant_name, variant_data in st.session_state.variant_registry.items():
+            variant = Variant(
+                name=variant_data['name'],
+                signature_mutations=variant_data['signature_mutations']
+            )
+            combined_variants.add_variant(variant)
+            
+        return combined_variants
     
     @staticmethod
     def get_selected_curated_names() -> List[str]:

@@ -117,24 +117,6 @@ def app():
     # Create a reference to the persistent variant list
     combined_variants = VariantSignatureComposerState.get_combined_variants()
     
-    # Restore any custom variants from session state
-    # This ensures custom variants persist between reruns, including when fetching data
-    registered_variants = VariantSignatureComposerState.get_registered_variants()
-    existing_variant_names = {v.name for v in combined_variants.variants}
-    
-    for variant_name, variant_data in registered_variants.items():
-        # Only restore custom variants (not curated ones, which are handled separately)
-        from state import VariantSource
-        if (variant_data['source'] in [VariantSource.CUSTOM_COVSPECTRUM, VariantSource.CUSTOM_MANUAL] 
-            and variant_name not in existing_variant_names):
-            # Create and add the variant
-            custom_variant = Variant(
-                name=variant_data['name'],
-                signature_mutations=variant_data['signature_mutations']
-            )
-            combined_variants.add_variant(custom_variant)
-            logging.info(f"Restored {variant_data['source'].value} variant '{variant_name}' from session state")
-
     # ============== UI HEADER ==============
     # Now start the UI
     st.title("Variant Signature Composer")
@@ -203,7 +185,8 @@ def app():
     
     # Now perform the removal
     for v in variants_to_remove:
-        combined_variants.remove_variant(v)
+        # Remove from the registry first - this is the single source of truth
+        VariantSignatureComposerState.unregister_variant(v.name)
         
     # Then add newly selected curated variants if they're not already in the combined list
     if selected_curated_variants:
@@ -214,7 +197,16 @@ def app():
         for name in selected_curated_variants:
             if name not in existing_variant_names and name in curated_variant_map:
                 variant_to_add = curated_variant_map[name]
-                combined_variants.add_variant(Variant.from_signature_variant(variant_to_add))
+                signature_variant = Variant.from_signature_variant(variant_to_add)
+                
+                # Register in the unified registry first
+                from state import VariantSource
+                VariantSignatureComposerState.register_variant(
+                    name=signature_variant.name,
+                    signature_mutations=signature_variant.signature_mutations,
+                    source=VariantSource.CURATED
+                )
+                # No need to add to combined_variants as it's generated from the registry
     
     # ============== CUSTOM VARIANT CREATION ==============
     st.markdown("#### Compose Custom Variant")
@@ -261,17 +253,18 @@ def app():
             # Show the selected mutations
             st.write("Selected Signature Mutations:")
             variant_query = st.session_state.get("custom_variant_variantQuery", "Custom Variant")
-            custom_variant = Variant(
-                                    name=variant_query,
-                                    signature_mutations=selected_mutations
-                                    )   
-            if any(v.name == custom_variant.name for v in combined_variants.variants):
-                st.warning(f"Variant '{custom_variant.name}' already exists in the list. Please choose a different name.")
+            
+            # Check if the variant is already registered
+            if VariantSignatureComposerState.is_variant_registered(variant_query):
+                st.warning(f"Variant '{variant_query}' already exists in the list. Please choose a different name.")
             else:
-                # Add the custom variant to the combined list
-                combined_variants.add_variant(custom_variant)
+                # Create the variant object for validation
+                custom_variant = Variant(
+                    name=variant_query,
+                    signature_mutations=selected_mutations
+                )
                 
-                # Also add to the session state's unified variant registry
+                # Register directly in the variant registry
                 from state import VariantSource
                 VariantSignatureComposerState.register_variant(
                     name=variant_query,
@@ -283,6 +276,9 @@ def app():
                 
                 # Show confirmation
                 st.success(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations")
+                
+                # Trigger a rerun to immediately update the UI with the new variant
+                st.rerun()
     
     # --- Manual Input Section ---
     with st.expander("##### Or Manual Input", expanded=False):
@@ -326,18 +322,17 @@ def app():
                         all_mutations_valid = False
 
                 if all_mutations_valid:
-                    # Check if the variant already exists in the combined list
-                    if any(v.name == manual_variant_name for v in combined_variants.variants):
+                    # Check if the variant is already registered
+                    if VariantSignatureComposerState.is_variant_registered(manual_variant_name):
                         st.warning(f"Variant '{manual_variant_name}' already exists in the list. Please choose a different name.")
                     else:
-                        # Create and add the custom variant using the local Variant model
+                        # Create the variant object for validation
                         new_manual_variant = Variant(
                             name=manual_variant_name,
                             signature_mutations=validated_signature_mutations
                         )
-                        combined_variants.add_variant(new_manual_variant)
                         
-                        # Also add to the session state's unified variant registry
+                        # Register directly in the variant registry
                         from state import VariantSource
                         VariantSignatureComposerState.register_variant(
                             name=manual_variant_name,
@@ -373,20 +368,14 @@ def app():
         help="Deselect variants to remove them from the list."
     )
     
-    # Check if any variants were deselected and remove them
+    # Check if any variants were deselected
     variants_removed = False
-    variants_to_remove = []
     for variant in combined_variants.variants:
         if variant.name not in displayed_variant_names:
-            variants_to_remove.append(variant)
+            # Remove from unified variant registry
+            VariantSignatureComposerState.unregister_variant(variant.name)
+            st.success(f"Removed variant '{variant.name}' from the list.")
             variants_removed = True
-    
-    # Now perform the removal
-    for variant in variants_to_remove:
-        combined_variants.remove_variant(variant)
-        # Remove from unified variant registry
-        VariantSignatureComposerState.unregister_variant(variant.name)
-        st.success(f"Removed variant '{variant.name}' from the list.")
     
     # If variants were removed, rerun to update the UI
     if variants_removed:
@@ -600,8 +589,13 @@ def app():
             
                         # Create a more compact figure with better proportions
                         fig_venn, ax_venn = plt.subplots(figsize=(5, 4))
-                        variant_names = tuple(variant.name for variant in combined_variants.variants)
-                        venn2((set1, set2), variant_names, ax=ax_venn)
+                        
+                        # Fix the typing issue by explicitly creating a tuple of exactly 2 elements
+                        variant_name1 = combined_variants.variants[0].name
+                        variant_name2 = combined_variants.variants[1].name
+                        variant_labels = (variant_name1, variant_name2)
+                        
+                        venn2((set1, set2), variant_labels, ax=ax_venn)
                         
                         # Adjust layout to be more compact
                         plt.tight_layout(pad=1.0)
@@ -624,8 +618,14 @@ def app():
                         
                         # Create a more compact figure with better proportions
                         fig_venn, ax_venn = plt.subplots(figsize=(5, 4))
-                        variant_names = tuple(variant.name for variant in combined_variants.variants)
-                        venn3((set1, set2, set3), variant_names, ax=ax_venn)
+                        
+                        # Fix the typing issue by explicitly creating a tuple of exactly 3 elements
+                        variant_name1 = combined_variants.variants[0].name
+                        variant_name2 = combined_variants.variants[1].name
+                        variant_name3 = combined_variants.variants[2].name
+                        variant_labels = (variant_name1, variant_name2, variant_name3)
+                        
+                        venn3((set1, set2, set3), variant_labels, ax=ax_venn)
                         
                         # Adjust layout to be more compact
                         plt.tight_layout(pad=1.0)
