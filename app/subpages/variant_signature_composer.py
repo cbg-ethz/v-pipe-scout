@@ -117,6 +117,26 @@ def app():
     # Create a reference to the persistent variant list
     combined_variants = VariantSignatureComposerState.get_combined_variants()
     
+    # Check if we need to handle first-time loading of variants
+    # If the combined list is empty and we have selected curated names, register them
+    if not combined_variants.variants and VariantSignatureComposerState.get_selected_curated_names():
+        selected_names = VariantSignatureComposerState.get_selected_curated_names()
+        all_curated_variants = cached_get_variant_list().variants
+        curated_variant_map = {v.name: v for v in all_curated_variants}
+        
+        for name in selected_names:
+            if name in curated_variant_map and not VariantSignatureComposerState.is_variant_registered(name):
+                variant_to_add = curated_variant_map[name]
+                from state import VariantSource
+                VariantSignatureComposerState.register_variant(
+                    name=variant_to_add.name,
+                    signature_mutations=variant_to_add.signature_mutations,
+                    source=VariantSource.CURATED
+                )
+        
+        # Refresh the combined variants after registering
+        combined_variants = VariantSignatureComposerState.get_combined_variants()
+    
     # ============== UI HEADER ==============
     # Now start the UI
     st.title("Variant Signature Composer")
@@ -160,6 +180,29 @@ def app():
     # Update the session state if the selection has changed
     if selected_curated_variants != VariantSignatureComposerState.get_selected_curated_names():
         VariantSignatureComposerState.set_selected_curated_names(selected_curated_variants)
+        
+        # Force immediate registration of selected variants
+        all_curated_variants = cached_get_variant_list().variants
+        curated_variant_map = {v.name: v for v in all_curated_variants}
+        
+        # First, unregister any curated variants that are no longer selected
+        from state import VariantSource
+        registered_variants = VariantSignatureComposerState.get_registered_variants()
+        for variant_name, variant_data in list(registered_variants.items()):
+            if variant_data['source'] == VariantSource.CURATED and variant_name not in selected_curated_variants:
+                VariantSignatureComposerState.unregister_variant(variant_name)
+        
+        # Then register all newly selected variants
+        for name in selected_curated_variants:
+            if name in curated_variant_map and not VariantSignatureComposerState.is_variant_registered(name):
+                variant_to_add = curated_variant_map[name]
+                signature_variant = Variant.from_signature_variant(variant_to_add)
+                VariantSignatureComposerState.register_variant(
+                    name=signature_variant.name,
+                    signature_mutations=signature_variant.signature_mutations,
+                    source=VariantSource.CURATED
+                )
+        
         st.rerun()
     
     # Sync the combined_variants with selected curated variants
@@ -272,6 +315,12 @@ def app():
                     source=VariantSource.CUSTOM_COVSPECTRUM
                 )
                 
+                # Add to the UI tracking for custom variants
+                custom_selected = VariantSignatureComposerState.get_selected_custom_names()
+                if variant_query not in custom_selected:
+                    custom_selected.append(variant_query)
+                    VariantSignatureComposerState.set_selected_custom_names(custom_selected)
+                
                 logging.info(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations.")
                 
                 # Show confirmation
@@ -326,11 +375,6 @@ def app():
                     if VariantSignatureComposerState.is_variant_registered(manual_variant_name):
                         st.warning(f"Variant '{manual_variant_name}' already exists in the list. Please choose a different name.")
                     else:
-                        # Create the variant object for validation
-                        new_manual_variant = Variant(
-                            name=manual_variant_name,
-                            signature_mutations=validated_signature_mutations
-                        )
                         
                         # Register directly in the variant registry
                         from state import VariantSource
@@ -339,6 +383,12 @@ def app():
                             signature_mutations=validated_signature_mutations,
                             source=VariantSource.CUSTOM_MANUAL
                         )
+                        
+                        # Add to the UI tracking for custom variants
+                        custom_selected = VariantSignatureComposerState.get_selected_custom_names()
+                        if manual_variant_name not in custom_selected:
+                            custom_selected.append(manual_variant_name)
+                            VariantSignatureComposerState.set_selected_custom_names(custom_selected)
                         
                         st.success(f"Added manual variant '{manual_variant_name}' with {len(validated_signature_mutations)} mutations.")
                         # Set flag to clear inputs on next rerun
@@ -349,7 +399,8 @@ def app():
     # Combine all selected variants for processing
     selected_variants = [variant.name for variant in combined_variants.variants]
     
-    if not selected_variants:
+    # Only show warning if combined_variants.variants is empty AND we've already loaded data
+    if not combined_variants.variants and VariantSignatureComposerState.get_registered_variants():
         st.warning("Please select at least one variant from either the curated list or create a custom variant")
     
     st.markdown("---")
@@ -360,27 +411,58 @@ def app():
     # Get the current variants for display
     current_variant_names = [variant.name for variant in combined_variants.variants]
     
-    # Create a multiselect showing current variants (user can deselect to remove)
-    displayed_variant_names = st.multiselect(
-        "Currently Selected Variants (Deselect to remove)",
-        options=current_variant_names,
-        default=current_variant_names,
-        help="Deselect variants to remove them from the list."
-    )
+    if current_variant_names:
+        # Create a multiselect showing current variants (user can deselect to remove)
+        displayed_variant_names = st.multiselect(
+            "Currently Selected Variants (Deselect to remove)",
+            options=current_variant_names,
+            default=current_variant_names,  # Always default to show all current variants
+            help="Deselect variants to remove them from the list."
+        )
+        
+        # Check if any variants were deselected
+        variants_removed = False
+        all_removed = False
+        
+        # Get reference to state for tracking
+        curated_selected = VariantSignatureComposerState.get_selected_curated_names()
+        custom_selected = VariantSignatureComposerState.get_selected_custom_names()
+        
+        for variant in combined_variants.variants:
+            if variant.name not in displayed_variant_names:
+                # Remove from unified variant registry
+                VariantSignatureComposerState.unregister_variant(variant.name)
+                
+                # Also remove from UI tracking lists
+                if variant.name in curated_selected:
+                    curated_selected.remove(variant.name)
+                    VariantSignatureComposerState.set_selected_curated_names(curated_selected)
+                
+                if variant.name in custom_selected:
+                    custom_selected.remove(variant.name)
+                    VariantSignatureComposerState.set_selected_custom_names(custom_selected)
+                
+                st.success(f"Removed variant '{variant.name}' from the list.")
+                variants_removed = True
+        
+        # If all variants were deselected, handle this special case
+        if not displayed_variant_names and current_variant_names:
+            all_removed = True
+            # Clear all registries
+            for name in current_variant_names:
+                VariantSignatureComposerState.unregister_variant(name)
+            
+            # Clear UI tracking lists
+            VariantSignatureComposerState.set_selected_curated_names([])
+            VariantSignatureComposerState.set_selected_custom_names([])
+            st.warning("All variants were removed. Please select new variants from the curated list or create custom variants.")
+        
+        # If variants were removed, rerun to update the UI
+        if variants_removed or all_removed:
+            st.rerun()
+    else:
+        st.info("No variants are currently selected. Select variants from the Curated Variant List or create Custom Variants above.")
     
-    # Check if any variants were deselected
-    variants_removed = False
-    for variant in combined_variants.variants:
-        if variant.name not in displayed_variant_names:
-            # Remove from unified variant registry
-            VariantSignatureComposerState.unregister_variant(variant.name)
-            st.success(f"Removed variant '{variant.name}' from the list.")
-            variants_removed = True
-    
-    # If variants were removed, rerun to update the UI
-    if variants_removed:
-        st.rerun()
-
     # ============== VARIANT DEBUG INFO (EXPANDABLE) ==============
     with st.expander("🔍 Variant Registry Information", expanded=False):
         st.write("**Current Variant Registry Status:**")
@@ -405,8 +487,12 @@ def app():
 
     # ============== MUTATION-VARIANT MATRIX ==============
     st.markdown("---")
+    
+    if not combined_variants.variants:
+        st.info("Select at least one variant to see the mutation-variant matrix and visualizations.")
+        
     # Build the mutation-variant matrix
-    if combined_variants.variants:
+    elif combined_variants.variants:
         
         # Collect all unique mutations across selected variants
         all_mutations = set()
@@ -706,14 +792,17 @@ def app():
         # Export functionality
         st.subheader("Export Variant Signatures")
         
-        # Convert to CSV for download
-        csv = matrix_df.to_csv(index=False)
-        st.download_button(
-            label="Download Mutation-Variant Matrix (CSV)",
-            data=csv,
-            file_name="mutation_variant_matrix.csv",
-            mime="text/csv",
-        )
+        if combined_variants.variants:
+            # Convert to CSV for download
+            csv = matrix_df.to_csv(index=False)
+            st.download_button(
+                label="Download Mutation-Variant Matrix (CSV)",
+                data=csv,
+                file_name="mutation_variant_matrix.csv",
+                mime="text/csv",
+            )
+        else:
+            st.info("Select at least one variant to enable export functionality.")
         
         st.markdown("---")
 

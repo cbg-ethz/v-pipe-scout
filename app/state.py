@@ -32,14 +32,49 @@ class VariantSignatureComposerState:
             st.session_state.clear_manual_inputs_flag = False
             
         # Unified variant tracking with source information
-        if 'variant_registry' not in st.session_state:
+        is_new_registry = 'variant_registry' not in st.session_state
+        if is_new_registry:
             st.session_state.variant_registry = {}
             
         # Selected curated variants (for backward compatibility and UI state)
         if 'ui_selected_curated_names' not in st.session_state:
             from subpages.variant_signature_composer import cached_get_variant_names
             available_curated_names_init = cached_get_variant_names()
-            st.session_state.ui_selected_curated_names = ["LP.8"] if "LP.8" in available_curated_names_init else []
+            # Set a default variant if available - LP.8 is preferred but any will do
+            if "LP.8" in available_curated_names_init:
+                default_variants = ["LP.8"]
+            elif available_curated_names_init:
+                default_variants = [available_curated_names_init[0]]  # Select first available
+            else:
+                default_variants = []
+            st.session_state.ui_selected_curated_names = default_variants
+        
+        # Selected custom variants (for UI state)
+        if 'ui_selected_custom_names' not in st.session_state:
+            st.session_state.ui_selected_custom_names = []
+            
+        # If this is a first-time initialization AND we have selected variants,
+        # make sure they're registered in the registry
+        if is_new_registry:
+            selected_curated = st.session_state.ui_selected_curated_names
+            if selected_curated:
+                try:
+                    from subpages.variant_signature_composer import cached_get_variant_list
+                    curated_variants = cached_get_variant_list().variants
+                    curated_variant_map = {v.name: v for v in curated_variants}
+                    
+                    for name in selected_curated:
+                        if name in curated_variant_map:
+                            variant = curated_variant_map[name]
+                            VariantSignatureComposerState.register_variant(
+                                name=variant.name,
+                                signature_mutations=variant.signature_mutations,
+                                source=VariantSource.CURATED
+                            )
+                except Exception as e:
+                    # Don't fail initialization if data loading fails
+                    # This can happen during imports or startup before API is ready
+                    pass
     
     # ============== UNIFIED VARIANT MANAGEMENT ==============
     
@@ -109,6 +144,20 @@ class VariantSignatureComposerState:
     def set_selected_curated_names(names: List[str]):
         """Update the selected curated variant names."""
         st.session_state.ui_selected_curated_names = names
+    
+    # ============== CUSTOM VARIANT MANAGEMENT ==============
+    
+    @staticmethod
+    def get_selected_custom_names() -> List[str]:
+        """Get the list of currently selected custom variant names."""
+        if 'ui_selected_custom_names' not in st.session_state:
+            st.session_state.ui_selected_custom_names = []
+        return st.session_state.ui_selected_custom_names
+    
+    @staticmethod
+    def set_selected_custom_names(names: List[str]):
+        """Update the selected custom variant names."""
+        st.session_state.ui_selected_custom_names = names
     
     # ============== MANUAL INPUT MANAGEMENT ==============
     
