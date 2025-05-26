@@ -88,8 +88,8 @@ class VariantList(BaseModel):
         self.variants.remove(variant)
 
 
-@st.cache_data(ttl=3600)  # Cache for 1 hour
-def cached_get_variant_list():
+@st.cache_data(ttl=3600) # Cache for 1 hour
+def cached_get_variant_list () -> SignatureVariantList:
     """Cached version of get_variant_list to avoid repeated API calls."""
     return get_variant_list()
 
