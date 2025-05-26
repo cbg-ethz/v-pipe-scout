@@ -285,13 +285,30 @@ def get_all_variant_definitions() -> List[VariantDefinition]:
     """Get all variant definitions from GitHub."""
     files = list_github_files()
     variant_defs = []
-    
-    for file in files:
-        yaml_data = download_yaml_file(file['name'])
-        if yaml_data:
-            variant_def = load_variant_definition(yaml_data)
-            if variant_def:
-                variant_defs.append(variant_def)
+    if files is None or len(files) == 0:
+        logger.error("No YAML files found in the GitHub repository.")
+        # load all locally cached files
+        logger.info("Loading all locally cached variant definitions")
+        ensure_cache_dir()
+        for file in LOCAL_CACHE_DIR.glob("*.yaml"):
+            try:
+                with open(file, 'r') as f:
+                    yaml_data = yaml.safe_load(f)
+                    variant_def = load_variant_definition(yaml_data)
+                    if variant_def:
+                        variant_defs.append(variant_def)
+            except Exception as e:
+                logger.error(f"Error loading cached file {file.name}: {e}") 
+
+        return variant_defs
+    else:
+        logger.info(f"Found {len(files)} YAML files to process")
+        for file in files:
+            yaml_data = download_yaml_file(file['name'])
+            if yaml_data:
+                variant_def = load_variant_definition(yaml_data)
+                if variant_def:
+                    variant_defs.append(variant_def)
     
     logger.info(f"Successfully loaded {len(variant_defs)} variant definitions")
     return variant_defs
