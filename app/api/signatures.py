@@ -353,6 +353,14 @@ def download_yaml_file(file_name: str) -> Optional[Dict[str, Any]]:
 def load_variant_definition(yaml_data: Dict[str, Any]) -> Optional[VariantDefinition]:
     """Convert YAML data to VariantDefinition."""
     try:
+        # NOTE: Old manual Variant Definitions reature `shared` and `mut` keys,
+        # which need to be merged correctly as they are part of the signature mutations.
+        # Merge 'shared' mutations into 'mut' if present
+        mut = yaml_data.get('mut', {})
+        shared = yaml_data.get('shared', {})
+        # Avoid overwriting any keys in mut with shared
+        merged_mut = {**shared, **mut}
+        yaml_data['mut'] = merged_mut
         return VariantDefinition.parse_obj(yaml_data)
     except Exception as e:
         logger.error(f"Error parsing variant definition: {e}")
