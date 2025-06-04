@@ -11,6 +11,7 @@
 import streamlit as st
 import yaml
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 import plotly.graph_objects as go
@@ -519,29 +520,39 @@ def app():
         
         # ============== VARIANT SIGNATURE COMPARISON ==============
         st.subheader("Variant Signature Comparison")
+        st.write("Compare the selected variant signatures via variant matrix and venn diagrams")
 
         # Visualize the data in different ways
         if len(combined_variants.variants) > 1:
             
-            # Create a matrix to show shared mutations between variants
+            # Create a matrix to show shared mutations between variants (triangular)
             variant_names = [variant.name for variant in combined_variants.variants]
             variant_comparison = pd.DataFrame(index=variant_names, columns=variant_names)
 
             # For each pair of variants, count the number of shared mutations
+            # Only compute upper triangle + diagonal to avoid redundancy
             for i, variant1 in enumerate(combined_variants.variants):
                 for j, variant2 in enumerate(combined_variants.variants):
-                    # Get the sets of mutations for each variant
-                    mutations1 = set(variant1.signature_mutations)
-                    mutations2 = set(variant2.signature_mutations)
-                    
-                    # Count number of shared mutations
-                    shared_count = len(mutations1.intersection(mutations2))
-                    
-                    # Store in the dataframe
-                    variant_comparison.iloc[i, j] = shared_count
+                    if j >= i:  # Upper triangle + diagonal only
+                        # Get the sets of mutations for each variant
+                        mutations1 = set(variant1.signature_mutations)
+                        mutations2 = set(variant2.signature_mutations)
+                        
+                        # Count number of shared mutations
+                        shared_count = len(mutations1.intersection(mutations2))
+                        
+                        # Store in the dataframe
+                        variant_comparison.iloc[i, j] = shared_count
+                    else:
+                        # Lower triangle: set to NaN to hide in visualization
+                        variant_comparison.iloc[i, j] = np.nan
         
-            # Make sure to convert numeric data to avoid potential rendering issues
-            variant_comparison = variant_comparison.astype(int)
+            # Convert numeric data to int for display, keeping NaN for lower triangle
+            # Only convert the upper triangle values to int
+            for i in range(len(variant_comparison.index)):
+                for j in range(len(variant_comparison.columns)):
+                    if j >= i and not pd.isna(variant_comparison.iloc[i, j]):
+                        variant_comparison.iloc[i, j] = int(variant_comparison.iloc[i, j])
             variant_comparison_melted = variant_comparison.reset_index().melt(
                 id_vars="index", 
                 var_name="variant2", 
@@ -555,65 +566,72 @@ def app():
             
             with col1:
                 st.markdown("#### Shared Mutations Heatmap")
-                # Calculate the shared mutations for hover text
+                # Calculate the shared mutations for hover text (only upper triangle + diagonal)
                 shared_mutations_hover = {}
                 for i, variant1 in enumerate(combined_variants.variants):
                     for j, variant2 in enumerate(combined_variants.variants):
-                        mutations1 = set(variant1.signature_mutations)
-                        mutations2 = set(variant2.signature_mutations)
-                        shared = mutations1.intersection(mutations2)
-                        shared_mutations_hover[(variant1.name, variant2.name)] = shared
+                        if j >= i:  # Only upper triangle + diagonal
+                            mutations1 = set(variant1.signature_mutations)
+                            mutations2 = set(variant2.signature_mutations)
+                            shared = mutations1.intersection(mutations2)
+                            shared_mutations_hover[(variant1.name, variant2.name)] = shared
 
                 # Create hover text with shared mutations
                 hover_text = []
                 for i, variant1 in enumerate([v.name for v in combined_variants.variants]):
                     hover_row = []
                     for j, variant2 in enumerate([v.name for v in combined_variants.variants]):
-                        count = variant_comparison.iloc[i, j]
-                        shared = shared_mutations_hover.get((variant1, variant2), set())
-                        
-                        if variant1 == variant2:
-                            text = f"<b>{variant1}</b><br>{count} signature mutations"
+                        if j >= i:  # Upper triangle + diagonal
+                            count = variant_comparison.iloc[i, j]
+                            shared = shared_mutations_hover.get((variant1, variant2), set())
+                            
+                            if variant1 == variant2:
+                                text = f"<b>{variant1}</b><br>{int(count)} signature mutations"
+                            else:
+                                text = f"<b>{variant1} ∩ {variant2}</b><br>{int(count)} shared mutations"
+                                if shared:
+                                    mutations_list = list(shared)
+                                    if len(mutations_list) > 10:
+                                        text += f"<br>First 10 shared mutations:<br>• " + "<br>• ".join(mutations_list[:10]) + f"<br>...and {len(mutations_list)-10} more"
+                                    else:
+                                        text += "<br>Shared mutations:<br>• " + "<br>• ".join(mutations_list)
                         else:
-                            text = f"<b>{variant1} ∩ {variant2}</b><br>{count} shared mutations"
-                            if shared:
-                                mutations_list = list(shared)
-                                if len(mutations_list) > 10:
-                                    text += f"<br>First 10 shared mutations:<br>• " + "<br>• ".join(mutations_list[:10]) + f"<br>...and {len(mutations_list)-10} more"
-                                else:
-                                    text += "<br>Shared mutations:<br>• " + "<br>• ".join(mutations_list)
+                            # Lower triangle: empty hover text
+                            text = ""
                         
                         hover_row.append(text)
                     hover_text.append(hover_row)
 
-                # Get min and max values for better color mapping
-                min_val = variant_comparison.values.min()
-                max_val = variant_comparison.values.max()
+                # Get min and max values for better color mapping (excluding NaN)
+                valid_values = variant_comparison.values[~pd.isna(variant_comparison.values)]
+                min_val = valid_values.min()
+                max_val = valid_values.max()
                 
-                # Create annotation text with adaptive text color
+                # Create annotation text with adaptive text color (only for upper triangle + diagonal)
                 annotations = []
                 for i in range(len(variant_comparison.index)):
                     for j in range(len(variant_comparison.columns)):
-                        value = variant_comparison.iloc[i, j]
-                        # Normalize value between 0 and 1
-                        normalized_val = (value - min_val) / (max_val - min_val) if max_val > min_val else 0
-                        # Adjust threshold based on the Blues colorscale - text is white above this normalized value
-                        text_color = "white" if normalized_val > 0.5 else "black"
-                        
-                        annotations.append(
-                            dict(
-                                x=j,
-                                y=i,
-                                text=str(value),
-                                showarrow=False,
-                                font=dict(color=text_color, size=14)
+                        if j >= i and not pd.isna(variant_comparison.iloc[i, j]):  # Upper triangle + diagonal
+                            value = variant_comparison.iloc[i, j]
+                            # Normalize value between 0 and 1
+                            normalized_val = (value - min_val) / (max_val - min_val) if max_val > min_val else 0
+                            # Adjust threshold based on the Blues colorscale - text is white above this normalized value
+                            text_color = "white" if normalized_val > 0.5 else "black"
+                            
+                            annotations.append(
+                                dict(
+                                    x=j,
+                                    y=i,
+                                    text=str(int(value)),
+                                    showarrow=False,
+                                    font=dict(color=text_color, size=14)
+                                )
                             )
-                        )
 
                 # Determine size based on number of variants (square plot)
                 size = max(350, min(500, 100 * len(combined_variants.variants)))
 
-                # Create Plotly heatmap
+                # Create Plotly heatmap (triangular)
                 fig = go.Figure(data=go.Heatmap(
                     z=variant_comparison.values,
                     x=variant_comparison.columns,
@@ -621,7 +639,8 @@ def app():
                     colorscale='Blues',
                     text=hover_text,
                     hoverinfo='text',
-                    showscale=False  # Remove colorbar/legend
+                    showscale=False,  # Remove colorbar/legend
+                    hoverongaps=False  # Don't show hover for NaN values
                 ))
 
                 # Update layout
@@ -655,8 +674,12 @@ def app():
                         set1 = set(combined_variants.variants[0].signature_mutations)
                         set2 = set(combined_variants.variants[1].signature_mutations)
             
-                        # Create a more compact figure with better proportions
-                        fig_venn, ax_venn = plt.subplots(figsize=(5, 4))
+                        # Use fixed, compact size to prevent excessive height on wide screens
+                        fig_width = 4.0  # Fixed width in inches
+                        fig_height = 3.0  # Fixed height in inches for better proportions
+                        
+                        # Create a figure with responsive size
+                        fig_venn, ax_venn = plt.subplots(figsize=(fig_width, fig_height))
                         
                         # Fix the typing issue by explicitly creating a tuple of exactly 2 elements
                         variant_name1 = combined_variants.variants[0].name
@@ -684,8 +707,12 @@ def app():
                         set2 = set(combined_variants.variants[1].signature_mutations)
                         set3 = set(combined_variants.variants[2].signature_mutations)
                         
-                        # Create a more compact figure with better proportions
-                        fig_venn, ax_venn = plt.subplots(figsize=(5, 4))
+                        # Use fixed, compact size to prevent excessive height on wide screens
+                        fig_width = 4.0  # Fixed width in inches
+                        fig_height = 3.0  # Fixed height in inches for better proportions
+                        
+                        # Create a figure with responsive size
+                        fig_venn, ax_venn = plt.subplots(figsize=(fig_width, fig_height))
                         
                         # Fix the typing issue by explicitly creating a tuple of exactly 3 elements
                         variant_name1 = combined_variants.variants[0].name
