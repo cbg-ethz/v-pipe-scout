@@ -72,6 +72,15 @@ _Only accessible within ETH Zürich Networks._
     docker-compose up --build
     ```
 
+### Automatic Deployment
+
+For production deployments on VMs or servers, you can set up automatic deployment to eliminate the need for manual updates. See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions on:
+
+- Setting up automatic deployment with cron jobs
+- Monitoring and logging deployment activities  
+- Configuring rollback mechanisms
+- Troubleshooting deployment issues
+
 ### Architecture Overview
 
 The application is built using a microservices architecture managed by Docker Compose. The key components include:
