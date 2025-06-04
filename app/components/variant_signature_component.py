@@ -278,60 +278,62 @@ def render_signature_composer(
 def render_distribution_plots(target, session_prefix: str = ""):
     """Render coverage and proportion distribution plots."""
     target.markdown('---')
-    target.subheader('Coverage and Proportion Distributions')
+    target.markdown("### [CovSpectrum]: Clinical Sequences Available – Statistics")
+    target.info(
+        """
+        These statistics are meant to help calibrate the above filters and are for all sequences found globally on CovSpectrum.\n\n
+        **Coverage Distribution:** Mutation count to number of clinical sequences for that given variant that have it.\n
+        **Proportion Distribution:** Mutation count to fraction of clinical sequences for that given variant that have it.
+        """
+    )
 
-    
     # Try to use the last mutation DataFrame if available
     mutation_df = st.session_state.get(f'{session_prefix}mutation_df', pd.DataFrame())
-    
+
     # Use the original DataFrame if available (for coverage/proportion columns)
     if f'{session_prefix}mutation_data_df' in st.session_state:
         df = st.session_state[f'{session_prefix}mutation_data_df']
     else:
         df = None
-    
+
     # Try to get the DataFrame from the last fetch
     if df is None or df.empty:
         if f'{session_prefix}last_fetched_df' in st.session_state:
             df = st.session_state[f'{session_prefix}last_fetched_df']
-    
+
     if df is None or df.empty:
         df = mutation_df
-    
-    # Use a reasonable max width for the figure
-    fig, axes = plt.subplots(1, 2, figsize=(8, 4))
-    plotted = False
-    
-    if not df.empty:
-        if 'coverage' in df.columns:
-            axes[0].hist(df['coverage'].dropna(), bins=20, color='skyblue', edgecolor='black')
-            axes[0].set_title('Coverage Distribution')
-            axes[0].set_xlabel('Coverage')
-            axes[0].set_ylabel('Count')
-            plotted = True
+
+    # Prepare columns for separate plots
+    col1, col2 = target.columns(2)
+    # Remove plot_style and blue background for a cleaner look
+
+    # Coverage Distribution Plot
+    with col1:
+        if not df.empty and 'coverage' in df.columns:
+            fig1, ax1 = plt.subplots(figsize=(5, 3))
+            ax1.hist(df['coverage'].dropna(), bins=20, color='#1E88E5', edgecolor='white', alpha=0.9)
+            ax1.set_title('Coverage Distribution', fontsize=14, fontweight='light')
+            ax1.set_xlabel('Number of Clinical Sequences', fontsize=12)
+            ax1.set_ylabel('Mutation Count', fontsize=12)
+            ax1.grid(axis='y', linestyle=':', alpha=0.5)
+            # No custom facecolor for a cleaner look
+            target.pyplot(fig1, use_container_width=True)
         else:
-            axes[0].set_visible(False)
-        
-        if 'proportion' in df.columns:
-            axes[1].hist(df['proportion'].dropna(), bins=20, color='orange', edgecolor='black')
-            axes[1].set_title('Proportion Distribution')
-            axes[1].set_xlabel('Proportion')
-            axes[1].set_ylabel('Count')
-            plotted = True
+            target.info('No coverage data available.')
+
+    # Proportion Distribution Plot
+    with col2:
+        if not df.empty and 'proportion' in df.columns:
+            fig2, ax2 = plt.subplots(figsize=(5, 3))
+            ax2.hist(df['proportion'].dropna(), bins=20, color='#FFA726', edgecolor='white', alpha=0.9)
+            ax2.set_title('Proportion Distribution', fontsize=14, fontweight='light')
+            ax2.set_xlabel('Fraction of Clinical Sequences', fontsize=12)
+            ax2.set_ylabel('Mutation Count', fontsize=12)
+            ax2.grid(axis='y', linestyle=':', alpha=0.5)
+            # No custom facecolor for a cleaner look
+            target.pyplot(fig2, use_container_width=True)
         else:
-            axes[1].set_visible(False)
-    
-    if not plotted:
-        fig.delaxes(axes[1])
-        fig.delaxes(axes[0])
-        fig, ax = plt.subplots(figsize=(5, 2))
-        ax.text(0.5, 0.5, 'No coverage or proportion data available.', ha='center', va='center')
-        ax.axis('off')
-    
-    # Center the plot
-    cols = target.columns([1,2,1])
-    with cols[1]:
-        st_fig_key = f"dist_plot_{session_prefix}_{id(fig)}"
-        target.pyplot(fig)
-    
+            target.info('No proportion data available.')
+
     target.markdown("---")
