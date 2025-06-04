@@ -12,6 +12,7 @@ dependencies:
   - aiohttp
   - requests
   - pytest
+  - pytest-asyncio
   - streamlit-pydantic
   - pydantic>=1.9,<2
   - cojac>=0.9.3
