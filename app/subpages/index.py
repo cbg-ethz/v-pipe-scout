@@ -38,6 +38,7 @@ def app():
     - *Dynamic mutation heatmap (AA)*: Amino acid mutations hijacking the clinical GenSpectrum frontend.
     - *Dynamic mutation heatmap (Nuc)*: Nucleotide mutations hijacking the clinical GenSpectrum frontend.
     - *Explore variant signatures*: See variant-specific mutations over time.
+    - *Explore Background Mutations*: See the mutations not currently accounted for in the variant signatures we track.
     - *Rapid variant abundance*: Estimate variant abundance over time for an interactively defined set of variants.
     """)
     
