@@ -234,3 +234,47 @@ class WiseLoculusLapis(Lapis):
 
         # Return the DataFrame
         return df
+
+    async def sample_nucleotideMutations(
+            self, 
+            date_range: Tuple[datetime, datetime], 
+            location_name: Optional[str] = None,
+            min_proportion: float = 0.05,
+        ) -> pd.DataFrame:
+        """
+        Fetches nucleotide mutations for a given date range and optional location.
+        
+        Retruns a DataFrame with 
+        Columns: ['mutation', 'count', 'coverage', 'proportion', 'sequenceName', 'mutationFrom', 'mutationTo', 'position']
+        """
+
+        payload = {
+            "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
+            "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
+            "location_name": location_name,
+            "minProportion": min_proportion, 
+            "orderBy": "proportion",
+            "limit": 10000,  # Adjust limit as needed
+            "dataFormat": "JSON",
+            "downloadAsFile": "false"
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f'{self.server_ip}/sample/nucleotideMutations',
+                params=payload,
+                headers={'accept': 'application/json'}
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    df = pd.DataFrame(data['data'])
+                    return df
+                else:
+                    logging.error(f"Failed to fetch nucleotide mutations: {response.status}")
+                    return pd.DataFrame()
+        return df
+    
+
+    
+        
+    

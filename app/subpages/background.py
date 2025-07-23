@@ -7,6 +7,8 @@ import streamlit.components.v1 as components
 import plotly.graph_objects as go 
 import pathlib
 
+from datetime import datetime
+
 from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
 
@@ -205,6 +207,16 @@ def app():
     location = st.selectbox("Select Location:", locations)
     
     sequence_type_value = "nucliotide"  # Default sequence type
+
+    raw_data =  asyncio.run(wiseLoculus.sample_nucleotideMutations(
+        date_range=(
+            datetime.strptime("2025-02-10", "%Y-%m-%d"),
+            datetime.strptime("2025-03-10", "%Y-%m-%d")
+        ),
+        location_name="Zürich (ZH)"
+    ))
+
+    st.write(raw_data)
 
     #formatted_mutations_str = str(formatted_mutations).replace("'", '"')
 
