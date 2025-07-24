@@ -3,9 +3,17 @@ import streamlit as st
 import pandas as pd
 import asyncio
 import yaml
-import streamlit.components.v1 as components
 import plotly.graph_objects as go 
 import pathlib
+from pydantic import BaseModel
+from typing import List
+
+from api.wiseloculus import WiseLoculusLapis
+from interface import MutationType
+
+from api.signatures import Variant as SignatureVariant
+from api.signatures import VariantList as SignatureVariantList
+from api.signatures import get_variant_list, get_variant_names
 
 from datetime import datetime
 
@@ -179,7 +187,55 @@ def plot_resistance_mutations(freq_df, counts_df=None, coverage_freq_df=None):
     return fig
 
 
+class Variant(BaseModel):
+    """
+    Model for a variant with its signature mutations.
+    This is a simplified version of the Variant class from signatures.py.
+    """
+    name: str  # pangolin name
+    signature_mutations: List[str]
+    
+    @classmethod
+    def from_signature_variant(cls, signature_variant: SignatureVariant) -> "Variant":
+        """Convert a signature Variant to our simplified Variant."""
+        return cls(
+            name=signature_variant.name,  # This is already the pangolin name
+            signature_mutations=signature_variant.signature_mutations
+        )
+
+
+class VariantList(BaseModel):
+    """Model for a simplified list of variants."""
+    variants: List[Variant] = []
+    
+    @classmethod
+    def from_signature_variant_list(cls, signature_variant_list: SignatureVariantList) -> "VariantList":
+        """Convert a signature VariantList to our simplified VariantList."""
+        variant_list = cls()
+        for signature_variant in signature_variant_list.variants:
+            variant_list.add_variant(Variant.from_signature_variant(signature_variant))
+        return variant_list
+        
+    def add_variant(self, variant: Variant):
+        self.variants.append(variant)
+        
+    def remove_variant(self, variant: Variant):
+        self.variants.remove(variant)
+
+
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def cached_get_variant_list() -> SignatureVariantList:
+    """Cached version of get_variant_list to avoid repeated API calls."""
+    return get_variant_list()
+
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def cached_get_variant_names() -> List[str]:
+    """Cached version of get_variant_names to avoid repeated API calls."""
+    return get_variant_names()
+
 def app():
+
+    
     st.title("Background Mutations")
     st.subheader("Explore Mutations currently not in any Variant Signature we track")
     st.write("This page allows you to visualize the numer of observed mutations over time.")
@@ -205,8 +261,6 @@ def app():
     locations = wiseLoculus.fetch_locations(default_locations)
 
     location = st.selectbox("Select Location:", locations)
-    
-    sequence_type_value = "nucliotide"  # Default sequence type
 
     mutations_in_timeframe_df =  asyncio.run(wiseLoculus.sample_nucleotideMutations(
         date_range=(
@@ -217,8 +271,34 @@ def app():
     ))
 
     mutations_in_timeframe = mutations_in_timeframe_df['mutation'].to_list()  
-    st.write(mutations_in_timeframe)
-    formatted_mutations_str = str(mutations_in_timeframe).replace("'", '"')
+
+    # Get the available variant names from the signatures API (cached)
+    available_variants = cached_get_variant_names()
+    
+    # Create a multi-select box for variants
+    selected_curated_variants = st.multiselect(
+        "Select known variants of interest – curated by the V-Pipe team",
+        options=available_variants,
+        default=cached_get_variant_names(),
+        help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team"
+    )
+    
+    # from selected_curated_variants get each variant's signature mutations
+    curated_variants = cached_get_variant_list()
+    curated_variants = VariantList.from_signature_variant_list(curated_variants)
+    curated_variants.variants = [
+        variant for variant in curated_variants.variants
+        if variant.name in selected_curated_variants
+    ]
+    # Extract the signature mutations from the selected curated variants
+    selected_signature_mutations = [
+        mutation for variant in curated_variants.variants
+        for mutation in variant.signature_mutations
+    ]
+
+    # remove duplicates from selected_signature_mutations
+    selected_signature_mutations = list(set(selected_signature_mutations))
+
 
     # Show a spinner while fetching data
     with st.spinner("Fetching mutation data..."):
@@ -229,7 +309,8 @@ def app():
             location_name=location
         )
 
-    st.write(counts_df)
+    # get the current muations of varaint signatures
+
 
     # reformat as a pandas DataFrame with mutations as rows and dates as columns, sort mutations by positions i.e
 
