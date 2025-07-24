@@ -26,7 +26,7 @@ wiseLoculus = WiseLoculusLapis(server_ip)
 
 def app():
     st.title("Resistance Mutations from Wastewater Data")
-    st.write("This page allows you to visualize the numer of observed resistance mutations over time.")
+    st.write("This page allows you to visualize the number of observed resistance mutations over time.")
     st.write("The data is fetched from the WISE-CovSpectrum API and currently cointains demo data for Feb-Mar 2025.")
     st.write("The sets of resistance mutations are provide from Stanfords Coronavirus Antivirial & Reistance Database. Last updated 05/14/2024")
     st.write("This is a demo frontend to later make the first queries to SILO for wastewater data.")
