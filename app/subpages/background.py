@@ -309,11 +309,26 @@ def app():
             location_name=location
         )
 
-    # get the current muations of varaint signatures
+    # background mutaitons are all mutaitons founf in mutations_in_timeframe 
+    # but are note in the selected signature mutations
+    background_mutations = [
+        mutation for mutation in mutations_in_timeframe
+        if mutation not in selected_signature_mutations
+    ]
 
+    print("Mutations in timeframe:", mutations_in_timeframe)
+    print("Background mutations:", background_mutations)
+    # show intersection of background mutations and selected signature mutations
+    print("Selected signature mutations:", selected_signature_mutations)
+    print("index of dataframes:", counts_df.index)
 
-    # reformat as a pandas DataFrame with mutations as rows and dates as columns, sort mutations by positions i.e
-
+    st.write(background_mutations)
+    st.write(type(background_mutations))
+    # drop the filtered mutations from the counts_df, freq_df, and coverage_freq_df
+    counts_df = counts_df.loc[background_mutations]
+    freq_df = freq_df.loc[background_mutations]
+    coverage_freq_df = coverage_freq_df.loc[background_mutations]
+    
     # 1.1) Which mutations appear at least once with a fraction of MIN_FREQ 
     #  in the data range and location?   
 
