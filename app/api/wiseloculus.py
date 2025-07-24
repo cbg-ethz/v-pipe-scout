@@ -233,7 +233,7 @@ class WiseLoculusLapis(Lapis):
         """
         Fetches nucleotide mutations for a given date range and optional location.
         
-        Retruns a DataFrame with 
+        Returns a DataFrame with 
         Columns: ['mutation', 'count', 'coverage', 'proportion', 'sequenceName', 'mutationFrom', 'mutationTo', 'position']
         """
 
