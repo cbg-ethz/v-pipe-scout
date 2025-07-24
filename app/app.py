@@ -7,6 +7,7 @@ import subpages.resistance_mut_silo as resistance_mut_silo
 import subpages.dynamic_mutations as dynamic_mutations
 import subpages.signature_explorer as signature_explorer
 import subpages.abundance_estimator as abundance_estimator
+import subpages.background as background
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -24,6 +25,7 @@ if __name__ == "__main__":
         {"app": index.app, "title": "Home", "icon": "🏠", "default": True, "url_path": None},
         {"app": resistance_mut_silo.app, "title": "Resistance Mutations", "icon": "🧬", "url_path": "resistance"},
         {"app": dynamic_mutations.app, "title": "Dynamic Mutation Heatmap", "icon": "🧮", "url_path": "dynamic-mutations"},
+        {"app": background.app, "title": "Background Mutations", "icon": "👀", "url_path": "background"},
         {"app": signature_explorer.app, "title": "Variant Signature Explorer", "icon": "🔍", "url_path": "signature-explorer"},
         {"app": abundance_estimator.app, "title": "Variant Abundances", "icon": "🧩", "url_path": "abundance-estimator"}
     ]

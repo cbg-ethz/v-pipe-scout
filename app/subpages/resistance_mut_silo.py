@@ -9,6 +9,7 @@ import pathlib
 
 from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
+from visualize.mutations import mutations_over_time
 
 pd.set_option('future.no_silent_downcasting', True)
 
@@ -23,163 +24,9 @@ server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:800
 wiseLoculus = WiseLoculusLapis(server_ip)
 
 
-def fetch_reformat_data(formatted_mutations, date_range, location_name=None):
-    """
-    Fetch mutation data using the new fetch_counts_coverage_freq method.
-    Returns a tuple of (counts_df, freq_df, coverage_freq_df) where:
-    - counts_df: DataFrame with mutations as rows and dates as columns (with counts for backward compatibility)
-    - freq_df: DataFrame with mutations as rows and dates as columns (with frequency values for plotting)
-    - coverage_freq_df: MultiIndex DataFrame with detailed count, coverage, and frequency data
-    """
-    mutation_type = MutationType.AMINO_ACID  # as we care about amino acid mutations, as in resistance mutations
-    
-    # Fetch comprehensive data using the new method
-    coverage_freq_df = wiseLoculus.fetch_counts_coverage_freq(
-        formatted_mutations, mutation_type, date_range, location_name
-    )
-    
-    # Get dates from date_range for consistency
-    dates = pd.date_range(date_range[0], date_range[1]).strftime('%Y-%m-%d')
-    
-    # Create DataFrames with mutations as rows and dates as columns
-    counts_df = pd.DataFrame(index=formatted_mutations, columns=list(dates))
-    freq_df = pd.DataFrame(index=formatted_mutations, columns=list(dates))
-    
-    # Fill the counts and frequency DataFrames from the MultiIndex DataFrame
-    if not coverage_freq_df.empty:
-        for mutation in formatted_mutations:
-            if mutation in coverage_freq_df.index.get_level_values('mutation'):
-                mutation_data = coverage_freq_df.loc[mutation]
-                for date in mutation_data.index:
-                    # Handle 'NA' values from the API
-                    count_val = mutation_data.loc[date, 'count']
-                    freq_val = mutation_data.loc[date, 'frequency']
-                    
-                    if count_val != 'NA':
-                        counts_df.at[mutation, date] = count_val
-                    
-                    if freq_val != 'NA':
-                        freq_df.at[mutation, date] = freq_val
-    
-    return counts_df, freq_df, coverage_freq_df
-
-
-def plot_resistance_mutations(freq_df, counts_df=None, coverage_freq_df=None):
-    """Plot resistance mutations over time as a heatmap using Plotly.
-    
-    Args:
-        freq_df: DataFrame with mutations as rows, dates as columns, and frequency values
-        counts_df: DataFrame with mutations as rows, dates as columns, and count values (for hover info)
-        coverage_freq_df: Optional MultiIndex DataFrame with detailed coverage and frequency data
-    """
-
-    # Replace None with np.nan and remove commas from numbers
-    df_processed = freq_df.replace({None: np.nan, ',': ''}, regex=True).infer_objects(copy=False).astype(float)
-
-    # Create enhanced hover text
-    hover_text = []
-    for mutation in df_processed.index:
-        row_hover_text = []
-        for date in df_processed.columns:
-            frequency = df_processed.loc[mutation, date]
-            
-            # Try to get additional data from other sources
-            count = None
-            coverage = None
-            
-            # First try to get count from counts_df if provided
-            if counts_df is not None and not counts_df.empty:
-                count = counts_df.loc[mutation, date] if not pd.isna(counts_df.loc[mutation, date]) else None
-            
-            # Then try to get additional data from coverage_freq_df
-            if coverage_freq_df is not None and not coverage_freq_df.empty:
-                try:
-                    if mutation in coverage_freq_df.index.get_level_values('mutation'):
-                        mutation_data = coverage_freq_df.loc[mutation]
-                        if date in mutation_data.index:
-                            coverage_val = mutation_data.loc[date, 'coverage']
-                            
-                            # If count is still None, try to get it from coverage_freq_df
-                            if count is None:
-                                count_val = mutation_data.loc[date, 'count']
-                                count = count_val if count_val != 'NA' else None
-                            
-                            # Handle 'NA' values for coverage
-                            coverage = coverage_val if coverage_val != 'NA' else None
-                except (KeyError, IndexError):
-                    pass  # Data not available for this mutation/date combination
-            
-            # Build hover text
-            if pd.isna(frequency):
-                text = f"Mutation: {mutation}<br>Date: {date}<br>Status: No data"
-            else:
-                text = f"Mutation: {mutation}<br>Date: {date}<br>Proportion: {frequency * 100:.1f}%"
-                if count is not None:
-                    text += f"<br>Count: {float(count):.0f}"
-                if coverage is not None:
-                    text += f"<br>Coverage: {float(coverage):.0f}"
-            
-            row_hover_text.append(text)
-        hover_text.append(row_hover_text)
-
-    # Determine dynamic height
-    height = max(400, len(df_processed.index) * 20 + 100) # Base height + per mutation + padding for title/axes
-
-    # Determine dynamic left margin based on mutation label length
-    max_len_mutation_label = 0
-    if not df_processed.index.empty: # Check if index is not empty
-        max_len_mutation_label = max(len(str(m)) for m in df_processed.index)
-    
-    margin_l = max(80, max_len_mutation_label * 7 + 30) # Min margin or calculated, adjust multiplier as needed
-
-
-    fig = go.Figure(data=go.Heatmap(
-        z=df_processed.values,  # Now using frequency values
-        x=df_processed.columns,
-        y=df_processed.index,
-        colorscale='Blues',
-        showscale=False,  # Hide color bar as requested
-        hoverongaps=True, # Show hover for gaps (NaNs)
-        text=hover_text,
-        hoverinfo='text'
-    ))
-
-    # Customize layout
-    num_cols = len(df_processed.columns)
-    tick_indices = []
-    tick_labels = []
-    if num_cols > 0:
-        tick_indices = [df_processed.columns[0]]
-        if num_cols > 1:
-            tick_indices.append(df_processed.columns[num_cols // 2])
-        if num_cols > 2 and num_cols //2 != num_cols -1 : # Avoid duplicate if middle is last
-             tick_indices.append(df_processed.columns[-1])
-        tick_labels = [str(label) for label in tick_indices]
-
-    fig.update_layout(
-        title="Proportion of Resistance Mutations Over Time",
-        xaxis=dict(
-            title='Date',
-            side='bottom',
-            tickmode='array',
-            tickvals=tick_indices,
-            ticktext=tick_labels,
-            tickangle=45,
-        ),
-        yaxis=dict(
-            title='Mutation',
-            autorange='reversed' # Show mutations from top to bottom as in original df
-        ),
-        height=height,
-        plot_bgcolor='lightpink',  # NaN values will appear as this background color
-        margin=dict(l=margin_l, r=20, t=80, b=100),  # Adjust margins
-    )
-    return fig
-
-
 def app():
     st.title("Resistance Mutations from Wastewater Data")
-    st.write("This page allows you to visualize the numer of observed resistance mutations over time.")
+    st.write("This page allows you to visualize the number of observed resistance mutations over time.")
     st.write("The data is fetched from the WISE-CovSpectrum API and currently cointains demo data for Feb-Mar 2025.")
     st.write("The sets of resistance mutations are provide from Stanfords Coronavirus Antivirial & Reistance Database. Last updated 05/14/2024")
     st.write("This is a demo frontend to later make the first queries to SILO for wastewater data.")
@@ -241,7 +88,8 @@ def app():
         index=0  # Default to showing all dates (off)
     )
 
-    counts_df, freq_df, coverage_freq_df = fetch_reformat_data(formatted_mutations, date_range, location)
+    with st.spinner("Fetching resistance mutation data..."):
+        counts_df, freq_df, coverage_freq_df = wiseLoculus.mutations_over_time_dfs(formatted_mutations, MutationType.AMINO_ACID, date_range, location)
 
 
     # Only skip NA dates if the option is selected
@@ -256,7 +104,12 @@ def app():
         if freq_df.isnull().all().all():
             st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
         else:
-            fig = plot_resistance_mutations(plot_freq_df, plot_counts_df, coverage_freq_df)
+            fig = mutations_over_time(
+                plot_freq_df, 
+                plot_counts_df, 
+                coverage_freq_df,
+                title="Proportion of Resistance Mutations Over Time"
+            )
             st.plotly_chart(fig, use_container_width=True)
 
     st.write("### GenSpectrum Dashboard Dynamic Mutations Over Time")

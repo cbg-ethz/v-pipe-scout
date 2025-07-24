@@ -3,13 +3,15 @@
 import logging
 import aiohttp
 import asyncio
-from typing import Optional, List, Tuple, Any  
+from typing import Optional, List, Tuple, Any, Union
 from datetime import datetime
 
 import pandas as pd
 
 from .lapis import Lapis
 from interface import MutationType
+
+from process.mutations import get_symbols_for_mutation_type
 
 
 
@@ -80,19 +82,6 @@ class WiseLoculusLapis(Lapis):
             tasks = [self.fetch_sample_aggregated(session, m, mutation_type, date_range, location_name) for m in mutations]
             return await asyncio.gather(*tasks)
         
-
-    def _get_symbols_for_mutation_type(self, mutation_type: MutationType) -> List[str]:
-        """Returns the list of symbols (amino acids or nucleotides) for the given mutation type."""
-
-        if mutation_type == MutationType.AMINO_ACID:
-            return ["A", "C", "D", "E", "F", "G", "H", "I", "K", 
-                    "L", "M", "N", "P", "Q", "R", "S", "T", 
-                    "V", "W", "Y"]
-        elif mutation_type == MutationType.NUCLEOTIDE:
-            return ['A', 'T', 'C', 'G']
-        else:
-            raise ValueError(f"Unknown mutation type: {mutation_type}")
-
     async def _fetch_coverage_for_mutation(
             self, 
             session: aiohttp.ClientSession,
@@ -105,7 +94,7 @@ class WiseLoculusLapis(Lapis):
         Fetches coverage data for all possible symbols at a mutation position.
         Returns (coverage_data, stratified_results).
         """
-        symbols = self._get_symbols_for_mutation_type(mutation_type)
+        symbols = get_symbols_for_mutation_type(mutation_type)
         mutation_base = mutation[:-1]  # Everything except the last character
         
         # Fetch data for all possible symbols at this position
@@ -200,7 +189,7 @@ class WiseLoculusLapis(Lapis):
             return combined_results
         
     
-    def fetch_counts_coverage_freq(self, mutations, mutation_type : MutationType, date_range, location_name) -> pd.DataFrame:
+    def fetch_counts_coverage_freq(self, mutations: List[str], mutation_type : MutationType, date_range: Tuple[datetime, datetime], location_name: str) -> pd.DataFrame:
         """Fetches mutation counts, coverage, and frequency for a list of nucleotide mutations over a date range.
 
         Args:
@@ -234,3 +223,122 @@ class WiseLoculusLapis(Lapis):
 
         # Return the DataFrame
         return df
+
+    async def sample_nucleotideMutations(
+            self, 
+            date_range: Tuple[datetime, datetime], 
+            location_name: Optional[str] = None,
+            min_proportion: float = 0.01,
+        ) -> pd.DataFrame:
+        """
+        Fetches nucleotide mutations for a given date range and optional location.
+        
+        Returns a DataFrame with 
+        Columns: ['mutation', 'count', 'coverage', 'proportion', 'sequenceName', 'mutationFrom', 'mutationTo', 'position']
+        """
+
+        payload = {
+            "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
+            "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
+            "location_name": location_name,
+            "minProportion": min_proportion, 
+            "orderBy": "proportion",
+            "limit": 10000,  # Adjust limit as needed
+            "dataFormat": "JSON",
+            "downloadAsFile": "false"
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f'{self.server_ip}/sample/nucleotideMutations',
+                params=payload,
+                headers={'accept': 'application/json'}
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    df = pd.DataFrame(data['data'])
+                    return df
+                else:
+                    logging.error(f"Failed to fetch nucleotide mutations: {response.status}")
+                    return pd.DataFrame()
+
+    def mutations_over_time_dfs(
+        self, 
+        formatted_mutations: List[str], 
+        mutation_type: MutationType, 
+        date_range: Tuple[datetime, datetime], 
+        location_name: str
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """
+        Fetch mutation data using the new fetch_counts_coverage_freq method.
+        
+        Args:
+            formatted_mutations: List of mutation strings (e.g., ['A123T', 'C456G'] for nucleotides 
+                               or ['ORF1a:V3449I'] for amino acids)
+            mutation_type: Type of mutations (MutationType.NUCLEOTIDE or MutationType.AMINO_ACID)
+            date_range: Tuple of (start_date, end_date) as datetime objects
+            location_name: Name of the location to filter by
+            
+        Returns:
+            Tuple of (counts_df, freq_df, coverage_freq_df) where:
+            - counts_df: DataFrame with mutations as rows and dates as columns (with counts for backward compatibility)
+            - freq_df: DataFrame with mutations as rows and dates as columns (with frequency values for plotting)
+            - coverage_freq_df: MultiIndex DataFrame with detailed count, coverage, and frequency data
+            
+        Raises:
+            TypeError: If formatted_mutations is not a list of strings
+            ValueError: If formatted_mutations is empty or contains invalid mutation formats
+        """
+        # Type validation
+        if not isinstance(formatted_mutations, list):
+            raise TypeError(f"formatted_mutations must be a list of strings, got {type(formatted_mutations).__name__}: {formatted_mutations}")
+        
+        if not formatted_mutations:
+            raise ValueError("formatted_mutations cannot be empty")
+            
+        if not all(isinstance(m, str) for m in formatted_mutations):
+            raise TypeError(f"All elements in formatted_mutations must be strings, got: {[type(m).__name__ for m in formatted_mutations]}")
+        
+        # Basic format validation for mutations
+        for mutation in formatted_mutations:
+            if not mutation.strip():  # Check for empty or whitespace-only strings
+                raise ValueError(f"Invalid mutation format: empty or whitespace-only string")
+            
+            if mutation_type == MutationType.NUCLEOTIDE:
+                # Nucleotide mutations should be like "A123T" - at least 3 characters
+                if len(mutation) < 3:
+                    raise ValueError(f"Invalid nucleotide mutation format: '{mutation}'. Expected format like 'A123T'")
+            elif mutation_type == MutationType.AMINO_ACID:
+                # Amino acid mutations should contain ":" for gene:mutation format
+                if ":" not in mutation:
+                    raise ValueError(f"Invalid amino acid mutation format: '{mutation}'. Expected format like 'ORF1a:V3449I'")
+
+        # Fetch comprehensive data using the new method
+        coverage_freq_df = self.fetch_counts_coverage_freq(
+            formatted_mutations, mutation_type, date_range, location_name
+        )
+        
+        # Get dates from date_range for consistency
+        dates = pd.date_range(date_range[0], date_range[1]).strftime('%Y-%m-%d')
+        
+        # Create DataFrames with mutations as rows and dates as columns
+        counts_df = pd.DataFrame(index=formatted_mutations, columns=list(dates))
+        freq_df = pd.DataFrame(index=formatted_mutations, columns=list(dates))
+        
+        # Fill the counts and frequency DataFrames from the MultiIndex DataFrame
+        if not coverage_freq_df.empty:
+            for mutation in formatted_mutations:
+                if mutation in coverage_freq_df.index.get_level_values('mutation'):
+                    mutation_data = coverage_freq_df.loc[mutation]
+                    for date in mutation_data.index:
+                        # Handle 'NA' values from the API
+                        count_val = mutation_data.loc[date, 'count']
+                        freq_val = mutation_data.loc[date, 'frequency']
+                        
+                        if count_val != 'NA':
+                            counts_df.at[mutation, date] = count_val
+                        
+                        if freq_val != 'NA':
+                            freq_df.at[mutation, date] = freq_val
+        
+        return counts_df, freq_df, coverage_freq_df

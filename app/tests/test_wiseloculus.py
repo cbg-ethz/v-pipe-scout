@@ -81,22 +81,6 @@ class TestWiseLoculusLapis:
         assert mutation_result["counts"] == {"A": 0, "T": 0, "C": 0, "G": 0}
         assert mutation_result["stratified"] == []
 
-    def test_get_symbols_for_mutation_type(self):
-        """Test _get_symbols_for_mutation_type helper method."""
-        nucleotides = self.api._get_symbols_for_mutation_type(MutationType.NUCLEOTIDE)
-        assert nucleotides == ['A', 'T', 'C', 'G']
-        
-        amino_acids = self.api._get_symbols_for_mutation_type(MutationType.AMINO_ACID)
-        expected_amino_acids = ["A", "C", "D", "E", "F", "G", "H", "I", "K", 
-                               "L", "M", "N", "P", "Q", "R", "S", "T", 
-                               "V", "W", "Y"]
-        assert amino_acids == expected_amino_acids
-        
-        # Test invalid mutation type
-        with pytest.raises(ValueError, match="Unknown mutation type: invalid"):
-            self.api._get_symbols_for_mutation_type("invalid") # pyright: ignore[reportArgumentType]
-
-
 if __name__ == "__main__":
 
     ### testing if the amino acid coverage works with real server data.
