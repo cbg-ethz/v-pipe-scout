@@ -156,7 +156,7 @@ def app():
             start_date,
             end_date
         ),
-        location_name="Zürich (ZH)"
+        location_name=location
     ))
 
     mutations_in_timeframe = mutations_in_timeframe_df['mutation'].to_list()  
@@ -319,6 +319,92 @@ def app():
                 title="Proportion of Background Mutations Over Time"
             )
             st.plotly_chart(fig, use_container_width=True)
+            
+            # Add download section after the plot
+            st.markdown("---")
+            st.write("### 📥 Download Filtered Data")
+            st.write("Download the filtered background mutation data for further analysis.")
+            
+            # Create a comprehensive dataset combining all information
+            download_data = []
+            
+            for mutation in filtered_mutations:
+                for date in freq_df_filtered.columns:
+                    # Get frequency data
+                    frequency = freq_df_filtered.loc[mutation, date] if not pd.isna(freq_df_filtered.loc[mutation, date]) else None
+                    
+                    # Get count data
+                    count = counts_df_filtered.loc[mutation, date] if not pd.isna(counts_df_filtered.loc[mutation, date]) else None
+                    
+                    # Get coverage data from coverage_freq_df if available
+                    coverage = None
+                    if not coverage_freq_df_filtered.empty and mutation in coverage_freq_df_filtered.index.get_level_values('mutation'):
+                        try:
+                            mutation_data = coverage_freq_df_filtered.loc[mutation]
+                            if date in mutation_data.index:
+                                coverage_val = mutation_data.loc[date, 'coverage']
+                                coverage = coverage_val if coverage_val != 'NA' else None
+                        except (KeyError, IndexError):
+                            pass
+                    
+                    # Add row to download data
+                    download_data.append({
+                        'mutation': mutation,
+                        'date': date,
+                        'frequency': frequency,
+                        'count': count,
+                        'coverage': coverage,
+                        'location': location,
+                        'min_frequency_threshold': min_frequency,
+                        'max_frequency_threshold': max_frequency
+                    })
+            
+            # Create DataFrame for download
+            download_df = pd.DataFrame(download_data)
+            
+            # Display download options
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # CSV Download
+                csv_data = download_df.to_csv(index=False)
+                st.download_button(
+                    label="📊 Download as CSV",
+                    data=csv_data,
+                    file_name=f'background_mutations_{location.replace(" ", "_")}_{start_date.strftime("%Y%m%d")}_{end_date.strftime("%Y%m%d")}.csv',
+                    mime='text/csv',
+                    help="Download the filtered background mutation data as a CSV file"
+                )
+            
+            with col2:
+                # JSON Download
+                json_data = download_df.to_json(orient='records', date_format='iso', indent=2)
+                st.download_button(
+                    label="📋 Download as JSON",
+                    data=json_data,
+                    file_name=f'background_mutations_{location.replace(" ", "_")}_{start_date.strftime("%Y%m%d")}_{end_date.strftime("%Y%m%d")}.json',
+                    mime='application/json',
+                    help="Download the filtered background mutation data as a JSON file"
+                )
+            
+            # Show preview of the data
+            with st.expander("📖 Preview download data", expanded=False):
+                st.write(f"**Data Preview** ({len(download_df)} rows)")
+                st.dataframe(download_df.head(10), use_container_width=True)
+                
+                # Show summary statistics
+                st.write("**Summary Statistics:**")
+                summary_col1, summary_col2, summary_col3 = st.columns(3)
+                
+                with summary_col1:
+                    st.metric("Total Records", len(download_df))
+                
+                with summary_col2:
+                    st.metric("Unique Mutations", download_df['mutation'].nunique())
+                
+                with summary_col3:
+                    st.metric("Date Range", f"{len(download_df['date'].unique())} days")
+            
     elif len(filtered_mutations) == 0:
         st.info("No background mutations found matching the frequency criteria. Try adjusting the frequency thresholds.")
     else:
