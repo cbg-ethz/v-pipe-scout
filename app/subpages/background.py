@@ -126,7 +126,8 @@ def app():
     
     st.title("Background Mutations")
     st.subheader("Explore Mutations currently not in any Variant Signature we track")
-    st.write("This page allows you to visualize the numer of observed mutations over time.")
+    st.write("This page allows you to visualize background mutations in wastewater samples that are not part of any known variant signature.")
+    st.write("Are we misisng something? Please let us know on [GitHub](https://github.com/cbg-ethz/cowwid/issues)")
     st.markdown("---")
     # Allow the user to choose a date range
     st.write("Choose your data to inspect:")
@@ -193,6 +194,7 @@ def app():
         if mutation not in selected_signature_mutations
     ]
 
+    # TODO: add a venn diragram here to visualize the overlap, once the better venn diagram library is available
     st.write(f"Total mutations in timeframe: {len(mutations_in_timeframe)}")
     st.write(f"Signature mutations to exclude: {len(selected_signature_mutations)}")
     st.write(f"Background mutations to analyze: {len(background_mutations)}")
