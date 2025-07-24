@@ -164,13 +164,17 @@ def app():
     # Get the available variant names from the signatures API (cached)
     available_variants = cached_get_variant_names()
     
-    # Create a multi-select box for variants
-    selected_curated_variants = st.multiselect(
-        "Select known variants of interest – curated by the V-Pipe team",
-        options=available_variants,
-        default=cached_get_variant_names(),
-        help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team"
-    )
+    # Create a collapsible section for variant selection
+    with st.expander("🔧 Advanced: Select known variants to exclude", expanded=False):
+        st.write("By default, all known variant signatures are excluded from background mutations. You can customize which variants to exclude here.")
+        
+        # Create a multi-select box for variants
+        selected_curated_variants = st.multiselect(
+            "Select known variants to exclude.",
+            options=available_variants,
+            default=cached_get_variant_names(),
+            help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team"
+        )
     
     # from selected_curated_variants get each variant's signature mutations
     curated_variants = cached_get_variant_list()
