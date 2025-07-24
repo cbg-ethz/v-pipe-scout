@@ -239,7 +239,7 @@ class WiseLoculusLapis(Lapis):
             self, 
             date_range: Tuple[datetime, datetime], 
             location_name: Optional[str] = None,
-            min_proportion: float = 0.05,
+            min_proportion: float = 0.01,
         ) -> pd.DataFrame:
         """
         Fetches nucleotide mutations for a given date range and optional location.

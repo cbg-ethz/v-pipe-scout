@@ -205,7 +205,82 @@ def app():
             date_range=(start_date, end_date),
             location_name=location
         )
+
+    # Add frequency filtering controls
+    st.markdown("---")
+    st.write("### Frequency Filtering")
+    st.write("Filter mutations based on their frequency ranges to focus on mutations of interest.")
     
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        min_frequency = st.slider(
+            "Minimum frequency threshold",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.01,  # Default value (1%)
+            step=0.001,
+            format="%.3f",
+            help="Only show mutations that reach at least this frequency at some point in the timeframe."
+        )
+    
+    with col2:
+        max_frequency = st.slider(
+            "Maximum frequency threshold", 
+            min_value=0.0,
+            max_value=1.0,
+            value=1.0,  # Default value (100%)
+            step=0.001,
+            format="%.3f",
+            help="Only show mutations that stay below this frequency throughout the timeframe."
+        )
+    
+    # Validate that min <= max
+    if min_frequency > max_frequency:
+        st.error("Minimum frequency cannot be greater than maximum frequency.")
+        return
+
+    # Filter mutations based on frequency criteria
+    # Convert freq_df to numeric, replacing non-numeric values with NaN
+    freq_df_numeric = freq_df.replace({None: np.nan, ',': ''}, regex=True)
+    freq_df_numeric = freq_df_numeric.apply(pd.to_numeric, errors='coerce')
+    
+    # Find mutations that meet the frequency criteria
+    # Mutation must have at least one value >= min_frequency AND all non-NaN values <= max_frequency
+    mutations_above_min = freq_df_numeric.max(axis=1) >= min_frequency
+    mutations_below_max = freq_df_numeric.max(axis=1) <= max_frequency
+    
+    # Combine both conditions
+    mutations_to_keep = mutations_above_min & mutations_below_max
+    filtered_mutations = freq_df_numeric.index[mutations_to_keep].tolist()
+    
+    # Apply filtering to all DataFrames
+    if len(filtered_mutations) > 0:
+        freq_df_filtered = freq_df.loc[filtered_mutations]
+        counts_df_filtered = counts_df.loc[filtered_mutations] 
+        
+        # Filter coverage_freq_df (MultiIndex DataFrame)
+        if not coverage_freq_df.empty:
+            existing_mutations_in_coverage = [
+                mut for mut in filtered_mutations 
+                if mut in coverage_freq_df.index.get_level_values('mutation')
+            ]
+            if existing_mutations_in_coverage:
+                coverage_freq_df_filtered = coverage_freq_df.loc[existing_mutations_in_coverage]
+            else:
+                coverage_freq_df_filtered = coverage_freq_df.iloc[0:0]  # Empty with same structure
+        else:
+            coverage_freq_df_filtered = coverage_freq_df
+            
+        st.write(f"**Mutations after frequency filtering: {len(filtered_mutations)}** (was {len(background_mutations)})")
+        st.write(f"Frequency range: {min_frequency:.3f} - {max_frequency:.3f}")
+        
+    else:
+        st.warning(f"No mutations found within the frequency range {min_frequency:.3f} - {max_frequency:.3f}. Please adjust the frequency thresholds.")
+        return
+
+
+
     # Display the visualization
     st.markdown("---")
     st.write("### Background Mutations Over Time")
@@ -218,27 +293,28 @@ def app():
         index=0  # Default to showing all dates
     )
     
+    # Use the filtered DataFrames for plotting
     # Only skip NA dates if the option is selected
     if show_empty_dates == "Skip dates with no coverage":
-        plot_counts_df = counts_df.dropna(axis=1, how='all')
-        plot_freq_df = freq_df.dropna(axis=1, how='all')
+        plot_counts_df = counts_df_filtered.dropna(axis=1, how='all')
+        plot_freq_df = freq_df_filtered.dropna(axis=1, how='all')
     else:
-        plot_counts_df = counts_df
-        plot_freq_df = freq_df
+        plot_counts_df = counts_df_filtered
+        plot_freq_df = freq_df_filtered
     
-    if not freq_df.empty and len(background_mutations) > 0:
-        if freq_df.isnull().all().all():
-            st.error("The fetched data contains only NaN values. Please try a different date range or select fewer variants to exclude.")
+    if not freq_df_filtered.empty and len(filtered_mutations) > 0:
+        if freq_df_filtered.isnull().all().all():
+            st.error("The fetched data contains only NaN values. Please try a different date range or adjust frequency filters.")
         else:
             fig = mutations_over_time(
                 plot_freq_df, 
                 plot_counts_df, 
-                coverage_freq_df,
+                coverage_freq_df_filtered,
                 title="Proportion of Background Mutations Over Time"
             )
             st.plotly_chart(fig, use_container_width=True)
-    elif len(background_mutations) == 0:
-        st.info("No background mutations found. All mutations in the selected timeframe are part of the selected variant signatures.")
+    elif len(filtered_mutations) == 0:
+        st.info("No background mutations found matching the frequency criteria. Try adjusting the frequency thresholds.")
     else:
         st.error("No data available for the selected parameters. Please try a different date range or location.")
 
