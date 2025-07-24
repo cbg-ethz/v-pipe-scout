@@ -299,35 +299,24 @@ def app():
     # remove duplicates from selected_signature_mutations
     selected_signature_mutations = list(set(selected_signature_mutations))
 
-
-    # Show a spinner while fetching data
-    with st.spinner("Fetching mutation data..."):
-        counts_df, freq_df, coverage_freq_df =  wiseLoculus.mutations_over_time_dfs(
-            mutations_in_timeframe,  # Pass the list directly, not the string representation
-            MutationType.NUCLEOTIDE,
-            date_range=(start_date, end_date),
-            location_name=location
-        )
-
-    # background mutaitons are all mutaitons founf in mutations_in_timeframe 
-    # but are note in the selected signature mutations
+    # Calculate background mutations (all mutations minus the signature mutations)
     background_mutations = [
         mutation for mutation in mutations_in_timeframe
         if mutation not in selected_signature_mutations
     ]
 
-    print("Mutations in timeframe:", mutations_in_timeframe)
-    print("Background mutations:", background_mutations)
-    # show intersection of background mutations and selected signature mutations
-    print("Selected signature mutations:", selected_signature_mutations)
-    print("index of dataframes:", counts_df.index)
+    st.write(f"Total mutations in timeframe: {len(mutations_in_timeframe)}")
+    st.write(f"Signature mutations to exclude: {len(selected_signature_mutations)}")
+    st.write(f"Background mutations to analyze: {len(background_mutations)}")
 
-    st.write(background_mutations)
-    st.write(type(background_mutations))
-    # drop the filtered mutations from the counts_df, freq_df, and coverage_freq_df
-    counts_df = counts_df.loc[background_mutations]
-    freq_df = freq_df.loc[background_mutations]
-    coverage_freq_df = coverage_freq_df.loc[background_mutations]
+    # Show a spinner while fetching data - only for background mutations
+    with st.spinner("Fetching mutation data for background mutations..."):
+        counts_df, freq_df, coverage_freq_df =  wiseLoculus.mutations_over_time_dfs(
+            background_mutations,  # Only fetch data for background mutations
+            MutationType.NUCLEOTIDE,
+            date_range=(start_date, end_date),
+            location_name=location
+        )
     
     # 1.1) Which mutations appear at least once with a fraction of MIN_FREQ 
     #  in the data range and location?   
