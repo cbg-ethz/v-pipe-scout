@@ -200,7 +200,7 @@ class WiseLoculusLapis(Lapis):
             return combined_results
         
     
-    def fetch_counts_coverage_freq(self, mutations, mutation_type : MutationType, date_range, location_name) -> pd.DataFrame:
+    def fetch_counts_coverage_freq(self, mutations: List[str], mutation_type : MutationType, date_range: Tuple[datetime, datetime], location_name: str) -> pd.DataFrame:
         """Fetches mutation counts, coverage, and frequency for a list of nucleotide mutations over a date range.
 
         Args:
@@ -273,8 +273,3 @@ class WiseLoculusLapis(Lapis):
                     logging.error(f"Failed to fetch nucleotide mutations: {response.status}")
                     return pd.DataFrame()
         return df
-    
-
-    
-        
-    

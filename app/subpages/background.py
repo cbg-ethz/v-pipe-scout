@@ -193,8 +193,8 @@ def app():
         st.error("Please select a valid date range with a start and end date.")
         return
 
-    start_date = date_range[0].strftime('%Y-%m-%d')
-    end_date = date_range[1].strftime('%Y-%m-%d')
+    start_date = datetime.strptime(str(date_range[0]), "%Y-%m-%d")
+    end_date = datetime.strptime(str(date_range[1]),"%Y-%m-%d")
     
 
     ## Fetch locations from API
@@ -208,15 +208,32 @@ def app():
     
     sequence_type_value = "nucliotide"  # Default sequence type
 
-    raw_data =  asyncio.run(wiseLoculus.sample_nucleotideMutations(
+    mutations_in_timeframe_df =  asyncio.run(wiseLoculus.sample_nucleotideMutations(
         date_range=(
-            datetime.strptime("2025-02-10", "%Y-%m-%d"),
-            datetime.strptime("2025-03-10", "%Y-%m-%d")
+            start_date,
+            end_date
         ),
         location_name="Zürich (ZH)"
     ))
 
-    st.write(raw_data)
+    mutations_in_timeframe = mutations_in_timeframe_df['mutation'].to_list()  
+    st.write(mutations_in_timeframe)
+
+    # TODO: show a spinner while fetching data
+    mutations_over_time = wiseLoculus.fetch_counts_coverage_freq(
+        mutations=mutations_in_timeframe,
+        mutation_type=MutationType.NUCLEOTIDE,
+        date_range=(start_date, end_date),
+        location_name=location
+    )
+
+
+    
+ 
+
+
+
+
 
     #formatted_mutations_str = str(formatted_mutations).replace("'", '"')
 
