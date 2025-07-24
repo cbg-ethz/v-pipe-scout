@@ -11,6 +11,8 @@ import pandas as pd
 from .lapis import Lapis
 from interface import MutationType
 
+from process.mutations import get_symbols_for_mutation_type
+
 
 
 class WiseLoculusLapis(Lapis):
@@ -80,19 +82,6 @@ class WiseLoculusLapis(Lapis):
             tasks = [self.fetch_sample_aggregated(session, m, mutation_type, date_range, location_name) for m in mutations]
             return await asyncio.gather(*tasks)
         
-
-    def _get_symbols_for_mutation_type(self, mutation_type: MutationType) -> List[str]:
-        """Returns the list of symbols (amino acids or nucleotides) for the given mutation type."""
-
-        if mutation_type == MutationType.AMINO_ACID:
-            return ["A", "C", "D", "E", "F", "G", "H", "I", "K", 
-                    "L", "M", "N", "P", "Q", "R", "S", "T", 
-                    "V", "W", "Y"]
-        elif mutation_type == MutationType.NUCLEOTIDE:
-            return ["A", "T", "C", "G"]
-        else:
-            raise ValueError(f"Unknown mutation type: {mutation_type}")
-
     async def _fetch_coverage_for_mutation(
             self, 
             session: aiohttp.ClientSession,
@@ -105,7 +94,7 @@ class WiseLoculusLapis(Lapis):
         Fetches coverage data for all possible symbols at a mutation position.
         Returns (coverage_data, stratified_results).
         """
-        symbols = self._get_symbols_for_mutation_type(mutation_type)
+        symbols = get_symbols_for_mutation_type(mutation_type)
         mutation_base = mutation[:-1]  # Everything except the last character
         
         # Fetch data for all possible symbols at this position
