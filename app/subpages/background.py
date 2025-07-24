@@ -3,22 +3,13 @@ import streamlit as st
 import pandas as pd
 import asyncio
 import yaml
-import plotly.graph_objects as go 
 import pathlib
-from pydantic import BaseModel
-from typing import List
 from datetime import datetime
+from typing import List
 
 from interface import MutationType
-
 from api.wiseloculus import WiseLoculusLapis
-
-from api.signatures import Variant as SignatureVariant
-from api.signatures import VariantList as SignatureVariantList
-from api.signatures import get_variant_list, get_variant_names
-
-
-from api.wiseloculus import WiseLoculusLapis
+from api.signatures import get_variant_list, get_variant_names, VariantList
 from visualize.mutations import mutations_over_time
 
 pd.set_option('future.no_silent_downcasting', True)
@@ -33,86 +24,9 @@ with open(CONFIG_PATH, 'r') as file:
 server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
 wiseLoculus = WiseLoculusLapis(server_ip)
 
-# TODO: dublicate in resistance mutaitons, extract as utility function + typing here
-def fetch_reformat_data(formatted_mutations, date_range, location_name=None):
-    """
-    Fetch mutation data using the new fetch_counts_coverage_freq method.
-    Returns a tuple of (counts_df, freq_df, coverage_freq_df) where:
-    - counts_df: DataFrame with mutations as rows and dates as columns (with counts for backward compatibility)
-    - freq_df: DataFrame with mutations as rows and dates as columns (with frequency values for plotting)
-    - coverage_freq_df: MultiIndex DataFrame with detailed count, coverage, and frequency data
-    """
-    mutation_type = MutationType.NUCLEOTIDE  # as we care about amino acid mutations, as in resistance mutations
-    
-    # Fetch comprehensive data using the new method
-    coverage_freq_df = wiseLoculus.fetch_counts_coverage_freq(
-        formatted_mutations, mutation_type, date_range, location_name
-    )
-    
-    # Get dates from date_range for consistency
-    dates = pd.date_range(date_range[0], date_range[1]).strftime('%Y-%m-%d')
-    
-    # Create DataFrames with mutations as rows and dates as columns
-    counts_df = pd.DataFrame(index=formatted_mutations, columns=list(dates))
-    freq_df = pd.DataFrame(index=formatted_mutations, columns=list(dates))
-    
-    # Fill the counts and frequency DataFrames from the MultiIndex DataFrame
-    if not coverage_freq_df.empty:
-        for mutation in formatted_mutations:
-            if mutation in coverage_freq_df.index.get_level_values('mutation'):
-                mutation_data = coverage_freq_df.loc[mutation]
-                for date in mutation_data.index:
-                    # Handle 'NA' values from the API
-                    count_val = mutation_data.loc[date, 'count']
-                    freq_val = mutation_data.loc[date, 'frequency']
-                    
-                    if count_val != 'NA':
-                        counts_df.at[mutation, date] = count_val
-                    
-                    if freq_val != 'NA':
-                        freq_df.at[mutation, date] = freq_val
-    
-    return counts_df, freq_df, coverage_freq_df
-
-
-class Variant(BaseModel):
-    """
-    Model for a variant with its signature mutations.
-    This is a simplified version of the Variant class from signatures.py.
-    """
-    name: str  # pangolin name
-    signature_mutations: List[str]
-    
-    @classmethod
-    def from_signature_variant(cls, signature_variant: SignatureVariant) -> "Variant":
-        """Convert a signature Variant to our simplified Variant."""
-        return cls(
-            name=signature_variant.name,  # This is already the pangolin name
-            signature_mutations=signature_variant.signature_mutations
-        )
-
-
-class VariantList(BaseModel):
-    """Model for a simplified list of variants."""
-    variants: List[Variant] = []
-    
-    @classmethod
-    def from_signature_variant_list(cls, signature_variant_list: SignatureVariantList) -> "VariantList":
-        """Convert a signature VariantList to our simplified VariantList."""
-        variant_list = cls()
-        for signature_variant in signature_variant_list.variants:
-            variant_list.add_variant(Variant.from_signature_variant(signature_variant))
-        return variant_list
-        
-    def add_variant(self, variant: Variant):
-        self.variants.append(variant)
-        
-    def remove_variant(self, variant: Variant):
-        self.variants.remove(variant)
-
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
-def cached_get_variant_list() -> SignatureVariantList:
+def cached_get_variant_list() -> VariantList:
     """Cached version of get_variant_list to avoid repeated API calls."""
     return get_variant_list()
 
@@ -177,15 +91,13 @@ def app():
         )
     
     # from selected_curated_variants get each variant's signature mutations
-    curated_variants = cached_get_variant_list()
-    curated_variants = VariantList.from_signature_variant_list(curated_variants)
-    curated_variants.variants = [
-        variant for variant in curated_variants.variants
-        if variant.name in selected_curated_variants
-    ]
-    # Extract the signature mutations from the selected curated variants
+    all_curated_variants = cached_get_variant_list()
+    
+    # Filter to only the selected variants and extract their signature mutations
     selected_signature_mutations = [
-        mutation for variant in curated_variants.variants
+        mutation 
+        for variant in all_curated_variants.variants
+        if variant.name in selected_curated_variants
         for mutation in variant.signature_mutations
     ]
 
