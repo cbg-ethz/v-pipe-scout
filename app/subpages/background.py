@@ -223,7 +223,7 @@ def app():
     # Show a spinner while fetching data
     with st.spinner("Fetching mutation data..."):
         counts_df, freq_df, coverage_freq_df =  wiseLoculus.mutations_over_time_dfs(
-            formatted_mutations_str,
+            mutations_in_timeframe,  # Pass the list directly, not the string representation
             MutationType.NUCLEOTIDE,
             date_range=(start_date, end_date),
             location_name=location
