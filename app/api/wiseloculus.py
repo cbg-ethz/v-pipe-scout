@@ -272,9 +272,7 @@ class WiseLoculusLapis(Lapis):
                 else:
                     logging.error(f"Failed to fetch nucleotide mutations: {response.status}")
                     return pd.DataFrame()
-        return df
 
-    # TODO: rename formated mutatinos - absorb the formating
     def mutations_over_time_dfs(
         self, 
         formatted_mutations: List[str], 

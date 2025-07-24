@@ -7,17 +7,17 @@ import plotly.graph_objects as go
 import pathlib
 from pydantic import BaseModel
 from typing import List
+from datetime import datetime
+
+from interface import MutationType
 
 from api.wiseloculus import WiseLoculusLapis
-from interface import MutationType
 
 from api.signatures import Variant as SignatureVariant
 from api.signatures import VariantList as SignatureVariantList
 from api.signatures import get_variant_list, get_variant_names
 
-from datetime import datetime
 
-from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
 from visualize.mutations import mutations_over_time
 
