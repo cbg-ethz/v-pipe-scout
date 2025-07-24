@@ -218,27 +218,20 @@ def app():
 
     mutations_in_timeframe = mutations_in_timeframe_df['mutation'].to_list()  
     st.write(mutations_in_timeframe)
+    formatted_mutations_str = str(mutations_in_timeframe).replace("'", '"')
 
-    # TODO: show a spinner while fetching data
-    mutations_over_time = wiseLoculus.fetch_counts_coverage_freq(
-        mutations=mutations_in_timeframe,
-        mutation_type=MutationType.NUCLEOTIDE,
-        date_range=(start_date, end_date),
-        location_name=location
-    )
+    # Show a spinner while fetching data
+    with st.spinner("Fetching mutation data..."):
+        counts_df, freq_df, coverage_freq_df =  wiseLoculus.mutations_over_time_dfs(
+            formatted_mutations_str,
+            MutationType.NUCLEOTIDE,
+            date_range=(start_date, end_date),
+            location_name=location
+        )
 
+    st.write(counts_df)
 
-    
- 
-
-
-
-
-
-    #formatted_mutations_str = str(formatted_mutations).replace("'", '"')
-
-
-    # {"sampling_dateFrom":"{start_date}", "sampling_dateTo": "{end_date}", "location_name": "{location}"}
+    # reformat as a pandas DataFrame with mutations as rows and dates as columns, sort mutations by positions i.e
 
     # 1.1) Which mutations appear at least once with a fraction of MIN_FREQ 
     #  in the data range and location?   

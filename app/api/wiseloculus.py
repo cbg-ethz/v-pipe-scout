@@ -89,7 +89,7 @@ class WiseLoculusLapis(Lapis):
                     "L", "M", "N", "P", "Q", "R", "S", "T", 
                     "V", "W", "Y"]
         elif mutation_type == MutationType.NUCLEOTIDE:
-            return ['A', 'T', 'C', 'G']
+            return ["A", "T", "C", "G"]
         else:
             raise ValueError(f"Unknown mutation type: {mutation_type}")
 
@@ -273,3 +273,43 @@ class WiseLoculusLapis(Lapis):
                     logging.error(f"Failed to fetch nucleotide mutations: {response.status}")
                     return pd.DataFrame()
         return df
+
+    # TODO: rename formated mutatinos - absorb the formating
+    def mutations_over_time_dfs(self, formatted_mutations, mutation_type : MutationType, date_range, location_name: str) -> tuple [pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """
+        Fetch mutation data using the new fetch_counts_coverage_freq method.
+        Returns a tuple of (counts_df, freq_df, coverage_freq_df) where:
+        - counts_df: DataFrame with mutations as rows and dates as columns (with counts for backward compatibility)
+        - freq_df: DataFrame with mutations as rows and dates as columns (with frequency values for plotting)
+        - coverage_freq_df: MultiIndex DataFrame with detailed count, coverage, and frequency data
+        """
+
+        # Fetch comprehensive data using the new method
+        coverage_freq_df = self.fetch_counts_coverage_freq(
+            formatted_mutations, mutation_type, date_range, location_name
+        )
+        
+        # Get dates from date_range for consistency
+        dates = pd.date_range(date_range[0], date_range[1]).strftime('%Y-%m-%d')
+        
+        # Create DataFrames with mutations as rows and dates as columns
+        counts_df = pd.DataFrame(index=formatted_mutations, columns=list(dates))
+        freq_df = pd.DataFrame(index=formatted_mutations, columns=list(dates))
+        
+        # Fill the counts and frequency DataFrames from the MultiIndex DataFrame
+        if not coverage_freq_df.empty:
+            for mutation in formatted_mutations:
+                if mutation in coverage_freq_df.index.get_level_values('mutation'):
+                    mutation_data = coverage_freq_df.loc[mutation]
+                    for date in mutation_data.index:
+                        # Handle 'NA' values from the API
+                        count_val = mutation_data.loc[date, 'count']
+                        freq_val = mutation_data.loc[date, 'frequency']
+                        
+                        if count_val != 'NA':
+                            counts_df.at[mutation, date] = count_val
+                        
+                        if freq_val != 'NA':
+                            freq_df.at[mutation, date] = freq_val
+        
+        return counts_df, freq_df, coverage_freq_df
