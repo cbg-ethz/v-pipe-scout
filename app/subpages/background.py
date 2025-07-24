@@ -41,7 +41,7 @@ def app():
     st.title("Background Mutations")
     st.subheader("Explore Mutations currently not in any Variant Signature we track")
     st.write("This page allows you to visualize background mutations in wastewater samples that are not part of any known variant signature.")
-    st.write("Are we misisng something? Please let us know on [GitHub](https://github.com/cbg-ethz/cowwid/issues)")
+    st.write("Are we missing something? Please let us know on [GitHub](https://github.com/cbg-ethz/cowwid/issues)")
     st.markdown("---")
     # Allow the user to choose a date range
     st.write("Choose your data to inspect:")
