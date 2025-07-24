@@ -8,6 +8,7 @@ mutation data over time, including heatmaps and other mutation-specific charts.
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from process.mutations import sort_mutations_by_position
 
 
 def mutations_over_time(freq_df, counts_df=None, coverage_freq_df=None, title="Mutations Over Time"):
@@ -15,6 +16,7 @@ def mutations_over_time(freq_df, counts_df=None, coverage_freq_df=None, title="M
     
     This function creates an interactive heatmap showing mutation frequencies
     over time with enhanced hover information including counts and coverage data.
+    Mutations are automatically sorted by genomic position in ascending order.
     
     Args:
         freq_df (pd.DataFrame): DataFrame with mutations as rows, dates as columns, 
@@ -28,6 +30,15 @@ def mutations_over_time(freq_df, counts_df=None, coverage_freq_df=None, title="M
     Returns:
         plotly.graph_objects.Figure: Interactive heatmap figure
     """
+    # Sort mutations by genomic position before processing
+    mutations_list = freq_df.index.tolist()
+    sorted_mutations = sort_mutations_by_position(mutations_list)
+    
+    # Reorder all DataFrames by the sorted mutation order
+    freq_df = freq_df.reindex(sorted_mutations)
+    if counts_df is not None and not counts_df.empty:
+        counts_df = counts_df.reindex(sorted_mutations)
+    
     # Replace None with np.nan and remove commas from numbers
     df_processed = freq_df.replace({None: np.nan, ',': ''}, regex=True).infer_objects(copy=False).astype(float)
 

@@ -36,6 +36,7 @@ from components.variant_signature_component import render_signature_composer
 from state import AbundanceEstimatorState
 from api.signatures import Variant as SignatureVariant
 from api.signatures import VariantList as SignatureVariantList
+from process.mutations import extract_position, sort_mutations_by_position
 
 
 # Initialize Celery
@@ -497,16 +498,8 @@ def app():
         # Create column names (variant names)
         columns = ["Mutation"] + [variant.name for variant in combined_variants.variants]
 
-        # Extract the position number from mutation strings for sorting
-        def extract_position(mutation_str):
-            # Use the same regex pattern from Mutation.validate_mutation_string
-            match = re.match(r"^([ACGTN]?)(\d+)([ACGTN-])$", mutation_str.upper())
-            if match:
-                return int(match.group(2))  # Return the position as integer
-            return 0  # Fallback if regex fails
-        
-        # Sort mutations by position number
-        matrix_data.sort(key=lambda x: extract_position(x[0]), reverse=True)  # Sort by position in descending order
+        # Sort mutations by position number using the utility function
+        matrix_data.sort(key=lambda x: extract_position(x[0]))  # Sort by position in ascending order
         
         # Sort columns alphabetically by variant name, but keep "Mutation" as the first column
         variant_columns = columns[1:]  # Skip the "Mutation" column
