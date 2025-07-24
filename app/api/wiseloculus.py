@@ -3,7 +3,7 @@
 import logging
 import aiohttp
 import asyncio
-from typing import Optional, List, Tuple, Any  
+from typing import Optional, List, Tuple, Any, Union
 from datetime import datetime
 
 import pandas as pd
@@ -275,14 +275,56 @@ class WiseLoculusLapis(Lapis):
         return df
 
     # TODO: rename formated mutatinos - absorb the formating
-    def mutations_over_time_dfs(self, formatted_mutations, mutation_type : MutationType, date_range, location_name: str) -> tuple [pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def mutations_over_time_dfs(
+        self, 
+        formatted_mutations: List[str], 
+        mutation_type: MutationType, 
+        date_range: Tuple[datetime, datetime], 
+        location_name: str
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Fetch mutation data using the new fetch_counts_coverage_freq method.
-        Returns a tuple of (counts_df, freq_df, coverage_freq_df) where:
-        - counts_df: DataFrame with mutations as rows and dates as columns (with counts for backward compatibility)
-        - freq_df: DataFrame with mutations as rows and dates as columns (with frequency values for plotting)
-        - coverage_freq_df: MultiIndex DataFrame with detailed count, coverage, and frequency data
+        
+        Args:
+            formatted_mutations: List of mutation strings (e.g., ['A123T', 'C456G'] for nucleotides 
+                               or ['ORF1a:V3449I'] for amino acids)
+            mutation_type: Type of mutations (MutationType.NUCLEOTIDE or MutationType.AMINO_ACID)
+            date_range: Tuple of (start_date, end_date) as datetime objects
+            location_name: Name of the location to filter by
+            
+        Returns:
+            Tuple of (counts_df, freq_df, coverage_freq_df) where:
+            - counts_df: DataFrame with mutations as rows and dates as columns (with counts for backward compatibility)
+            - freq_df: DataFrame with mutations as rows and dates as columns (with frequency values for plotting)
+            - coverage_freq_df: MultiIndex DataFrame with detailed count, coverage, and frequency data
+            
+        Raises:
+            TypeError: If formatted_mutations is not a list of strings
+            ValueError: If formatted_mutations is empty or contains invalid mutation formats
         """
+        # Type validation
+        if not isinstance(formatted_mutations, list):
+            raise TypeError(f"formatted_mutations must be a list of strings, got {type(formatted_mutations).__name__}: {formatted_mutations}")
+        
+        if not formatted_mutations:
+            raise ValueError("formatted_mutations cannot be empty")
+            
+        if not all(isinstance(m, str) for m in formatted_mutations):
+            raise TypeError(f"All elements in formatted_mutations must be strings, got: {[type(m).__name__ for m in formatted_mutations]}")
+        
+        # Basic format validation for mutations
+        for mutation in formatted_mutations:
+            if not mutation.strip():  # Check for empty or whitespace-only strings
+                raise ValueError(f"Invalid mutation format: empty or whitespace-only string")
+            
+            if mutation_type == MutationType.NUCLEOTIDE:
+                # Nucleotide mutations should be like "A123T" - at least 3 characters
+                if len(mutation) < 3:
+                    raise ValueError(f"Invalid nucleotide mutation format: '{mutation}'. Expected format like 'A123T'")
+            elif mutation_type == MutationType.AMINO_ACID:
+                # Amino acid mutations should contain ":" for gene:mutation format
+                if ":" not in mutation:
+                    raise ValueError(f"Invalid amino acid mutation format: '{mutation}'. Expected format like 'ORF1a:V3449I'")
 
         # Fetch comprehensive data using the new method
         coverage_freq_df = self.fetch_counts_coverage_freq(
