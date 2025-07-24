@@ -40,7 +40,8 @@ def mutations_over_time(freq_df, counts_df=None, coverage_freq_df=None, title="M
         counts_df = counts_df.reindex(sorted_mutations)
     
     # Replace None with np.nan and remove commas from numbers
-    df_processed = freq_df.replace({None: np.nan, ',': ''}, regex=True).infer_objects(copy=False).astype(float)
+    df_processed = freq_df.replace({None: np.nan, ',': ''}, regex=True)
+    df_processed = df_processed.apply(pd.to_numeric, errors='coerce')
 
     # Create enhanced hover text
     hover_text = []
