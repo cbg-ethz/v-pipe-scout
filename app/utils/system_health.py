@@ -65,13 +65,18 @@ def get_system_health_status() -> Dict[str, ApiHealthResult]:
     # Otherwise, perform health checks
     try:
         # Run async health check
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         try:
-            health_results = loop.run_until_complete(check_api_health(wise_url, covspectrum_url))
-            return health_results
-        finally:
-            loop.close()
+            # Check if an event loop is already running
+            loop = asyncio.get_running_loop()
+            # If running, use asyncio.run_coroutine_threadsafe
+            future = asyncio.run_coroutine_threadsafe(
+                check_api_health(wise_url, covspectrum_url), loop
+            )
+            health_results = future.result()
+        except RuntimeError:
+            # If no event loop is running, use asyncio.run
+            health_results = asyncio.run(check_api_health(wise_url, covspectrum_url))
+        return health_results
     except Exception as e:
         st.error(f"Error checking API health: {e}")
         # Return dummy results indicating unknown status
