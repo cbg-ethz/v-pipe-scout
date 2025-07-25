@@ -60,12 +60,15 @@ def app():
     
     st.info("This project is under heavy development.")
     
-    # Debug Information Section (Collapsible)
+        # Debug Information Section (Collapsible)
     st.markdown("---")
     with st.expander("🛠️ Debug Information", expanded=False):
         st.markdown("### System Information")
         
-        # Version Information (with fallback strategy)
+        # Version Information (simplified)
+        from utils.system_info import get_version_info, get_system_info
+        from utils.system_health import get_system_health_status
+        
         version_info = get_version_info()
         
         col1, col2 = st.columns(2)
@@ -75,17 +78,8 @@ def app():
             if version_info['version']:
                 st.code(f"Version: {version_info['version']}")
             
-            if version_info['commit_hash']:
-                dirty_indicator = " (dirty)" if version_info['is_dirty'] else ""
-                st.code(f"Commit: {version_info['commit_short']}{dirty_indicator}")
-                
-                if version_info['commit_message']:
-                    st.text(f"Message: {version_info['commit_message']}")
-            
-            # Show build or commit date
-            date_info = version_info['build_date'] or version_info['commit_date']
-            if date_info:
-                st.text(f"Last Updated: {date_info}")
+            if version_info['build_date']:
+                st.text(f"Built: {version_info['build_date']}")
             
             # Show source of version info
             st.caption(f"Source: {version_info['source']}")

@@ -19,24 +19,14 @@ ENV PATH=/opt/conda/envs/v-pipe-scout-app/bin:$PATH
 # Copy the rest of the application code
 COPY . .
 
-# Generate version.py with build-time information (extract from git context if available)
-RUN if [ -d ".git" ]; then \
-        BUILD_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown"); \
-        BUILD_TAG=$(git describe --tags --exact-match 2>/dev/null || echo ""); \
-        BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
-    else \
-        BUILD_COMMIT="unknown"; \
-        BUILD_TAG=""; \
-        BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
-    fi && \
+# Generate version.py with build-time information
+RUN BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") && \
     BASE_VERSION=$(python -c "exec(open('version.py').read()); print(VERSION)" 2>/dev/null || echo "0.1.0-alpha") && \
     echo "\"\"\"Version information for v-pipe-scout.\"\"\"" > version.py && \
     echo "" >> version.py && \
     echo "# Build-time version information" >> version.py && \
     echo "VERSION = \"${BASE_VERSION}\"" >> version.py && \
     echo "BUILD_DATE = \"${BUILD_DATE}\"" >> version.py && \
-    echo "BUILD_COMMIT = \"${BUILD_COMMIT}\"" >> version.py && \
-    echo "BUILD_TAG = \"${BUILD_TAG}\"" >> version.py && \
     echo "" >> version.py && \
     echo "# Generated at build time on $(date)" >> version.py
 
