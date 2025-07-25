@@ -1,6 +1,6 @@
 server:
   lapis_address: "http://88.198.54.174:80"
-  cov_sprectrum_api: "https://lapis.cov-spectrum.org"
+  cov_spectrum_api: "https://lapis.cov-spectrum.org"
 
 curated_variant_definitions:
   # Full GitHub repository URL (e.g., https://github.com/cbg-ethz/cowwid)

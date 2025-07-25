@@ -13,6 +13,7 @@ dependencies:
   - requests
   - pytest
   - pytest-asyncio
+  - pytest-mock
   - streamlit-pydantic
   - pydantic>=1.9,<2
   - plotly>=6.2.0

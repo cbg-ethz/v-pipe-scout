@@ -72,6 +72,8 @@ _Only accessible within ETH Zürich Networks._
     docker-compose up --build
     ```
 
+    The application automatically captures version information during build for debugging purposes.
+
 ### Automatic Deployment
 
 For production deployments on VMs or servers, you can set up automatic deployment to eliminate the need for manual updates. See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions on:
