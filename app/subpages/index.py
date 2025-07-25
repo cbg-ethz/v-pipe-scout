@@ -1,16 +1,9 @@
 import streamlit as st
 from streamlit_theme import st_theme
-from utils.system_health import setup_page_health_monitoring, get_system_health_status
-from utils.system_info import get_git_info, get_system_info
+from utils.system_info import get_version_info, get_system_info
+from utils.system_health import get_system_health_status
 
 def app():
-    # Setup page with health checks - home page doesn't require specific APIs but shows warnings
-    page_can_function, health_results = setup_page_health_monitoring(
-        page_title="Home",
-        required_apis=[],  # No specific APIs required for home page
-        show_sidebar_status=False  # Sidebar status is shown globally
-    )
-    
     st.title("POC: Rapid Variant Abundance Estimation 1-Month")
     
     # Get current theme and display appropriate POC image
@@ -72,24 +65,30 @@ def app():
     with st.expander("🛠️ Debug Information", expanded=False):
         st.markdown("### System Information")
         
-        # Git Information
-        git_info = get_git_info()
+        # Version Information (with fallback strategy)
+        version_info = get_version_info()
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("**Version Control:**")
-            if git_info['commit_hash']:
-                st.code(f"Commit: {git_info['commit_short']} {'(dirty)' if git_info['is_dirty'] else ''}")
-                if git_info['commit_message']:
-                    st.text(f"Message: {git_info['commit_message']}")
-            else:
-                st.text("Git information not available")
+            st.markdown("**Version Information:**")
+            if version_info['version']:
+                st.code(f"Version: {version_info['version']}")
             
-            if git_info['tag']:
-                st.text(f"Latest Tag: {git_info['tag']}")
-            if git_info['commit_date']:
-                st.text(f"Last Updated: {git_info['commit_date']}")
+            if version_info['commit_hash']:
+                dirty_indicator = " (dirty)" if version_info['is_dirty'] else ""
+                st.code(f"Commit: {version_info['commit_short']}{dirty_indicator}")
+                
+                if version_info['commit_message']:
+                    st.text(f"Message: {version_info['commit_message']}")
+            
+            # Show build or commit date
+            date_info = version_info['build_date'] or version_info['commit_date']
+            if date_info:
+                st.text(f"Last Updated: {date_info}")
+            
+            # Show source of version info
+            st.caption(f"Source: {version_info['source']}")
         
         with col2:
             st.markdown("**System Status:**")

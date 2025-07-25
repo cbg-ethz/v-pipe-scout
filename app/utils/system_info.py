@@ -6,6 +6,65 @@ from typing import Dict, Optional
 import datetime
 
 
+def get_version_info() -> Dict[str, Optional[str]]:
+    """
+    Get version information with fallback strategy:
+    1. Try git information (development)
+    2. Try build-time version info (Docker)
+    3. Fall back to static version (default)
+    
+    Returns:
+        Dictionary with version information
+    """
+    version_info = {
+        'version': '1.0.0-unknown',
+        'commit_hash': None,
+        'commit_short': None,
+        'tag': None,
+        'build_date': None,
+        'commit_date': None,
+        'commit_message': None,
+        'is_dirty': False,
+        'source': 'fallback'
+    }
+    
+    # Try build-time version info first (Docker production)
+    try:
+        from version import VERSION, BUILD_DATE, BUILD_COMMIT, BUILD_TAG
+        if BUILD_COMMIT and BUILD_COMMIT != "unknown":
+            version_info.update({
+                'version': BUILD_TAG if BUILD_TAG else VERSION,
+                'commit_hash': BUILD_COMMIT,
+                'commit_short': BUILD_COMMIT[:8] if BUILD_COMMIT else None,
+                'tag': BUILD_TAG if BUILD_TAG else None,
+                'build_date': BUILD_DATE,
+                'source': 'build'
+            })
+            return version_info
+        elif VERSION:
+            version_info.update({
+                'version': VERSION,
+                'build_date': BUILD_DATE,
+                'source': 'static'
+            })
+    except ImportError:
+        pass
+    
+    # Try git information (development environment)
+    git_info = get_git_info()
+    if git_info['commit_hash']:
+        version_info.update(git_info)
+        version_info['source'] = 'git'
+        # Generate version from git info
+        if git_info['tag']:
+            version_info['version'] = git_info['tag']
+        else:
+            version_info['version'] = f"dev-{git_info['commit_short']}"
+        return version_info
+    
+    return version_info
+
+
 def get_git_info() -> Dict[str, Optional[str]]:
     """
     Get current git commit and tag information.

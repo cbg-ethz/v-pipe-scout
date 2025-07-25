@@ -6,7 +6,6 @@ import streamlit.components.v1 as components
 from api.wiseloculus import WiseLoculusLapis
 from api.covspectrum import CovSpectrumLapis
 from components.variant_signature_component import render_signature_composer
-from utils.system_health import setup_page_health_monitoring, is_api_available
 
 
 # Load configuration from config.yaml
@@ -20,24 +19,12 @@ wiseLoculus = WiseLoculusLapis(wise_server_ip)
 covSpectrum = CovSpectrumLapis(cov_sprectrum_api)
 
 def app():
-    # Setup page with health checks
-    page_can_function, health_results = setup_page_health_monitoring(
-        page_title="Variant Signature Explorer",
-        required_apis=['wiseloculus', 'covspectrum'],
-        show_sidebar_status=True
-    )
 
     st.title("Variant Signature Explorer")
     st.subheader("Explore the variant signatures in the wastewater data.")
     st.write("First make a variant definition based on live queries to CovSpectrum.")
     st.write("Then explore the variant signature in the wastewater data, on read level.")
 
-    # Check if CovSpectrum is available for signature creation
-    if not is_api_available('covspectrum', health_results):
-        st.error("🚫 **CovSpectrum API Unavailable**")
-        st.write("Variant signature creation is not available when CovSpectrum API is down.")
-        st.write("Please check back later or contact system administrators.")
-        return
 
     # Configure the component with full functionality
     component_config = {
@@ -52,22 +39,11 @@ def app():
     }
 
     # Render the variant signature component
-    try:
-        result = render_signature_composer(
-            covSpectrum,
-            component_config,
-            session_prefix="compact_"  # Use a prefix to avoid session state conflicts
-        )
-        
-        if result is not None:
-            selected_mutations, sequence_type_value = result
-        else:
-            selected_mutations, sequence_type_value = None, "nucleotide"
-            
-    except Exception as e:
-        st.error(f"Error loading variant signature component: {str(e)}")
-        st.write("This may be due to CovSpectrum API issues. Please try refreshing the page.")
-        return
+    selected_mutations, sequence_type_value= render_signature_composer(
+        covSpectrum,
+        component_config,
+        session_prefix="compact_"  # Use a prefix to avoid session state conflicts
+    )
 
     st.markdown("---")
 
@@ -76,29 +52,11 @@ def app():
     st.write("Are these global signatures, already observed in the wastewater data? - Check the plot below.")
     st.write("The data is fetched from the WISE-CovSpectrum API and currently contains demo data for Feb-Mar 2025.")
 
-    # Check if WiseLoculus is available for wastewater data
-    if not is_api_available('wiseloculus', health_results):
-        st.warning("⚠️ **WISE-CovSpectrum API Issues**")
-        st.write("Wastewater data visualization may not work properly.")
-        if health_results.get('wiseloculus'):
-            error_msg = health_results['wiseloculus'].error_message
-            if error_msg:
-                st.write(f"Error details: {error_msg}")
-
     #### #3) Select the date range
     date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08")])
-    
     #### #4) Select the location
     default_locations = ["Zürich (ZH)"]  # Define default locations
-    
-    # Try to fetch locations with error handling
-    try:
-        locations = wiseLoculus.fetch_locations(default_locations)
-    except Exception as e:
-        st.warning(f"Could not fetch locations from WISE-CovSpectrum API: {str(e)}")
-        st.write("Using default locations instead.")
-        locations = default_locations
-    
+    locations = wiseLoculus.fetch_locations(default_locations)
     location = st.selectbox("Select Location:", locations)
 
     # Check if all necessary parameters are available
