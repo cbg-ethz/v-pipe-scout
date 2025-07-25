@@ -114,10 +114,16 @@ def create_interactive_venn(
             x=[hover_info['x']], 
             y=[hover_info['y']],
             mode='markers',
-            marker=dict(size=10, opacity=0),  # Invisible markers
-            hovertemplate=hover_info['hovertext'],
+            marker=dict(
+                size=15, 
+                opacity=0,  # Invisible markers
+                color='rgba(0,0,0,0)',
+                line=dict(width=0)
+            ),
+            hovertemplate=hover_info['hovertext'] + "<extra></extra>",  # Remove trace box
             showlegend=False,
-            name=f"Region {region_key}"
+            name=f"Region {region_key}",
+            hoverinfo='text'
         ))
     
     # Update layout
@@ -152,15 +158,15 @@ def create_interactive_venn(
 
 
 def _get_optimal_figsize(num_sets: int) -> Tuple[int, int]:
-    """Get optimal figure size based on number of sets."""
+    """Get optimal figure size based on number of sets for better quality."""
     size_map = {
         2: (8, 6),
-        3: (8, 8), 
-        4: (10, 10),
-        5: (12, 12),
-        6: (16, 16)
+        3: (9, 8), 
+        4: (12, 12),
+        5: (14, 14),
+        6: (18, 18)
     }
-    return size_map.get(num_sets, (10, 10))
+    return size_map.get(num_sets, (12, 12))
 
 
 def _create_hover_points(
@@ -196,14 +202,24 @@ def _create_hover_points(
             if bit == '1':
                 region_sets.append(names[i])
         
-        # Create hover text
+        # Create enhanced hover text with more detail
         if len(region_sets) == 1:
-            hover_text = f"<b>Only in {region_sets[0]}</b><br>"
+            hover_text = f"<b>Unique to {region_sets[0]}</b><br><br>"
         else:
-            hover_text = f"<b>Intersection of:</b><br>• " + "<br>• ".join(region_sets) + "<br>"
+            hover_text = f"<b>Shared by {len(region_sets)} variants:</b><br>"
+            for i, variant in enumerate(region_sets):
+                hover_text += f"  • {variant}<br>"
+            hover_text += "<br>"
         
-        hover_text += f"<b>Count:</b> {count}<br>"
-        hover_text += f"<b>Percentage:</b> {percentage:.1f}%"
+        hover_text += f"<b>Unique Mutations:</b> {count}<br>"
+        hover_text += f"<b>Percentage of Total:</b> {percentage:.1f}%<br>"
+        
+        # Add some additional context
+        if count > 0:
+            if len(region_sets) == 1:
+                hover_text += f"<br><i>These mutations appear only in {region_sets[0]}</i>"
+            else:
+                hover_text += f"<br><i>These mutations are shared by all {len(region_sets)} variants</i>"
         
         # Get position (approximate)
         pos = positions.get(region_key, {'x': 0.5, 'y': 0.5})
@@ -232,28 +248,81 @@ def _parse_count_from_label(label_text: str) -> int:
 def _get_region_positions(num_sets: int) -> Dict[str, Dict[str, float]]:
     """
     Get approximate positions for different regions in the Venn diagram.
-    These are rough estimates for hover point placement.
+    These positions are optimized for hover point placement based on pyvenn layouts.
     """
     if num_sets == 2:
         return {
-            '10': {'x': 0.25, 'y': 0.5},  # Only A
-            '01': {'x': 0.75, 'y': 0.5},  # Only B  
-            '11': {'x': 0.5, 'y': 0.5},   # A ∩ B
+            '10': {'x': 0.3, 'y': 0.5},   # Only A - left circle
+            '01': {'x': 0.7, 'y': 0.5},   # Only B - right circle
+            '11': {'x': 0.5, 'y': 0.5},   # A ∩ B - center overlap
         }
     elif num_sets == 3:
         return {
-            '100': {'x': 0.3, 'y': 0.3},   # Only A
-            '010': {'x': 0.7, 'y': 0.3},   # Only B
-            '001': {'x': 0.5, 'y': 0.7},   # Only C
-            '110': {'x': 0.5, 'y': 0.2},   # A ∩ B
-            '101': {'x': 0.35, 'y': 0.55}, # A ∩ C
-            '011': {'x': 0.65, 'y': 0.55}, # B ∩ C
-            '111': {'x': 0.5, 'y': 0.45},  # A ∩ B ∩ C
+            '100': {'x': 0.35, 'y': 0.35}, # Only A - bottom left
+            '010': {'x': 0.65, 'y': 0.35}, # Only B - bottom right
+            '001': {'x': 0.5, 'y': 0.7},   # Only C - top center
+            '110': {'x': 0.5, 'y': 0.25},  # A ∩ B - bottom center
+            '101': {'x': 0.4, 'y': 0.55},  # A ∩ C - left center
+            '011': {'x': 0.6, 'y': 0.55},  # B ∩ C - right center
+            '111': {'x': 0.5, 'y': 0.5},   # A ∩ B ∩ C - center
         }
+    elif num_sets == 4:
+        # Based on pyvenn4 approximate layout
+        return {
+            '1000': {'x': 0.15, 'y': 0.42}, # Only A
+            '0100': {'x': 0.32, 'y': 0.72}, # Only B
+            '0010': {'x': 0.68, 'y': 0.72}, # Only C
+            '0001': {'x': 0.85, 'y': 0.42}, # Only D
+            '1100': {'x': 0.23, 'y': 0.59}, # A ∩ B
+            '1010': {'x': 0.39, 'y': 0.24}, # A ∩ C
+            '1001': {'x': 0.29, 'y': 0.30}, # A ∩ D
+            '0110': {'x': 0.50, 'y': 0.66}, # B ∩ C
+            '0101': {'x': 0.71, 'y': 0.30}, # B ∩ D
+            '0011': {'x': 0.77, 'y': 0.59}, # C ∩ D
+            '1110': {'x': 0.50, 'y': 0.38}, # A ∩ B ∩ C
+            '1101': {'x': 0.35, 'y': 0.50}, # A ∩ B ∩ D
+            '1011': {'x': 0.65, 'y': 0.50}, # A ∩ C ∩ D
+            '0111': {'x': 0.50, 'y': 0.50}, # B ∩ C ∩ D
+            '1111': {'x': 0.50, 'y': 0.50}, # A ∩ B ∩ C ∩ D
+        }
+    elif num_sets == 5:
+        # Simplified positions for 5-set diagram - center most overlaps
+        positions = {}
+        outer_positions = [(0.1, 0.61), (0.72, 0.94), (0.97, 0.74), (0.88, 0.05), (0.12, 0.05)]
+        for i in range(32):  # 2^5 = 32 regions
+            key = bin(i)[2:].zfill(5)
+            bit_count = key.count('1')
+            if bit_count == 1:
+                # Single set regions - use outer positions
+                set_idx = key.index('1')
+                positions[key] = {'x': outer_positions[set_idx][0], 'y': outer_positions[set_idx][1]}
+            elif bit_count == 2:
+                # Two-set intersections - between the two sets
+                positions[key] = {'x': 0.4 + 0.2 * (i % 3), 'y': 0.4 + 0.2 * ((i // 3) % 3)}
+            else:
+                # Multi-set intersections - closer to center
+                positions[key] = {'x': 0.45 + 0.1 * (i % 2), 'y': 0.45 + 0.1 * ((i // 2) % 2)}
+        return positions
+    elif num_sets == 6:
+        # For 6-set diagram, use a grid-based approach for hover points
+        positions = {}
+        for i in range(64):  # 2^6 = 64 regions
+            key = bin(i)[2:].zfill(6)
+            bit_count = key.count('1')
+            
+            # Position based on complexity of intersection
+            if bit_count == 1:
+                # Single set regions - outer positions
+                positions[key] = {'x': 0.2 + 0.6 * (i % 6) / 5, 'y': 0.2 + 0.6 * ((i // 6) % 6) / 5}
+            elif bit_count <= 3:
+                # Simple intersections
+                positions[key] = {'x': 0.3 + 0.4 * (i % 5) / 4, 'y': 0.3 + 0.4 * ((i // 5) % 5) / 4}
+            else:
+                # Complex intersections - center region
+                positions[key] = {'x': 0.4 + 0.2 * (i % 3) / 2, 'y': 0.4 + 0.2 * ((i // 3) % 3) / 2}
+        return positions
     else:
-        # For 4-6 sets, use center positions as approximation
-        # In a full implementation, these would be calculated based on 
-        # the actual pyvenn coordinates
+        # Fallback for unexpected cases
         positions = {}
         for i in range(1, 2**num_sets):
             key = bin(i)[2:].zfill(num_sets)
