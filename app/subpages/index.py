@@ -1,7 +1,15 @@
 import streamlit as st
 from streamlit_theme import st_theme
+from monitoring.system_health import setup_page_health_monitoring
 
 def app():
+    # Setup page with health checks - home page doesn't require specific APIs but shows warnings
+    page_can_function, health_results = setup_page_health_monitoring(
+        page_title="Home",
+        required_apis=[],  # No specific APIs required for home page
+        show_sidebar_status=False  # Sidebar status is shown globally
+    )
+    
     st.title("POC: Rapid Variant Abundance Estimation 1-Month")
     
     # Get current theme and display appropriate POC image
