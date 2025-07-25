@@ -17,6 +17,11 @@ import yaml
 import subprocess
 import json
 import pandas as pd
+import logging
+
+# Configure logging for the worker
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 
 def devconvolve(
@@ -53,7 +58,7 @@ def devconvolve(
 
         # Reset the index to columns if it's a MultiIndex
         if isinstance(mutation_counts_df.index, pd.MultiIndex):
-            print("Detected MultiIndex in mutation_counts_df, resetting to columns")
+            logger.debug("Detected MultiIndex in mutation_counts_df, resetting to columns")
             mutation_counts_df = mutation_counts_df.reset_index()
         
         # Save the dataframes to CSV files in the input directory
@@ -138,13 +143,11 @@ def devconvolve(
                     stderr=subprocess.PIPE,
                     text=True,
                 )
-            print(
-                f"Successfully parsed mutation positions and bases: {matrix_pos_base_file}"
-            )
+            logger.debug(f"Successfully parsed mutation positions and bases: {matrix_pos_base_file}")
         except subprocess.CalledProcessError as e:
-            print(f"Error running gawk command: {e}")
+            logger.error(f"Error running gawk command: {e}")
             if e.stderr:
-                print(e.stderr)
+                logger.error(e.stderr)
             exit(1)
 
         # # add the  above-update matrix to the mutation counts+coverage table
@@ -155,8 +158,8 @@ def devconvolve(
         # Create output filename with descriptive suffix
         tallymut_file = output_dir / (mutation_counts.stem + "_tallymut.tsv")
 
-        # DEBUG pring head of mutation_counts_fp
-        print(f"Mutation counts file: {mutation_counts_fp}")
+        # DEBUG: Print head of mutation_counts_fp
+        logger.debug(f"Mutation counts file: {mutation_counts_fp}")
         # do head in the terminal
         head_command = ["head", "-n", "5", str(mutation_counts_fp)]
         try:
@@ -168,9 +171,9 @@ def devconvolve(
                 text=True,
             )
         except subprocess.CalledProcessError as e:
-            print(f"Error running head command: {e}")
+            logger.error(f"Error running head command: {e}")
             if e.stderr:
-                print(e.stderr)
+                logger.error(e.stderr)
             exit(1)
 
 
@@ -188,37 +191,37 @@ def devconvolve(
             ]
             
             # Debug: Print more details about the files
-            print(f"Running command: {' '.join(join_command)}")
-            print(f"Checking if files exist:")
-            print(f"  - mutation_counts_fp exists: {Path(mutation_counts_fp).exists()}")
-            print(f"  - matrix_pos_base_file exists: {Path(matrix_pos_base_file).exists()}")
+            logger.debug(f"Running command: {' '.join(join_command)}")
+            logger.debug(f"Checking if files exist:")
+            logger.debug(f"  - mutation_counts_fp exists: {Path(mutation_counts_fp).exists()}")
+            logger.debug(f"  - matrix_pos_base_file exists: {Path(matrix_pos_base_file).exists()}")
             
             # Debug: Print file contents
-            print(f"Contents of mutation_counts_fp (first 5 lines):")
+            logger.debug(f"Contents of mutation_counts_fp (first 5 lines):")
             try:
                 with open(mutation_counts_fp, 'r') as f:
                     for i, line in enumerate(f):
                         if i < 5:
-                            print(f"  {line.strip()}")
+                            logger.debug(f"  {line.strip()}")
                         else:
                             break
             except Exception as e:
-                print(f"Error reading mutation_counts_fp: {e}")
+                logger.error(f"Error reading mutation_counts_fp: {e}")
                 
-            print(f"Contents of matrix_pos_base_file (first 5 lines):")
+            logger.debug(f"Contents of matrix_pos_base_file (first 5 lines):")
             try:
                 with open(matrix_pos_base_file, 'r') as f:
                     for i, line in enumerate(f):
                         if i < 5:
-                            print(f"  {line.strip()}")
+                            logger.debug(f"  {line.strip()}")
                         else:
                             break
             except Exception as e:
-                print(f"Error reading matrix_pos_base_file: {e}")
+                logger.error(f"Error reading matrix_pos_base_file: {e}")
             
             # Try basic xsv command first to verify xsv works
             try:
-                print("Testing basic xsv command...")
+                logger.debug("Testing basic xsv command...")
                 test_result = subprocess.run(
                     ["xsv", "count", str(mutation_counts_fp)],
                     check=True,
@@ -226,10 +229,10 @@ def devconvolve(
                     stderr=subprocess.PIPE,
                     text=True,
                 )
-                print(f"xsv count result: {test_result.stdout.strip()}")
+                logger.debug(f"xsv count result: {test_result.stdout.strip()}")
             except subprocess.CalledProcessError as e:
-                print(f"Basic xsv command failed: {e}")
-                print(f"stderr: {e.stderr}")
+                logger.error(f"Basic xsv command failed: {e}")
+                logger.error(f"stderr: {e.stderr}")
             
             # Now try the actual join command
             join_result = subprocess.run(
@@ -280,27 +283,27 @@ def devconvolve(
                     text=True,
                     check=True,
                 )
-            print(f"Successfully created tally mutation file: {tallymut_file}")
+            logger.debug(f"Successfully created tally mutation file: {tallymut_file}")
 
         except subprocess.CalledProcessError as e:
-            print(f"Error running command: {e}")
+            logger.error(f"Error running command: {e}")
             if e.stderr:
-                print(f"stderr: {e.stderr}")
+                logger.error(f"stderr: {e.stderr}")
             
             # Debug - print file existence and content
-            print(f"\nDebug info:")
+            logger.debug(f"\nDebug info:")
             for file_path in [mutation_counts_fp, matrix_pos_base_file]:
                 if Path(file_path).exists():
-                    print(f"File exists: {file_path}")
+                    logger.debug(f"File exists: {file_path}")
                     try:
                         # Print first few lines of the file
                         with open(file_path, 'r') as f:
                             content = [next(f).strip() for _ in range(3)]
-                            print(f"Content of {file_path}:\n{content}")
+                            logger.debug(f"Content of {file_path}:\n{content}")
                     except Exception as read_err:
-                        print(f"Error reading file: {read_err}")
+                        logger.error(f"Error reading file: {read_err}")
                 else:
-                    print(f"File does not exist: {file_path}")
+                    logger.error(f"File does not exist: {file_path}")
                     
             exit(1)
 
@@ -339,7 +342,7 @@ def devconvolve(
                 stderr=subprocess.PIPE,
                 text=True,
             )
-            print(f"Successfully deconvoluted: {output_csv_fp}")
+            logger.info(f"Successfully deconvoluted: {output_csv_fp}")
 
             # Read and format the JSON file properly
             with open(output_json_fp, "r") as f:
@@ -349,11 +352,11 @@ def devconvolve(
             with open(output_json_fp, "w") as f:
                 json.dump(deconvolved_data, f, indent=4)
 
-            print(f"Formatted JSON output: {output_json_fp}")
+            logger.debug(f"Formatted JSON output: {output_json_fp}")
         except subprocess.CalledProcessError as e:
-            print(f"Error running lollipop command: {e}")
+            logger.error(f"Error running lollipop command: {e}")
             if e.stderr:
-                print(e.stderr)
+                logger.error(e.stderr)
             exit(1)
 
         ###################################
