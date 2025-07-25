@@ -60,7 +60,7 @@ def app():
     
     st.info("This project is under heavy development.")
     
-        # Debug Information Section (Collapsible)
+    # Debug Information Section (Collapsible)
     st.markdown("---")
     with st.expander("🛠️ Debug Information", expanded=False):
         st.markdown("### System Information")
