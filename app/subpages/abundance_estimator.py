@@ -649,7 +649,7 @@ def app():
                 # Display the interactive Plotly chart in Streamlit
                 st.plotly_chart(fig)
             
-            # Venn Diagram in the second column (only for 2-3 variants)
+            # Venn Diagram in the second column (supports 2-3 variants)
             with col2:
                 if 2 <= len(combined_variants.variants) <= 3:
                     st.markdown("#### Mutation Overlap")
@@ -667,11 +667,11 @@ def app():
                         set1 = set(combined_variants.variants[0].signature_mutations)
                         set2 = set(combined_variants.variants[1].signature_mutations)
             
-                        # Use fixed, compact size to prevent excessive height on wide screens
-                        fig_width = 4.0  # Fixed width in inches
-                        fig_height = 3.0  # Fixed height in inches for better proportions
+                        # Increased size for better readability and visibility
+                        fig_width = 8.0  # Increased from 4.0 to 8.0 inches
+                        fig_height = 6.0  # Increased from 3.0 to 6.0 inches
                         
-                        # Create a figure with responsive size
+                        # Create a figure with improved size
                         fig_venn, ax_venn = plt.subplots(figsize=(fig_width, fig_height))
                         
                         # Fix the typing issue by explicitly creating a tuple of exactly 2 elements
@@ -682,7 +682,7 @@ def app():
                         venn2((set1, set2), variant_labels, ax=ax_venn)
                         
                         # Adjust layout to be more compact
-                        plt.tight_layout(pad=1.0)
+                        plt.tight_layout(pad=1.5)
                         
                         # Add a light gray border
                         for spine in ax_venn.spines.values():
@@ -700,11 +700,11 @@ def app():
                         set2 = set(combined_variants.variants[1].signature_mutations)
                         set3 = set(combined_variants.variants[2].signature_mutations)
                         
-                        # Use fixed, compact size to prevent excessive height on wide screens
-                        fig_width = 4.0  # Fixed width in inches
-                        fig_height = 3.0  # Fixed height in inches for better proportions
+                        # Increased size for better readability and visibility
+                        fig_width = 8.0  # Increased from 4.0 to 8.0 inches
+                        fig_height = 6.0  # Increased from 3.0 to 6.0 inches
                         
-                        # Create a figure with responsive size
+                        # Create a figure with improved size
                         fig_venn, ax_venn = plt.subplots(figsize=(fig_width, fig_height))
                         
                         # Fix the typing issue by explicitly creating a tuple of exactly 3 elements
@@ -716,7 +716,7 @@ def app():
                         venn3((set1, set2, set3), variant_labels, ax=ax_venn)
                         
                         # Adjust layout to be more compact
-                        plt.tight_layout(pad=1.0)
+                        plt.tight_layout(pad=1.5)
                         
                         # Add a light gray border
                         for spine in ax_venn.spines.values():
