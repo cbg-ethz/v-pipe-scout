@@ -1,4 +1,4 @@
-"""Simple tests for core functionality."""
+"""Simple tests for system functionality."""
 
 import unittest
 from unittest.mock import Mock, patch
@@ -6,18 +6,22 @@ import requests
 
 
 class TestSystemInfo(unittest.TestCase):
-    """Test basic system info functionality."""
+    """Test system info functionality."""
 
-    def test_git_info_import(self):
-        """Test that git info can be imported and called."""
-        from utils.system_info import get_git_info
+    def test_version_info_import(self):
+        """Test that version info can be imported and called."""
+        from utils.system_info import get_version_info
         
-        git_info = get_git_info()
+        version_info = get_version_info()
         
         # Should return a dict with expected keys
-        expected_keys = ['commit_hash', 'commit_short', 'tag', 'branch', 'commit_date', 'commit_message', 'is_dirty']
+        expected_keys = ['version', 'build_date', 'source']
         for key in expected_keys:
-            self.assertIn(key, git_info)
+            self.assertIn(key, version_info)
+        
+        # Version should be a string
+        self.assertIsInstance(version_info['version'], str)
+        self.assertIn('source', version_info)
 
     def test_system_info_import(self):
         """Test that system info can be imported and called."""
@@ -26,9 +30,12 @@ class TestSystemInfo(unittest.TestCase):
         system_info = get_system_info()
         
         # Should return a dict with expected keys
-        expected_keys = ['python_version', 'current_time', 'working_directory']
+        expected_keys = ['python_version', 'current_time']
         for key in expected_keys:
             self.assertIn(key, system_info)
+        
+        # Should have current time as ISO string
+        self.assertIsInstance(system_info['current_time'], str)
 
 
 class TestHealthCheck(unittest.TestCase):
@@ -59,7 +66,7 @@ class TestHealthCheck(unittest.TestCase):
             mock_response.json.return_value = {"data": []}
             mock_get.return_value = mock_response
             
-            with patch('time.time', return_value=0.1):  # Fixed response time
+            with patch('time.time', side_effect=[0.0, 0.1, 0.2]):  # Start, end, cache time
                 result = checker.check_covspectrum_health("https://test.example.com")
                 
             self.assertEqual(result.status, HealthStatus.HEALTHY)

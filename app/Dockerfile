@@ -21,7 +21,7 @@ COPY . .
 
 # Generate version.py with build-time information
 RUN BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") && \
-    BASE_VERSION=$(python -c "exec(open('version.py').read()); print(VERSION)" 2>/dev/null || echo "0.1.0-alpha") && \
+    BASE_VERSION=$(grep -Po '(?<=^VERSION\s*=\s*").*(?=")' version.py 2>/dev/null || echo "0.1.0-alpha") && \
     echo "\"\"\"Version information for v-pipe-scout.\"\"\"" > version.py && \
     echo "" >> version.py && \
     echo "# Build-time version information" >> version.py && \

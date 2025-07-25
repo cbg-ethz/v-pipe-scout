@@ -43,7 +43,6 @@ def get_system_info() -> Dict[str, str]:
     system_info = {
         'python_version': None,
         'current_time': datetime.datetime.now().isoformat(),
-        'working_directory': os.getcwd(),
     }
     
     try:
