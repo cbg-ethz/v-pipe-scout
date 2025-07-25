@@ -3,7 +3,7 @@
 import streamlit as st
 from unittest.mock import patch
 from api.health_check import ApiHealthResult, HealthStatus
-from monitoring.system_health import display_global_system_status
+from utils.system_health import display_global_system_status
 
 def test_clean_ui():
     st.title("Clean UI Test")
@@ -16,7 +16,7 @@ def test_clean_ui():
     }
     
     # Patch the health status to return healthy results
-    with patch('monitoring.system_health.get_system_health_status') as mock_health:
+    with patch('utils.system_health.get_system_health_status') as mock_health:
         mock_health.return_value = healthy_results
         
         st.write("✅ All APIs are healthy - sidebar should be clean (no API status section)")

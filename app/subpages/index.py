@@ -1,6 +1,7 @@
 import streamlit as st
 from streamlit_theme import st_theme
-from monitoring.system_health import setup_page_health_monitoring
+from utils.system_health import setup_page_health_monitoring, get_system_health_status
+from utils.system_info import get_git_info, get_system_info
 
 def app():
     # Setup page with health checks - home page doesn't require specific APIs but shows warnings
@@ -65,3 +66,51 @@ def app():
     st.markdown("**24.5 Mio Reads × 2.5 GB/Mio Reads = 61.25 GB of RAM**")
     
     st.info("This project is under heavy development.")
+    
+    # Debug Information Section (Collapsible)
+    st.markdown("---")
+    with st.expander("🛠️ Debug Information", expanded=False):
+        st.markdown("### System Information")
+        
+        # Git Information
+        git_info = get_git_info()
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Version Control:**")
+            if git_info['commit_hash']:
+                st.code(f"Commit: {git_info['commit_short']} {'(dirty)' if git_info['is_dirty'] else ''}")
+                if git_info['commit_message']:
+                    st.text(f"Message: {git_info['commit_message']}")
+            else:
+                st.text("Git information not available")
+            
+            if git_info['tag']:
+                st.text(f"Latest Tag: {git_info['tag']}")
+            if git_info['commit_date']:
+                st.text(f"Last Updated: {git_info['commit_date']}")
+        
+        with col2:
+            st.markdown("**System Status:**")
+            system_info = get_system_info()
+            if system_info['python_version']:
+                st.text(f"Python: {system_info['python_version']}")
+            st.text(f"Current Time: {system_info['current_time']}")
+        
+        # API Health Status
+        st.markdown("**API Health Status:**")
+        health_results = get_system_health_status()
+        
+        for api_name, result in health_results.items():
+            status_emoji = "✅" if result.is_healthy else "⚠️" if result.is_available else "❌"
+            st.text(f"{status_emoji} {api_name.title()}: {result.status.value}")
+            
+            if result.response_time_ms:
+                st.text(f"   Response Time: {result.response_time_ms:.1f}ms")
+            if result.error_message:
+                st.text(f"   Error: {result.error_message}")
+            if result.last_checked:
+                import datetime
+                check_time = datetime.datetime.fromtimestamp(result.last_checked)
+                st.text(f"   Last Checked: {check_time.strftime('%H:%M:%S')}")

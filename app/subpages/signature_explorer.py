@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 from api.wiseloculus import WiseLoculusLapis
 from api.covspectrum import CovSpectrumLapis
 from components.variant_signature_component import render_signature_composer
-from monitoring.system_health import setup_page_health_monitoring, is_api_available
+from utils.system_health import setup_page_health_monitoring, is_api_available
 
 
 # Load configuration from config.yaml

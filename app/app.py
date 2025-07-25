@@ -8,7 +8,7 @@ import subpages.dynamic_mutations as dynamic_mutations
 import subpages.signature_explorer as signature_explorer
 import subpages.abundance_estimator as abundance_estimator
 import subpages.background as background
-from monitoring.system_health import initialize_health_monitoring, display_global_system_status, show_system_status_debug
+from utils.system_health import initialize_health_monitoring, display_global_system_status
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -69,10 +69,6 @@ if __name__ == "__main__":
         
         # Display API status only when there are issues
         display_global_system_status()
-        
-        # Add debug option in sidebar (for development)
-        if st.checkbox("Show Debug Info"):
-            show_system_status_debug()
     
     # Run the current page
     current_page.run()

@@ -112,8 +112,8 @@ class TestApiWarningComponents:
 class TestHealthIntegration:
     """Test health integration utilities."""
     
-    @patch('monitoring.system_health.load_api_config')
-    @patch('monitoring.system_health.check_api_health')
+    @patch('utils.system_health.load_api_config')
+    @patch('utils.system_health.check_api_health')
     def test_get_api_health_status_success(self, mock_check_api_health, mock_load_config):
         """Test successful health status retrieval."""
         # Mock config loading
@@ -131,7 +131,7 @@ class TestHealthIntegration:
         mock_check_api_health.return_value = expected_results
         
         # Import and test the function
-        from monitoring.system_health import get_system_health_status
+        from utils.system_health import get_system_health_status
         
         with patch('asyncio.new_event_loop') as mock_new_loop, \
              patch('asyncio.set_event_loop') as mock_set_loop:
@@ -180,7 +180,7 @@ class TestHealthIntegration:
             display_compact_api_status(issue_results)
             mock_warning.assert_called_once()
         """Test API availability checking."""
-        from monitoring.system_health import is_api_available
+        from utils.system_health import is_api_available
         
         health_results = {
             'healthy_api': ApiHealthResult(status=HealthStatus.HEALTHY, response_time_ms=100.0),
