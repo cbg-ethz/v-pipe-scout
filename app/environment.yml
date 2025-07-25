@@ -3,8 +3,8 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - python=3.9
-  - streamlit=1.45.0
+  - python=3.12
+  - streamlit=1.47.0
   - matplotlib
   - numpy
   - pandas=2.2.3
@@ -15,8 +15,7 @@ dependencies:
   - pytest-asyncio
   - streamlit-pydantic
   - pydantic>=1.9,<2
-  - cojac>=0.9.3
-  - plotly
+  - plotly>=6.2.0
   - pip
   - celery==5.3.6
   - pip:
