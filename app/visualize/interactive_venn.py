@@ -2,7 +2,7 @@
 Interactive Plotly-based Venn diagrams using pyvenn backend.
 
 This module provides functionality to create interactive Venn diagrams 
-that support 2-6 sets using the pyvenn library and converting them to 
+that support 2-5 sets using the pyvenn library and converting them to 
 Plotly interactive plots.
 """
 
@@ -16,7 +16,7 @@ import numpy as np
 from io import BytesIO
 import base64
 
-from .pyvenn import get_labels, venn2, venn3, venn4, venn5, venn6
+from .pyvenn import get_labels, venn2, venn3, venn4, venn5
 
 
 def create_interactive_venn(
@@ -29,7 +29,7 @@ def create_interactive_venn(
     show_percentages: bool = True
 ) -> go.Figure:
     """
-    Create an interactive Plotly Venn diagram supporting 2-6 sets.
+    Create an interactive Plotly Venn diagram supporting 2-5 sets.
     
     Args:
         data: List of sets to create Venn diagram for
@@ -45,8 +45,8 @@ def create_interactive_venn(
     """
     num_sets = len(data)
     
-    if num_sets < 2 or num_sets > 6:
-        raise ValueError("Venn diagrams are supported for 2-6 sets only")
+    if num_sets < 2 or num_sets > 5:
+        raise ValueError("Venn diagrams are supported for 2-5 sets only")
     
     # Prepare fill options for labels
     fill_options = []
@@ -66,8 +66,7 @@ def create_interactive_venn(
         2: venn2,
         3: venn3, 
         4: venn4,
-        5: venn5,
-        6: venn6
+        5: venn5
     }
     
     # Use smaller figure size for embedding
@@ -127,21 +126,16 @@ def create_interactive_venn(
         ))
     
     # Update layout
-    fig.update_layout(
-        title={
-            'text': title,
-            'x': 0.5,
-            'xanchor': 'center'
-        },
-        width=width,
-        height=height,
-        xaxis=dict(
+    layout_config = {
+        'width': width,
+        'height': height,
+        'xaxis': dict(
             range=[0, 1],
             showgrid=False,
             showticklabels=False,
             zeroline=False
         ),
-        yaxis=dict(
+        'yaxis': dict(
             range=[0, 1], 
             showgrid=False,
             showticklabels=False,
@@ -149,10 +143,20 @@ def create_interactive_venn(
             scaleanchor="x",
             scaleratio=1
         ),
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        margin=dict(l=20, r=20, t=50, b=20)
-    )
+        'plot_bgcolor': 'rgba(0,0,0,0)',
+        'paper_bgcolor': 'rgba(0,0,0,0)',
+        'margin': dict(l=20, r=20, t=30 if title else 20, b=20)
+    }
+    
+    # Only add title if it's provided and not empty
+    if title:
+        layout_config['title'] = {
+            'text': title,
+            'x': 0.5,
+            'xanchor': 'center'
+        }
+    
+    fig.update_layout(**layout_config)
     
     return fig
 
@@ -160,11 +164,10 @@ def create_interactive_venn(
 def _get_optimal_figsize(num_sets: int) -> Tuple[int, int]:
     """Get optimal figure size based on number of sets for better quality."""
     size_map = {
-        2: (8, 6),
-        3: (9, 8), 
-        4: (12, 12),
-        5: (14, 14),
-        6: (18, 18)
+        2: (10, 8),
+        3: (12, 10), 
+        4: (14, 14),
+        5: (16, 16)
     }
     return size_map.get(num_sets, (12, 12))
 
@@ -303,24 +306,6 @@ def _get_region_positions(num_sets: int) -> Dict[str, Dict[str, float]]:
                 # Multi-set intersections - closer to center
                 positions[key] = {'x': 0.45 + 0.1 * (i % 2), 'y': 0.45 + 0.1 * ((i // 2) % 2)}
         return positions
-    elif num_sets == 6:
-        # For 6-set diagram, use a grid-based approach for hover points
-        positions = {}
-        for i in range(64):  # 2^6 = 64 regions
-            key = bin(i)[2:].zfill(6)
-            bit_count = key.count('1')
-            
-            # Position based on complexity of intersection
-            if bit_count == 1:
-                # Single set regions - outer positions
-                positions[key] = {'x': 0.2 + 0.6 * (i % 6) / 5, 'y': 0.2 + 0.6 * ((i // 6) % 6) / 5}
-            elif bit_count <= 3:
-                # Simple intersections
-                positions[key] = {'x': 0.3 + 0.4 * (i % 5) / 4, 'y': 0.3 + 0.4 * ((i // 5) % 5) / 4}
-            else:
-                # Complex intersections - center region
-                positions[key] = {'x': 0.4 + 0.2 * (i % 3) / 2, 'y': 0.4 + 0.2 * ((i // 3) % 3) / 2}
-        return positions
     else:
         # Fallback for unexpected cases
         positions = {}
@@ -332,7 +317,7 @@ def _get_region_positions(num_sets: int) -> Dict[str, Dict[str, float]]:
 
 def create_venn_from_mutations(
     variant_data: List[Tuple[str, List[str]]],
-    title: str = "Variant Mutation Overlap",
+    title: str = "",
     width: int = 700,
     height: int = 600
 ) -> go.Figure:

@@ -649,9 +649,9 @@ def app():
                 # Display the interactive Plotly chart in Streamlit
                 st.plotly_chart(fig)
             
-            # Venn Diagram in the second column (now supports 2-6 variants)
+            # Venn Diagram in the second column (supports 2-5 variants)
             with col2:
-                if 2 <= len(combined_variants.variants) <= 6:
+                if 2 <= len(combined_variants.variants) <= 5:
                     st.markdown("#### Mutation Overlap")
                     
                     # Import the new interactive venn diagram functionality
@@ -664,24 +664,24 @@ def app():
                     ]
                     
                     try:
-                        # Calculate responsive dimensions based on viewport
-                        # Base dimensions that work well in the column layout
-                        base_width = 450
-                        base_height = 400
+                        # Calculate responsive dimensions with larger minimum sizes for better readability
+                        # Increased base dimensions to ensure plots are readable
+                        base_width = 600
+                        base_height = 500
                         
                         # Adjust size based on number of variants
                         num_variants = len(combined_variants.variants)
-                        if num_variants >= 5:
-                            width = base_width + 100
-                            height = base_height + 100
+                        if num_variants >= 4:
+                            width = base_width + 150
+                            height = base_height + 150
                         else:
                             width = base_width
                             height = base_height
                         
-                        # Create the interactive Venn diagram
+                        # Create the interactive Venn diagram without title
                         venn_fig = create_venn_from_mutations(
                             variant_data=variant_data,
-                            title="Mutation Overlap",
+                            title="",  # Remove title from plot
                             width=width,
                             height=height
                         )
@@ -694,9 +694,9 @@ def app():
                         # Fallback: show a simple message
                         st.info("Interactive Venn diagram could not be generated. Please check the data.")
                         
-                elif len(combined_variants.variants) > 6:
+                elif len(combined_variants.variants) > 5:
                     st.markdown("#### Mutation Overlap")
-                    st.info("Venn diagrams support up to 6 variants. You have selected more than 6 variants.")
+                    st.info("Venn diagrams support up to 5 variants. You have selected more than 5 variants.")
                 else:
                     st.markdown("#### Mutation Overlap") 
                     st.info("Venn diagram requires at least 2 variants to display.")
