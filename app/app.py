@@ -61,7 +61,7 @@ if __name__ == "__main__":
         
         # Create custom navigation links using page_link
         for page in pages:
-            st.page_link(page, label=f"{page.icon} {page.title}" if page.icon else page.title)
+            st.page_link(page, label=page.title)
     
     # Run the current page
     current_page.run()
