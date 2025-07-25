@@ -66,8 +66,8 @@ def app():
         st.markdown("### System Information")
         
         # Version Information (simplified)
-        from utils.system_info import get_version_info, get_system_info
-        from utils.system_health import get_system_health_status
+        
+        
         
         version_info = get_version_info()
         
