@@ -6,5 +6,6 @@ used across different subpages of the application.
 """
 
 from .mutations import mutations_over_time
+from . import pyvenn
 
-__all__ = ['mutations_over_time']
+__all__ = ['mutations_over_time', 'pyvenn']
