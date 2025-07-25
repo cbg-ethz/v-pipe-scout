@@ -649,57 +649,85 @@ def app():
                 # Display the interactive Plotly chart in Streamlit
                 st.plotly_chart(fig)
             
-            # Venn Diagram in the second column (supports 2-5 variants)
+            # Venn Diagram in the second column (supports 2-3 variants)
             with col2:
-                if 2 <= len(combined_variants.variants) <= 5:
+                if 2 <= len(combined_variants.variants) <= 3:
                     st.markdown("#### Mutation Overlap")
                     
-                    # Import the new interactive venn diagram functionality
-                    from visualize.interactive_venn import create_venn_from_mutations
+                    # Matplotlib is already imported at the top
+                    matplotlib.use('agg')  # Set non-interactive backend
                     
-                    # Prepare data for the Venn diagram
-                    variant_data = [
-                        (variant.name, variant.signature_mutations) 
-                        for variant in combined_variants.variants
-                    ]
+                    # Set a professional style for the plots
+                    plt.style.use('seaborn-v0_8-whitegrid')  # Modern, clean style
                     
-                    try:
-                        # Calculate responsive dimensions with larger minimum sizes for better readability
-                        # Increased base dimensions to ensure plots are readable
-                        base_width = 600
-                        base_height = 500
+                    if len(combined_variants.variants) == 2:
+                        from matplotlib_venn import venn2
                         
-                        # Adjust size based on number of variants
-                        num_variants = len(combined_variants.variants)
-                        if num_variants >= 4:
-                            width = base_width + 150
-                            height = base_height + 150
-                        else:
-                            width = base_width
-                            height = base_height
+                        # Create sets of mutations for each variant
+                        set1 = set(combined_variants.variants[0].signature_mutations)
+                        set2 = set(combined_variants.variants[1].signature_mutations)
+            
+                        # Increased size for better readability and visibility
+                        fig_width = 8.0  # Increased from 4.0 to 8.0 inches
+                        fig_height = 6.0  # Increased from 3.0 to 6.0 inches
                         
-                        # Create the interactive Venn diagram without title
-                        venn_fig = create_venn_from_mutations(
-                            variant_data=variant_data,
-                            title="",  # Remove title from plot
-                            width=width,
-                            height=height
-                        )
+                        # Create a figure with improved size
+                        fig_venn, ax_venn = plt.subplots(figsize=(fig_width, fig_height))
                         
-                        # Display the interactive Plotly diagram
-                        st.plotly_chart(venn_fig, use_container_width=True)
+                        # Fix the typing issue by explicitly creating a tuple of exactly 2 elements
+                        variant_name1 = combined_variants.variants[0].name
+                        variant_name2 = combined_variants.variants[1].name
+                        variant_labels = (variant_name1, variant_name2)
                         
-                    except Exception as e:
-                        st.error(f"Error creating Venn diagram: {str(e)}")
-                        # Fallback: show a simple message
-                        st.info("Interactive Venn diagram could not be generated. Please check the data.")
+                        venn2((set1, set2), variant_labels, ax=ax_venn)
                         
-                elif len(combined_variants.variants) > 5:
-                    st.markdown("#### Mutation Overlap")
-                    st.info("Venn diagrams support up to 5 variants. You have selected more than 5 variants.")
+                        # Adjust layout to be more compact
+                        plt.tight_layout(pad=1.5)
+                        
+                        # Add a light gray border
+                        for spine in ax_venn.spines.values():
+                            spine.set_visible(True)
+                            spine.set_color('#f0f0f0')
+                        
+                        # Display the venn diagram
+                        st.pyplot(fig_venn)
+                        
+                    elif len(combined_variants.variants) == 3:
+                        from matplotlib_venn import venn3
+                        
+                        # Create sets of mutations for each variant - extract exactly 3 sets as required by venn3
+                        set1 = set(combined_variants.variants[0].signature_mutations)
+                        set2 = set(combined_variants.variants[1].signature_mutations)
+                        set3 = set(combined_variants.variants[2].signature_mutations)
+                        
+                        # Increased size for better readability and visibility
+                        fig_width = 8.0  # Increased from 4.0 to 8.0 inches
+                        fig_height = 6.0  # Increased from 3.0 to 6.0 inches
+                        
+                        # Create a figure with improved size
+                        fig_venn, ax_venn = plt.subplots(figsize=(fig_width, fig_height))
+                        
+                        # Fix the typing issue by explicitly creating a tuple of exactly 3 elements
+                        variant_name1 = combined_variants.variants[0].name
+                        variant_name2 = combined_variants.variants[1].name
+                        variant_name3 = combined_variants.variants[2].name
+                        variant_labels = (variant_name1, variant_name2, variant_name3)
+                        
+                        venn3((set1, set2, set3), variant_labels, ax=ax_venn)
+                        
+                        # Adjust layout to be more compact
+                        plt.tight_layout(pad=1.5)
+                        
+                        # Add a light gray border
+                        for spine in ax_venn.spines.values():
+                            spine.set_visible(True)
+                            spine.set_color('#f0f0f0')
+                        
+                        # Display the venn diagram
+                        st.pyplot(fig_venn)
                 else:
-                    st.markdown("#### Mutation Overlap") 
-                    st.info("Venn diagram requires at least 2 variants to display.")
+                    st.markdown("#### Mutation Overlap")
+                    st.info("Venn diagram is only available for 2-3 variants")
             
 
             # 3. Mutation-Variant Matrix Visualization (heatmap) - Collapsible

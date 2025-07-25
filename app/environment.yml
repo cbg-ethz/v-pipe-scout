@@ -19,6 +19,7 @@ dependencies:
   - pip
   - celery==5.3.6
   - pip:
+      - matplotlib-venn
       - redis==5.0.1
       - streamlit-autorefresh
       - st-theme
