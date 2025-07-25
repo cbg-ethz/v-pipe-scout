@@ -36,7 +36,7 @@ def load_api_config() -> Tuple[str, str]:
             return "http://default_ip:8000", "https://lapis.cov-spectrum.org"
         
         wise_url = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
-        covspectrum_url = config.get('server', {}).get('cov_sprectrum_api', 'https://lapis.cov-spectrum.org')
+        covspectrum_url = config.get('server', {}).get('cov_spectrum_api', 'https://lapis.cov-spectrum.org')
         
         return wise_url, covspectrum_url
         
