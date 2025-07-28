@@ -667,12 +667,8 @@ def app():
                         set1 = set(combined_variants.variants[0].signature_mutations)
                         set2 = set(combined_variants.variants[1].signature_mutations)
             
-                        # Increased size for better readability and visibility
-                        fig_width = 8.0  # Increased from 4.0 to 8.0 inches
-                        fig_height = 6.0  # Increased from 3.0 to 6.0 inches
-                        
-                        # Create a figure with improved size
-                        fig_venn, ax_venn = plt.subplots(figsize=(fig_width, fig_height))
+                        # Very small fixed size - try even smaller
+                        fig_venn, ax_venn = plt.subplots(figsize=(3, 3), dpi=100)
                         
                         # Fix the typing issue by explicitly creating a tuple of exactly 2 elements
                         variant_name1 = combined_variants.variants[0].name
@@ -689,8 +685,10 @@ def app():
                             spine.set_visible(True)
                             spine.set_color('#f0f0f0')
                         
-                        # Display the venn diagram
-                        st.pyplot(fig_venn)
+                        # Display the venn diagram with controlled size using columns
+                        venn_col1, venn_col2, venn_col3 = st.columns([1, 2, 1])
+                        with venn_col2:
+                            st.pyplot(fig_venn, use_container_width=True)
                         
                     elif len(combined_variants.variants) == 3:
                         from matplotlib_venn import venn3
@@ -700,12 +698,8 @@ def app():
                         set2 = set(combined_variants.variants[1].signature_mutations)
                         set3 = set(combined_variants.variants[2].signature_mutations)
                         
-                        # Increased size for better readability and visibility
-                        fig_width = 8.0  # Increased from 4.0 to 8.0 inches
-                        fig_height = 6.0  # Increased from 3.0 to 6.0 inches
-                        
-                        # Create a figure with improved size
-                        fig_venn, ax_venn = plt.subplots(figsize=(fig_width, fig_height))
+                        # Very small fixed size - try even smaller
+                        fig_venn, ax_venn = plt.subplots(figsize=(3, 3), dpi=100)
                         
                         # Fix the typing issue by explicitly creating a tuple of exactly 3 elements
                         variant_name1 = combined_variants.variants[0].name
@@ -723,8 +717,10 @@ def app():
                             spine.set_visible(True)
                             spine.set_color('#f0f0f0')
                         
-                        # Display the venn diagram
-                        st.pyplot(fig_venn)
+                        # Display the venn diagram with controlled size using columns
+                        venn_col1, venn_col2, venn_col3 = st.columns([1, 2, 1])
+                        with venn_col2:
+                            st.pyplot(fig_venn, use_container_width=True)
                 else:
                     st.markdown("#### Mutation Overlap")
                     st.info("Venn diagram is only available for 2-3 variants")
