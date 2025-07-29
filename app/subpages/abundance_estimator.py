@@ -649,7 +649,7 @@ def app():
                 # Display the interactive Plotly chart in Streamlit
                 st.plotly_chart(fig)
             
-            # Venn Diagram in the second column (only for 2-3 variants)
+            # Venn Diagram in the second column (supports 2-3 variants)
             with col2:
                 if 2 <= len(combined_variants.variants) <= 3:
                     st.markdown("#### Mutation Overlap")
@@ -667,12 +667,8 @@ def app():
                         set1 = set(combined_variants.variants[0].signature_mutations)
                         set2 = set(combined_variants.variants[1].signature_mutations)
             
-                        # Use fixed, compact size to prevent excessive height on wide screens
-                        fig_width = 4.0  # Fixed width in inches
-                        fig_height = 3.0  # Fixed height in inches for better proportions
-                        
-                        # Create a figure with responsive size
-                        fig_venn, ax_venn = plt.subplots(figsize=(fig_width, fig_height))
+                        # Very small fixed size - try even smaller
+                        fig_venn, ax_venn = plt.subplots(figsize=(3, 3), dpi=100)
                         
                         # Fix the typing issue by explicitly creating a tuple of exactly 2 elements
                         variant_name1 = combined_variants.variants[0].name
@@ -682,15 +678,17 @@ def app():
                         venn2((set1, set2), variant_labels, ax=ax_venn)
                         
                         # Adjust layout to be more compact
-                        plt.tight_layout(pad=1.0)
+                        plt.tight_layout(pad=1.5)
                         
                         # Add a light gray border
                         for spine in ax_venn.spines.values():
                             spine.set_visible(True)
                             spine.set_color('#f0f0f0')
                         
-                        # Display the venn diagram
-                        st.pyplot(fig_venn)
+                        # Display the venn diagram with controlled size using columns
+                        venn_col1, venn_col2, venn_col3 = st.columns([1, 2, 1])
+                        with venn_col2:
+                            st.pyplot(fig_venn, use_container_width=True)
                         
                     elif len(combined_variants.variants) == 3:
                         from matplotlib_venn import venn3
@@ -700,12 +698,8 @@ def app():
                         set2 = set(combined_variants.variants[1].signature_mutations)
                         set3 = set(combined_variants.variants[2].signature_mutations)
                         
-                        # Use fixed, compact size to prevent excessive height on wide screens
-                        fig_width = 4.0  # Fixed width in inches
-                        fig_height = 3.0  # Fixed height in inches for better proportions
-                        
-                        # Create a figure with responsive size
-                        fig_venn, ax_venn = plt.subplots(figsize=(fig_width, fig_height))
+                        # Very small fixed size - try even smaller
+                        fig_venn, ax_venn = plt.subplots(figsize=(3, 3), dpi=100)
                         
                         # Fix the typing issue by explicitly creating a tuple of exactly 3 elements
                         variant_name1 = combined_variants.variants[0].name
@@ -716,15 +710,17 @@ def app():
                         venn3((set1, set2, set3), variant_labels, ax=ax_venn)
                         
                         # Adjust layout to be more compact
-                        plt.tight_layout(pad=1.0)
+                        plt.tight_layout(pad=1.5)
                         
                         # Add a light gray border
                         for spine in ax_venn.spines.values():
                             spine.set_visible(True)
                             spine.set_color('#f0f0f0')
                         
-                        # Display the venn diagram
-                        st.pyplot(fig_venn)
+                        # Display the venn diagram with controlled size using columns
+                        venn_col1, venn_col2, venn_col3 = st.columns([1, 2, 1])
+                        with venn_col2:
+                            st.pyplot(fig_venn, use_container_width=True)
                 else:
                     st.markdown("#### Mutation Overlap")
                     st.info("Venn diagram is only available for 2-3 variants")
