@@ -8,6 +8,7 @@ import subpages.dynamic_mutations as dynamic_mutations
 import subpages.signature_explorer as signature_explorer
 import subpages.abundance_estimator as abundance_estimator
 import subpages.background as background
+from utils.system_health import initialize_health_monitoring, display_global_system_status
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -17,6 +18,9 @@ if __name__ == "__main__":
         page_icon="https://cbg-ethz.github.io/V-pipe/favicon-32x32.png",
         layout="wide"
     )
+    
+    # Initialize health monitoring session state
+    initialize_health_monitoring()
     
     # Create navigation with proper URLs for subpages, but hide the default navigation UI
     # to replace it with a custom navigation system in the sidebar for a more tailored user experience.
@@ -62,6 +66,9 @@ if __name__ == "__main__":
         # Create custom navigation links using page_link
         for page in pages:
             st.page_link(page, label=page.title)
+        
+        # Display API status only when there are issues
+        display_global_system_status()
     
     # Run the current page
     current_page.run()
