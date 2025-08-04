@@ -49,7 +49,7 @@ def app():
     - V-Pipe nucleotide alignments are processed and wrangled on EULER.
     - Data is submitted to a Loculus files instance with a short-read version of the SILO database.
     - This frontend runs on an ETHZ DBSSE machine.
-    - Variant abundance estimation, is also done in coorinated fashion on the same machine.
+    - Variant abundance estimation, is also done in coordinated fashion on the same machine.
     """)
     
     st.write("## Technical Challenges")
