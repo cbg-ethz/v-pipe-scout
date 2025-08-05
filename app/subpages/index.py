@@ -20,7 +20,7 @@ def app():
     st.write("## Overview")
     st.write("This is a Proof-Of-Concept for the FAIR-CBG Grant Objective: Fast querying of short reads.")
     
-    st.write("We show the most recent 1 month of Swiss wastewater seqeuncing data for Sars-Cov-2, at 6 wastewater treatment plants.")
+    st.write("We show the most recent 1 month of Swiss wastewater sequencing data for Sars-Cov-2, at 6 wastewater treatment plants.")
     
     st.write("The data was enriched with amino acid alignments, to enable the querying of resistance mutations.")
 
