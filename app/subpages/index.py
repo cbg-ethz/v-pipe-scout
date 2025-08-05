@@ -25,7 +25,7 @@ def app():
     st.write("The data was enriched with amino acid alignments, to enable the querying of resistance mutations.")
 
     st.success("**First-ever:** Real-time, interactive querying of more than 108 million short seqeuning reads in aligment in seconds in the browser.")
-    st.warning("This project is still experimental and and we claim no responsibility for the correctness of the data shown here.")
+    st.warning("This project is still experimental and we claim no responsibility for the correctness of the data shown here.")
 
     st.write("## Demo")
     st.markdown("""
