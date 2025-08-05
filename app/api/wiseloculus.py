@@ -314,7 +314,15 @@ class WiseLoculusLapis(Lapis):
             raise TypeError(f"formatted_mutations must be a list of strings, got {type(formatted_mutations).__name__}: {formatted_mutations}")
         
         if not formatted_mutations:
-            raise ValueError("formatted_mutations cannot be empty")
+            # Return empty DataFrames with proper structure when no mutations provided
+            logging.warning("No mutations provided to mutations_over_time_dfs, returning empty DataFrames")
+            dates = pd.date_range(date_range[0], date_range[1]).strftime('%Y-%m-%d')
+            empty_counts_df = pd.DataFrame(columns=list(dates))
+            empty_freq_df = pd.DataFrame(columns=list(dates))
+            # Create empty MultiIndex DataFrame properly
+            empty_coverage_df = pd.DataFrame(columns=["count", "coverage", "frequency"])
+            empty_coverage_df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
+            return empty_counts_df, empty_freq_df, empty_coverage_df
             
         if not all(isinstance(m, str) for m in formatted_mutations):
             raise TypeError(f"All elements in formatted_mutations must be strings, got: {[type(m).__name__ for m in formatted_mutations]}")
