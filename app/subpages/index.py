@@ -20,15 +20,12 @@ def app():
     st.write("## Overview")
     st.write("This is a Proof-Of-Concept for the FAIR-CBG Grant Objective: Fast querying of short reads.")
     
-    st.markdown("**QUERY all 27 Mio Reads instantly as you access.**")
-    
-    st.write("We show 1 Month of full depth wastewater sequencing data for 6 sequencing .")
+    st.write("We show the most recent 1 month of Swiss wastewater seqeuncing data for Sars-Cov-2, at 6 wastewater treatment plants.")
     
     st.write("The data was enriched with amino acid alignments, to enable the querying of resistance mutations.")
-    
-    st.write("To get this running, heavy data wrangling and new pre-processing was required in the database SILO.")
-    
-    st.write("This demo is done on Sars-Cov-2 data for Swiss wastewater samples.")
+
+    st.success("**First-ever:** Real-time, interactive querying of more than 108 million short seqeuning reads in aligment in seconds in the browser.")
+    st.warning("This project is still experimental and and we claim no responsibility for the correctness of the data shown here.")
 
     st.write("## Demo")
     st.markdown("""
@@ -44,30 +41,19 @@ def app():
     - *Rapid variant abundance*: Estimate variant abundance over time for an interactively defined set of variants.
     """)
     
-    st.write("## Setup")
-    st.markdown("""
-    - V-Pipe nucleotide alignments are processed and wrangled on EULER.
-    - Data is submitted to a Loculus files instance with a short-read version of the SILO database.
-    - This frontend runs on an ETHZ DBSSE machine.
-    - Variant abundance estimation, is also done in coordinated fashion on the same machine.
-    """)
-    
     st.write("## Technical Challenges")
     st.write("The difficulty of this demo lies in the enormous number of reads to make instantaneously available.")
     
     st.write("This requires heavy memory for the database to run:")
     st.markdown("**27 Mio Reads × 2.5 GB/Mio Reads = 67.5 GB of RAM**")
-    
-    st.info("This project is under heavy development.")
-    
+    st.markdown("**4 weeks x 67.5 GB/week =  270 GB of RAM**")
+
     # Debug Information Section (Collapsible)
     st.markdown("---")
     with st.expander("🛠️ Debug Information", expanded=False):
         st.markdown("### System Information")
         
         # Version Information (simplified)
-        
-        
         
         version_info = get_version_info()
         
