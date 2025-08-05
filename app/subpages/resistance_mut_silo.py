@@ -32,10 +32,12 @@ def app():
     st.write("This is a demo frontend to later make the first queries to SILO for wastewater data.")
     st.markdown("---")
     st.write("Select from the following resistance mutation sets:")
+    # Get absolute path to data directory to handle different working directories
+    data_dir = pathlib.Path(__file__).parent.parent / "data"
     options = {
-        "3CLpro Inhibitors": 'data/translated_3CLpro_in_ORF1a_mutations.csv',
-        "RdRP Inhibitors": 'data/translated_RdRp_in_ORF1a_ORF1b_mutations.csv',
-        "Spike mAbs": 'data/translated_Spike_in_S_mutations.csv'
+        "3CLpro Inhibitors": str(data_dir / 'translated_3CLpro_in_ORF1a_mutations.csv'),
+        "RdRP Inhibitors": str(data_dir / 'translated_RdRp_in_ORF1a_ORF1b_mutations.csv'),
+        "Spike mAbs": str(data_dir / 'translated_Spike_in_S_mutations.csv')
     }
 
     selected_option = st.selectbox("Select a resistance mutation set:", options.keys())
@@ -89,7 +91,15 @@ def app():
     )
 
     with st.spinner("Fetching resistance mutation data..."):
-        counts_df, freq_df, coverage_freq_df = wiseLoculus.mutations_over_time_dfs(formatted_mutations, MutationType.AMINO_ACID, date_range, location)
+        try:
+            counts_df, freq_df, coverage_freq_df = wiseLoculus.mutations_over_time_dfs(formatted_mutations, MutationType.AMINO_ACID, date_range, location)
+        except Exception as e:
+            st.error(f"⚠️ Error fetching resistance mutation data: {str(e)}")
+            st.info("This could be due to API connectivity issues. Please try again later.")
+            # Create empty DataFrames for consistency
+            counts_df = pd.DataFrame()
+            freq_df = pd.DataFrame()
+            coverage_freq_df = pd.DataFrame()
 
 
     # Only skip NA dates if the option is selected

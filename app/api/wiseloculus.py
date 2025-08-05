@@ -47,22 +47,26 @@ class WiseLoculusLapis(Lapis):
             payload["location_name"] = location_name  
 
         logging.debug(f"Fetching sample aggregated with payload: {payload}")
-        async with session.post(
-            f'{self.server_ip}/sample/aggregated',
-            headers={
-                'accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            json=payload
-        ) as response:
-            if response.status == 200:
-                data = await response.json()
-                return {"mutation": mutation, "data": data.get('data', [])}
-            else:
-                logging.error(f"Failed to fetch data for mutation {mutation} (type: {mutation_type}, location: {location_name}).")
-                logging.error(f"Status code: {response.status}")
-                logging.error(await response.text())
-                return {"mutation": mutation, "data": None, "status_code": response.status, "error_details": await response.text()}
+        try:
+            async with session.post(
+                f'{self.server_ip}/sample/aggregated',
+                headers={
+                    'accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                json=payload
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return {"mutation": mutation, "data": data.get('data', [])}
+                else:
+                    logging.error(f"Failed to fetch data for mutation {mutation} (type: {mutation_type}, location: {location_name}).")
+                    logging.error(f"Status code: {response.status}")
+                    logging.error(await response.text())
+                    return {"mutation": mutation, "data": None, "status_code": response.status, "error_details": await response.text()}
+        except Exception as e:
+            logging.error(f"Connection error fetching data for mutation {mutation}: {e}")
+            return {"mutation": mutation, "data": None, "error": str(e)}
 
     async def fetch_mutation_counts(
             self, 
@@ -80,7 +84,7 @@ class WiseLoculusLapis(Lapis):
 
         async with aiohttp.ClientSession() as session:
             tasks = [self.fetch_sample_aggregated(session, m, mutation_type, date_range, location_name) for m in mutations]
-            return await asyncio.gather(*tasks)
+            return await asyncio.gather(*tasks, return_exceptions=True)  # return_exceptions to avoid failing the entire batch
         
     async def _fetch_coverage_for_mutation(
             self, 
@@ -173,20 +177,26 @@ class WiseLoculusLapis(Lapis):
         Note Amino Acid mutations require gene:change name "ORF1a:V3449I" while nucleotide mutations can be in the form "A123T".
         """
   
-        async with aiohttp.ClientSession() as session:
-            combined_results = []
+        try:
+            timeout = aiohttp.ClientTimeout(total=10)  # 10 second timeout
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                combined_results = []
 
-            for mutation in mutations:
-                # Fetch coverage data for all possible symbols at this position
-                coverage_data, stratified_results = await self._fetch_coverage_for_mutation(
-                    session, mutation, mutation_type, date_range, location_name
-                )
-                
-                # Calculate and append the result for this mutation
-                mutation_result = self._calculate_mutation_result(mutation, coverage_data, stratified_results)
-                combined_results.append(mutation_result)
+                for mutation in mutations:
+                    # Fetch coverage data for all possible symbols at this position
+                    coverage_data, stratified_results = await self._fetch_coverage_for_mutation(
+                        session, mutation, mutation_type, date_range, location_name
+                    )
+                    
+                    # Calculate and append the result for this mutation
+                    mutation_result = self._calculate_mutation_result(mutation, coverage_data, stratified_results)
+                    combined_results.append(mutation_result)
 
-            return combined_results
+                return combined_results
+        except Exception as e:
+            logging.error(f"Error fetching mutation counts and coverage: {e}")
+            # Return empty results for all mutations
+            return [{"mutation": mutation, "coverage": 0, "frequency": 0, "counts": {}, "stratified": []} for mutation in mutations]
         
     
     def fetch_counts_coverage_freq(self, mutations: List[str], mutation_type : MutationType, date_range: Tuple[datetime, datetime], location_name: str) -> pd.DataFrame:
@@ -200,29 +210,34 @@ class WiseLoculusLapis(Lapis):
             pd.DataFrame: A MultiIndex DataFrame with mutation and sampling_date as the index, and count, coverage, and frequency as columns.
         """
 
-        all_data = asyncio.run(self.fetch_mutation_counts_and_coverage(mutations, mutation_type, date_range, location_name))
+        try:
+            all_data = asyncio.run(self.fetch_mutation_counts_and_coverage(mutations, mutation_type, date_range, location_name))
 
-        # Flatten the data into a list of records
-        records = []
-        for mutation_data in all_data:
-            mutation = mutation_data["mutation"]
-            for stratified in mutation_data["stratified"]:
-                records.append({
-                    "mutation": mutation,
-                    "sampling_date": stratified["sampling_date"],
-                    "count": stratified["count"],
-                    "coverage": stratified["coverage"],
-                    "frequency": stratified["frequency"]
-                })
+            # Flatten the data into a list of records
+            records = []
+            for mutation_data in all_data:
+                mutation = mutation_data["mutation"]
+                for stratified in mutation_data["stratified"]:
+                    records.append({
+                        "mutation": mutation,
+                        "sampling_date": stratified["sampling_date"],
+                        "count": stratified["count"],
+                        "coverage": stratified["coverage"],
+                        "frequency": stratified["frequency"]
+                    })
 
-        # Create a DataFrame from the records
-        df = pd.DataFrame(records)
+            # Create a DataFrame from the records
+            df = pd.DataFrame(records)
 
-        # Set MultiIndex with mutation and sampling_date
-        df.set_index(["mutation", "sampling_date"], inplace=True)
+            # Set MultiIndex with mutation and sampling_date
+            df.set_index(["mutation", "sampling_date"], inplace=True)
 
-        # Return the DataFrame
-        return df
+            # Return the DataFrame
+            return df
+        except Exception as e:
+            logging.error(f"Error fetching mutation counts and coverage: {e}")
+            # Return empty DataFrame with proper MultiIndex structure
+            return pd.DataFrame(columns=["count", "coverage", "frequency"]).set_index(["mutation", "sampling_date"])
 
     async def sample_nucleotideMutations(
             self, 
@@ -248,19 +263,24 @@ class WiseLoculusLapis(Lapis):
             "downloadAsFile": "false"
         }
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f'{self.server_ip}/sample/nucleotideMutations',
-                params=payload,
-                headers={'accept': 'application/json'}
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    df = pd.DataFrame(data['data'])
-                    return df
-                else:
-                    logging.error(f"Failed to fetch nucleotide mutations: {response.status}")
-                    return pd.DataFrame()
+        try:
+            timeout = aiohttp.ClientTimeout(total=10)  # 10 second timeout
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(
+                    f'{self.server_ip}/sample/nucleotideMutations',
+                    params=payload,
+                    headers={'accept': 'application/json'}
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        df = pd.DataFrame(data['data'])
+                        return df
+                    else:
+                        logging.error(f"Failed to fetch nucleotide mutations: {response.status}")
+                        return pd.DataFrame()
+        except Exception as e:
+            logging.error(f"Error fetching nucleotide mutations: {e}")
+            return pd.DataFrame()
 
     def mutations_over_time_dfs(
         self, 

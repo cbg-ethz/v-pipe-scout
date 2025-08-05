@@ -73,7 +73,13 @@ def app():
         location_name=location
     ))
 
-    mutations_in_timeframe = mutations_in_timeframe_df['mutation'].to_list()  
+    # Handle case where API call failed and returned empty DataFrame
+    if mutations_in_timeframe_df.empty or 'mutation' not in mutations_in_timeframe_df.columns:
+        st.error("⚠️ Unable to fetch mutation data from the API. Please check your connection and try again.")
+        st.info("This could be due to API unavailability or network issues.")
+        mutations_in_timeframe = []  # Empty list as fallback
+    else:
+        mutations_in_timeframe = mutations_in_timeframe_df['mutation'].to_list()  
 
     # Get the available variant names from the signatures API (cached)
     available_variants = cached_get_variant_names()
@@ -116,13 +122,32 @@ def app():
     st.write(f"Background mutations to analyze: {len(background_mutations)}")
 
     # Show a spinner while fetching data - only for background mutations
-    with st.spinner("Fetching mutation data for background mutations..."):
-        counts_df, freq_df, coverage_freq_df =  wiseLoculus.mutations_over_time_dfs(
-            background_mutations,  # Only fetch data for background mutations
-            MutationType.NUCLEOTIDE,
-            date_range=(start_date, end_date),
-            location_name=location
-        )
+    if not background_mutations:
+        st.warning("⚠️ No background mutations available for analysis. This could be due to:")
+        st.write("• API connection issues preventing mutation data fetch")
+        st.write("• No mutations found in the selected time range and location")
+        st.write("• All detected mutations were excluded as variant signatures")
+        st.info("💡 Try adjusting the date range, location, or variant exclusions.")
+        # Create empty DataFrames for consistency
+        counts_df = pd.DataFrame()
+        freq_df = pd.DataFrame()
+        coverage_freq_df = pd.DataFrame()
+    else:
+        with st.spinner("Fetching mutation data for background mutations..."):
+            try:
+                counts_df, freq_df, coverage_freq_df =  wiseLoculus.mutations_over_time_dfs(
+                    background_mutations,  # Only fetch data for background mutations
+                    MutationType.NUCLEOTIDE,
+                    date_range=(start_date, end_date),
+                    location_name=location
+                )
+            except Exception as e:
+                st.error(f"⚠️ Error fetching mutation analysis data: {str(e)}")
+                st.info("This could be due to API connectivity issues. Please try again later.")
+                # Create empty DataFrames for consistency
+                counts_df = pd.DataFrame()
+                freq_df = pd.DataFrame()
+                coverage_freq_df = pd.DataFrame()
 
     # Add frequency filtering controls
     st.markdown("---")
