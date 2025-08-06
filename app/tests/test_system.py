@@ -46,7 +46,7 @@ class TestHealthCheck(unittest.TestCase):
         from api.health_check import ApiHealthChecker, HealthStatus, ApiHealthResult
         
         # Should be able to create instances
-        checker = ApiHealthChecker(timeout_seconds=1.0)
+        checker = ApiHealthChecker(timeout_seconds=5.0)
         self.assertIsNotNone(checker)
         
         # Test enum values
@@ -57,7 +57,7 @@ class TestHealthCheck(unittest.TestCase):
         """Test basic CovSpectrum health check structure."""
         from api.health_check import ApiHealthChecker, HealthStatus
         
-        checker = ApiHealthChecker(timeout_seconds=1.0)
+        checker = ApiHealthChecker(timeout_seconds=5.0)
         
         # Mock a successful response
         with patch('requests.get') as mock_get:

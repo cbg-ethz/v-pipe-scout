@@ -4,13 +4,12 @@ services:
   # Redis service: Acts as both message broker and result backend for Celery
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # Removed port exposure - Redis only needs to be accessible within Docker network
     volumes:
       - redis-data:/data
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-defaultpassword123}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-defaultpassword123}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -29,10 +28,11 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-defaultpassword123}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-defaultpassword123}@redis:6379/0
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-defaultpassword123}
 
   # Celery worker: Processes background tasks
   worker:
@@ -46,10 +46,11 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-defaultpassword123}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-defaultpassword123}@redis:6379/0
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-defaultpassword123}
 
 volumes:
   redis-data:

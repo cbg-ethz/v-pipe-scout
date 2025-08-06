@@ -178,7 +178,7 @@ class WiseLoculusLapis(Lapis):
         """
   
         try:
-            timeout = aiohttp.ClientTimeout(total=10)  # 10 second timeout
+            timeout = aiohttp.ClientTimeout(total=45)  # 45 second timeout
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 combined_results = []
 
@@ -264,7 +264,7 @@ class WiseLoculusLapis(Lapis):
         }
 
         try:
-            timeout = aiohttp.ClientTimeout(total=10)  # 10 second timeout
+            timeout = aiohttp.ClientTimeout(total=45)  # 45 second timeout
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
                     f'{self.server_ip}/sample/nucleotideMutations',
