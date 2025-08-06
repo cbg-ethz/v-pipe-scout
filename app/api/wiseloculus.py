@@ -178,7 +178,7 @@ class WiseLoculusLapis(Lapis):
         """
   
         try:
-            timeout = aiohttp.ClientTimeout(total=15)  # 10 second timeout
+            timeout = aiohttp.ClientTimeout(total=5)  # seconds timeout
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 combined_results = []
 
