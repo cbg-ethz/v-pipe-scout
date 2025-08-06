@@ -24,6 +24,8 @@ services:
       - "80:8000"
     volumes:
       - ./app:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       redis:
         condition: service_healthy
