@@ -1,5 +1,5 @@
 server:
-  lapis_address: "http://wasap.genspectrum.org:8083"
+  lapis_address: "http://localhost:8083"
   cov_spectrum_api: "https://lapis.cov-spectrum.org"
 
 curated_variant_definitions:
