@@ -105,7 +105,7 @@ class ApiHealthChecker:
                 payload = {
                     "fields": ["location_name"],
                     "limit": 1,
-                    "orderBy": "location_name",
+                    "orderBy": ["location_name"],
                     "dataFormat": "JSON"
                 }
                 
