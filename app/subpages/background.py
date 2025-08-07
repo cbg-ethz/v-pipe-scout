@@ -68,10 +68,16 @@ def app():
         location_name=location
     ))
 
-    # Handle case where API call failed and returned empty DataFrame
-    if mutations_in_timeframe_df.empty or 'mutation' not in mutations_in_timeframe_df.columns:
-        st.error("⚠️ Unable to fetch mutation data from the API. Please check your connection and try again.")
-        st.info("This could be due to API unavailability or network issues.")
+    # Handle case where no mutations were found or API call failed
+    if mutations_in_timeframe_df.empty:
+        st.info("ℹ️ No mutations found for the selected date range and location.")
+        st.write("This could be due to:")
+        st.write("• No mutations present in the specified time period")
+        st.write("• The selected location having no data for this date range")
+        mutations_in_timeframe = []  # Empty list as fallback
+    elif 'mutation' not in mutations_in_timeframe_df.columns:
+        st.error("⚠️ Unexpected data format received from the API. Please try again or contact support.")
+        st.info("The API response doesn't contain the expected mutation data structure.")
         mutations_in_timeframe = []  # Empty list as fallback
     else:
         mutations_in_timeframe = mutations_in_timeframe_df['mutation'].to_list()  
