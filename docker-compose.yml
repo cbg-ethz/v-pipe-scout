@@ -21,7 +21,7 @@ services:
       context: ./app
       dockerfile: Dockerfile
     ports:
-      - "80:8000"
+      - "9001:8000"
     volumes:
       - ./app:/app
     extra_hosts:

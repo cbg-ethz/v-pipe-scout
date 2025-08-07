@@ -47,6 +47,9 @@ def app():
 
         sequence_type_value = "amino acid" if sequence_type == "Amino Acids" else "nucleotide"
 
+        # For browser-based components, we need to use localhost instead of host.docker.internal
+        browser_server_ip = server_ip.replace("host.docker.internal", "localhost")
+
         components.html(
             f"""
             <html>
@@ -56,7 +59,7 @@ def app():
             </head>
                 <body>
                 <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
-                <gs-app lapis="{wiseLoculus.server_ip}">
+                <gs-app lapis="{browser_server_ip}">
                     <gs-mutations-over-time
                     lapisFilter='{{"sampling_dateFrom":"{start_date}", "sampling_dateTo": "{end_date}", "location_name": "{location}"}}'
                     sequenceType='{sequence_type_value}'

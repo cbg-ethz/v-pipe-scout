@@ -33,7 +33,7 @@ class WiseLoculusLapis(Lapis):
             "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
             "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
             "fields": ["sampling_date"],
-            "orderBy": "sampling_date"
+            "orderBy": ["sampling_date"]  # API expects array, not string
         }
 
         if mutation_type == MutationType.AMINO_ACID:
@@ -214,11 +214,17 @@ class WiseLoculusLapis(Lapis):
         try:
             all_data = asyncio.run(self.fetch_mutation_counts_and_coverage(mutations, mutation_type, date_range, location_name))
 
+            # Debug logging
+            logging.debug(f"fetch_counts_coverage_freq: Received {len(all_data)} mutation results")
+
             # Flatten the data into a list of records
             records = []
             for mutation_data in all_data:
                 mutation = mutation_data["mutation"]
-                for stratified in mutation_data["stratified"]:
+                stratified_data = mutation_data.get("stratified", [])
+                logging.debug(f"Mutation {mutation}: {len(stratified_data)} stratified entries")
+                
+                for stratified in stratified_data:
                     records.append({
                         "mutation": mutation,
                         "sampling_date": stratified["sampling_date"],
@@ -227,18 +233,27 @@ class WiseLoculusLapis(Lapis):
                         "frequency": stratified["frequency"]
                     })
 
+            logging.debug(f"Created {len(records)} records from API data")
+
             # Create a DataFrame from the records
             df = pd.DataFrame(records)
 
-            # Set MultiIndex with mutation and sampling_date
-            df.set_index(["mutation", "sampling_date"], inplace=True)
+            # Only set MultiIndex if we have data and the required columns exist
+            if not df.empty and "mutation" in df.columns and "sampling_date" in df.columns:
+                df.set_index(["mutation", "sampling_date"], inplace=True)
+            else:
+                # Create empty DataFrame with proper MultiIndex structure
+                df = pd.DataFrame(columns=["count", "coverage", "frequency"])
+                df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
 
             # Return the DataFrame
             return df
         except Exception as e:
             logging.error(f"Error fetching mutation counts and coverage: {e}")
             # Return empty DataFrame with proper MultiIndex structure
-            return pd.DataFrame(columns=["count", "coverage", "frequency"]).set_index(["mutation", "sampling_date"])
+            df = pd.DataFrame(columns=["count", "coverage", "frequency"])
+            df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
+            return df
 
     async def sample_nucleotideMutations(
             self, 
