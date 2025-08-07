@@ -43,7 +43,7 @@ class ApiHealthResult:
 class ApiHealthChecker:
     """Centralized API health checking service."""
     
-    def __init__(self, timeout_seconds: float = 3.0, cache_duration_seconds: float = 60.0):
+    def __init__(self, timeout_seconds: float = 5.0, cache_duration_seconds: float = 60.0):
         """
         Initialize the health checker.
         

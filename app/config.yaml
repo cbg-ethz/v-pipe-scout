@@ -1,5 +1,5 @@
 server:
-  lapis_address: "http://88.198.54.174:80"
+  lapis_address: "http://host.docker.internal:8083"
   cov_spectrum_api: "https://lapis.cov-spectrum.org"
 
 curated_variant_definitions:

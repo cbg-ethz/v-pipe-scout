@@ -60,19 +60,21 @@ _Only accessible within ETH Zürich Networks._
     cd v-pipe-scout
     ```
 
-2. Configure the Wise Loculus to LAPIS APIs for clinical and wastewater data in `app/config.yaml` including ports:
+2. **Setup environment:**
+    ```sh
+    ./setup.sh  # Creates .env with secure Redis password
+    ```
+
+3. **Configure LAPIS connection** in `app/config.yaml`:
     ```yaml
     server:
-      lapis_address: "http://88.198.54.174:80"
-      cov_sprectrum_api: "https://lapis.cov-spectrum.org"
+      lapis_address: "http://host.docker.internal:8083"  # For local LAPIS
     ```
 
-3. Run the application using Docker Compose:
+4. **Run the application:**
     ```sh
-    docker-compose up --build
+    docker compose up --build
     ```
-
-    The application automatically captures version information during build for debugging purposes.
 
 ### Automatic Deployment
 
@@ -83,15 +85,11 @@ For production deployments on VMs or servers, you can set up automatic deploymen
 - Configuring rollback mechanisms
 - Troubleshooting deployment issues
 
-### Architecture Overview
+### Architecture
 
-The application is built using a microservices architecture managed by Docker Compose. The key components include:
-
-- **Streamlit Frontend**: A web application for interactive exploration of viral variants.
-- **Celery Worker**: Handles background tasks such as deconvolution and data processing.
-- **Redis**: Acts as both the message broker and result backend for Celery.
-
-The `docker-compose.yml` file orchestrates these services, ensuring seamless communication between components.
+- **Streamlit Frontend**: Interactive web interface
+- **Celery Worker**: Background task processing  
+- **Redis**: Message broker (password-protected, internal only)
 
 
 ## Project Origin
