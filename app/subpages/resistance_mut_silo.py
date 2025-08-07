@@ -22,9 +22,7 @@ wiseLoculus = WiseLoculusLapis(server_ip)
 def app():
     st.title("Resistance Mutations from Wastewater Data")
     st.write("This page allows you to visualize the number of observed resistance mutations over time.")
-    st.write("The data is fetched from the WISE-CovSpectrum API and currently cointains demo data for Feb-Mar 2025.")
-    st.write("The sets of resistance mutations are provide from Stanfords Coronavirus Antivirial & Reistance Database. Last updated 05/14/2024")
-    st.write("This is a demo frontend to later make the first queries to SILO for wastewater data.")
+    st.write("The sets of resistance mutations are provide from Stanfords Coronavirus Antivirial & Reistance Database.")
     st.markdown("---")
     st.write("Select from the following resistance mutation sets:")
     # Get absolute path to data directory to handle different working directories
@@ -50,7 +48,14 @@ def app():
     st.markdown("---")
     # Allow the user to choose a date range
     st.write("Choose your data to inspect:")
-    date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08")])
+    # Get dynamic date range from API with bounds to enforce limits
+    default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("resistance_mutations")
+    date_range = st.date_input(
+        "Select a date range:", 
+        [default_start, default_end],
+        min_value=min_date,
+        max_value=max_date
+    )
 
     # Ensure date_range is a tuple with two elements
     if len(date_range) != 2:
