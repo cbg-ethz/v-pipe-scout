@@ -32,7 +32,8 @@ class WiseLoculusLapis(Lapis):
         payload: dict[str, Any] = { 
             "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
             "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
-            "fields": ["sampling_date"]  
+            "fields": ["sampling_date"],
+            "orderBy": "sampling_date"
         }
 
         if mutation_type == MutationType.AMINO_ACID:

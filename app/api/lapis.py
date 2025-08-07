@@ -32,7 +32,7 @@ class Lapis:
         if default_locations is None:
             default_locations = ["Zürich (ZH)"]
         address_no_port = self.parse_url_hostname(self.server_ip)
-        location_url = f'{address_no_port}/sample/aggregated?fields=location_name&limit=100&dataFormat=JSON&downloadAsFile=false'
+        location_url = f'{address_no_port}/sample/aggregated?fields=location_name&limit=100&orderBy=location_name&dataFormat=JSON&downloadAsFile=false'
         try:
             logging.info(f"Attempting to fetch locations from: {location_url}")
             st.toast("Attempting to fetch locations from API...", icon="🔄") # Temporary toast
