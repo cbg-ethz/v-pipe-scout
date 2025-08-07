@@ -13,13 +13,20 @@ class Lapis:
 
     @staticmethod
     def parse_url_hostname(url_string):
-        """Parses a URL string and returns the scheme and hostname."""
+        """Parses a URL string and returns the scheme, hostname and port."""
         try:
             parsed_url = urlparse(url_string)
             if parsed_url.hostname:
-                address_no_port = f"{parsed_url.scheme}://{parsed_url.hostname}"
-                logging.info(f"Parsed URL: {url_string}, Address without port: {address_no_port}")
-                return address_no_port
+                # Include port if it exists, otherwise use the full original URL
+                if parsed_url.port:
+                    address_with_port = f"{parsed_url.scheme}://{parsed_url.hostname}:{parsed_url.port}"
+                    logging.info(f"Parsed URL: {url_string}, Address with port: {address_with_port}")
+                    return address_with_port
+                else:
+                    # No explicit port, use hostname only (for cases like https://example.com)
+                    address_no_port = f"{parsed_url.scheme}://{parsed_url.hostname}"
+                    logging.info(f"Parsed URL: {url_string}, Address without explicit port: {address_no_port}")
+                    return address_no_port
             else:
                 logging.warning(f"Could not parse hostname from {url_string}. Returning original.")
                 return url_string # Fallback to the original URL
@@ -31,8 +38,8 @@ class Lapis:
         """Fetches locations from the API endpoint."""
         if default_locations is None:
             default_locations = ["Zürich (ZH)"]
-        address_no_port = self.parse_url_hostname(self.server_ip)
-        location_url = f'{address_no_port}/sample/aggregated?fields=location_name&limit=100&dataFormat=JSON&downloadAsFile=false'
+        # Use the full server_ip URL directly instead of parsing it
+        location_url = f'{self.server_ip.rstrip("/")}/sample/aggregated?fields=location_name&limit=100&orderBy=location_name&dataFormat=JSON&downloadAsFile=false'
         try:
             logging.info(f"Attempting to fetch locations from: {location_url}")
             st.toast("Attempting to fetch locations from API...", icon="🔄") # Temporary toast

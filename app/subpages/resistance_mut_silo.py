@@ -2,7 +2,6 @@ import numpy as np
 import streamlit as st
 import pandas as pd
 import asyncio
-import yaml
 import streamlit.components.v1 as components
 import plotly.graph_objects as go 
 import pathlib
@@ -10,17 +9,13 @@ import pathlib
 from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
 from visualize.mutations import mutations_over_time
+from utils.config import get_wiseloculus_url
 
 pd.set_option('future.no_silent_downcasting', True)
 
 
-# Load configuration from config.yaml
-CONFIG_PATH = pathlib.Path(__file__).parent.parent / "config.yaml"
-with open(CONFIG_PATH, 'r') as file:
-    config = yaml.safe_load(file)
-
-
-server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
+# Get server configuration from centralized config
+server_ip = get_wiseloculus_url()
 wiseLoculus = WiseLoculusLapis(server_ip)
 
 
@@ -132,6 +127,10 @@ def app():
     # of the list with double quotes, e.g., '["ORF1a:T103L", "ORF1a:N126K"]'
     # The lapisFilter uses double curly braces {{ and }} to escape the literal
     # curly braces needed for the JSON object within the f-string.
+    
+    # For browser-based components, we need to use localhost instead of host.docker.internal
+    browser_server_ip = server_ip.replace("host.docker.internal", "localhost")
+    
     components.html(
         f"""
         <html>
@@ -141,7 +140,7 @@ def app():
         </head>
             <body>
             <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
-            <gs-app lapis="{server_ip}">
+            <gs-app lapis="{browser_server_ip}">
                 <gs-mutations-over-time
                 lapisFilter='{{"sampling_dateFrom":"{start_date}", "sampling_dateTo": "{end_date}", "location_name": "{location}"}}'
                 sequenceType='{sequence_type_value}'

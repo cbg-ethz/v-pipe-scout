@@ -1,20 +1,17 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
-import yaml
 import logging 
 
 from api.lapis import Lapis
+from utils.config import get_wiseloculus_url
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-# Load configuration from config.yaml
-with open('config.yaml', 'r') as file:
-    config = yaml.safe_load(file)
-
-server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
+# Get server configuration from centralized config
+server_ip = get_wiseloculus_url()
 
 wiseLoculus = Lapis(server_ip)
 
@@ -50,6 +47,9 @@ def app():
 
         sequence_type_value = "amino acid" if sequence_type == "Amino Acids" else "nucleotide"
 
+        # For browser-based components, we need to use localhost instead of host.docker.internal
+        browser_server_ip = server_ip.replace("host.docker.internal", "localhost")
+
         components.html(
             f"""
             <html>
@@ -59,7 +59,7 @@ def app():
             </head>
                 <body>
                 <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
-                <gs-app lapis="{wiseLoculus.server_ip}">
+                <gs-app lapis="{browser_server_ip}">
                     <gs-mutations-over-time
                     lapisFilter='{{"sampling_dateFrom":"{start_date}", "sampling_dateTo": "{end_date}", "location_name": "{location}"}}'
                     sequenceType='{sequence_type_value}'
