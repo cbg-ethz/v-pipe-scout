@@ -807,6 +807,11 @@ def app():
             st.write("You can download the mutation counts and coverage data for the selected mutations over a specified date range and location.")
             st.write("This data is fetched from the the Loculus Wastewater Instance and can be used for further analysis, such as tracking variant prevalence over time.")
             st.write("Please specify the date range for the data.")
+            
+            # Initialize the API client first
+            server_ip = get_wiseloculus_url()
+            wiseLoculus = WiseLoculusLapis(server_ip)
+            
             # Date range input
             # Get dynamic date range from API with bounds to enforce limits
             default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("abundance_estimator")
@@ -818,9 +823,6 @@ def app():
                 max_value=max_date,
                 help="Select the date range for which you want to fetch mutation counts and coverage data."
             )
-            
-            server_ip = get_wiseloculus_url()
-            wiseLoculus = WiseLoculusLapis(server_ip)
 
             # Fetch locations using the new function
             if "locations" not in st.session_state:
