@@ -2,47 +2,20 @@
 
 import streamlit as st
 import asyncio
-import yaml
-import pathlib
 from typing import Dict, Optional, Tuple, List
 from api.health_check import check_api_health, get_cached_health_status, ApiHealthResult, HealthStatus
 from components.api_warnings import display_api_warnings, display_compact_api_status
+from utils.config import get_api_urls
 
 
 def load_api_config() -> Tuple[str, str]:
     """
-    Load API configuration from config.yaml.
+    Load API configuration from centralized config.
     
     Returns:
-        Tuple of (wise_url, covspectrum_url)
+        Tuple of (wiseloculus_url, covspectrum_url)
     """
-    try:
-        # Handle different possible working directories
-        config_paths = [
-            pathlib.Path("config.yaml"),
-            pathlib.Path("app/config.yaml"),
-            pathlib.Path(__file__).parent.parent / "config.yaml"
-        ]
-        
-        config = None
-        for config_path in config_paths:
-            if config_path.exists():
-                with open(config_path, 'r') as file:
-                    config = yaml.safe_load(file)
-                break
-        
-        if config is None:
-            st.error("Could not find config.yaml file")
-            return "http://default_ip:8000", "https://lapis.cov-spectrum.org"
-        
-        wise_url = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
-        covspectrum_url = config.get('server', {}).get('cov_spectrum_api', 'https://lapis.cov-spectrum.org')
-        
-        return wise_url, covspectrum_url
-        
-    except Exception as e:
-        st.error(f"Error loading configuration: {e}")
-        return "http://default_ip:8000", "https://lapis.cov-spectrum.org"
+    return get_api_urls()
 
 
 @st.cache_data(ttl=30)  # Cache for 30 seconds

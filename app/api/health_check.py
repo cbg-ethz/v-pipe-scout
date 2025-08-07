@@ -43,16 +43,19 @@ class ApiHealthResult:
 class ApiHealthChecker:
     """Centralized API health checking service."""
     
-    def __init__(self, timeout_seconds: float = 5.0, cache_duration_seconds: float = 60.0):
+    def __init__(self, timeout_seconds: float = 10.0, cache_duration_seconds: float = 60.0, 
+                 warning_threshold_ms: float = 5000.0):
         """
         Initialize the health checker.
         
         Args:
             timeout_seconds: Timeout for health check requests
             cache_duration_seconds: How long to cache health results
+            warning_threshold_ms: Response time threshold for warning status (in milliseconds)
         """
         self.timeout = timeout_seconds
         self.cache_duration = cache_duration_seconds
+        self.warning_threshold_ms = warning_threshold_ms
         self._cache: Dict[str, ApiHealthResult] = {}
 
     def _is_cache_valid(self, result: ApiHealthResult) -> bool:
@@ -114,7 +117,7 @@ class ApiHealthChecker:
                         try:
                             data = await response.json()
                             if isinstance(data, dict) and 'data' in data:
-                                status = HealthStatus.HEALTHY if response_time < 2000 else HealthStatus.WARNING
+                                status = HealthStatus.HEALTHY if response_time < self.warning_threshold_ms else HealthStatus.WARNING
                                 result = ApiHealthResult(
                                     status=status,
                                     response_time_ms=response_time,
@@ -201,7 +204,7 @@ class ApiHealthChecker:
                 try:
                     data = response.json()
                     if isinstance(data, dict) and 'data' in data:
-                        status = HealthStatus.HEALTHY if response_time < 2000 else HealthStatus.WARNING
+                        status = HealthStatus.HEALTHY if response_time < self.warning_threshold_ms else HealthStatus.WARNING
                         result = ApiHealthResult(
                             status=status,
                             response_time_ms=response_time,
@@ -272,8 +275,8 @@ class ApiHealthChecker:
         }
 
 
-# Global health checker instance
-_health_checker = ApiHealthChecker()
+# Global health checker instance with more lenient thresholds
+_health_checker = ApiHealthChecker(timeout_seconds=10.0, warning_threshold_ms=5000.0)
 
 
 async def check_api_health(wise_url: str, covspectrum_url: str) -> Dict[str, ApiHealthResult]:

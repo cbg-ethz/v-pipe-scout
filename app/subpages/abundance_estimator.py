@@ -9,7 +9,6 @@
 """
 
 import streamlit as st
-import yaml
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -37,6 +36,7 @@ from state import AbundanceEstimatorState
 from api.signatures import Variant as SignatureVariant
 from api.signatures import VariantList as SignatureVariantList
 from process.mutations import extract_position, sort_mutations_by_position
+from utils.config import get_wiseloculus_url, get_covspectrum_url
 
 
 # Initialize Celery
@@ -145,12 +145,8 @@ def app():
     st.markdown("---")
 
     # ============== CONFIGURATION ==============
-    # Load configuration from config.yaml
-    with open('config.yaml', 'r') as file:
-        config = yaml.safe_load(file)
-    
-    # Setup APIs
-    cov_spectrum_api = config.get('server', {}).get('cov_spectrum_api', 'https://lapis.cov-spectrum.org')
+    # Setup APIs from centralized config
+    cov_spectrum_api = get_covspectrum_url()
     covSpectrum = CovSpectrumLapis(cov_spectrum_api)
 
     # ============== VARIANT SELECTION ==============
@@ -820,7 +816,7 @@ def app():
             help="Select the date range for which you want to fetch mutation counts and coverage data."
             )
             
-            server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
+            server_ip = get_wiseloculus_url()
             wiseLoculus = WiseLoculusLapis(server_ip)
 
             # Fetch locations using the new function

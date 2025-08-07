@@ -2,7 +2,6 @@ import numpy as np
 import streamlit as st
 import pandas as pd
 import asyncio
-import yaml
 import pathlib
 from datetime import datetime
 from typing import List
@@ -11,17 +10,13 @@ from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
 from api.signatures import get_variant_list, get_variant_names, VariantList
 from visualize.mutations import mutations_over_time
+from utils.config import get_wiseloculus_url
 
 pd.set_option('future.no_silent_downcasting', True)
 
 
-# Load configuration from config.yaml
-CONFIG_PATH = pathlib.Path(__file__).parent.parent / "config.yaml"
-with open(CONFIG_PATH, 'r') as file:
-    config = yaml.safe_load(file)
-
-
-server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
+# Get server configuration from centralized config
+server_ip = get_wiseloculus_url()
 wiseLoculus = WiseLoculusLapis(server_ip)
 
 

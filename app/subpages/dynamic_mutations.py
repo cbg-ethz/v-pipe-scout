@@ -1,20 +1,17 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
-import yaml
 import logging 
 
 from api.lapis import Lapis
+from utils.config import get_wiseloculus_url
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-# Load configuration from config.yaml
-with open('config.yaml', 'r') as file:
-    config = yaml.safe_load(file)
-
-server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
+# Get server configuration from centralized config
+server_ip = get_wiseloculus_url()
 
 wiseLoculus = Lapis(server_ip)
 

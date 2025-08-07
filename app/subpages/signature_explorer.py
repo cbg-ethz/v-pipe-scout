@@ -1,22 +1,19 @@
 import streamlit as st
-import yaml
 import pandas as pd
 import streamlit.components.v1 as components
 
 from api.wiseloculus import WiseLoculusLapis
 from api.covspectrum import CovSpectrumLapis
 from components.variant_signature_component import render_signature_composer
+from utils.config import get_wiseloculus_url, get_covspectrum_url
 
 
-# Load configuration from config.yaml
-with open('config.yaml', 'r') as file:
-    config = yaml.safe_load(file)
-
-wise_server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
-cov_sprectrum_api = config.get('server', {}).get('cov_spectrum_api', 'https://lapis.cov-spectrum.org')
+# Get server configuration from centralized config
+wise_server_ip = get_wiseloculus_url()
+cov_spectrum_api = get_covspectrum_url()
     
 wiseLoculus = WiseLoculusLapis(wise_server_ip)
-covSpectrum = CovSpectrumLapis(cov_sprectrum_api)
+covSpectrum = CovSpectrumLapis(cov_spectrum_api)
 
 def app():
 
