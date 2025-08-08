@@ -13,7 +13,8 @@ from interface import MutationType
 
 from process.mutations import get_symbols_for_mutation_type
 
-
+# Constants for fallback date range
+FALLBACK_START_DATE, FALLBACK_END_DATE = datetime(2025, 1, 1), datetime(2025, 12, 31)
 
 class WiseLoculusLapis(Lapis):
     """Wise-Loculus Instance API"""
