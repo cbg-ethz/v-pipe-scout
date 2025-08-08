@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
-import streamlit.components.v1 as components
+from datetime import datetime
 
 from api.wiseloculus import WiseLoculusLapis
 from api.covspectrum import CovSpectrumLapis
 from components.variant_signature_component import render_signature_composer
+from components.mutation_plot_component import render_mutation_plot_component
 from utils.config import get_wiseloculus_url, get_covspectrum_url
 
 
@@ -36,11 +37,18 @@ def app():
     }
 
     # Render the variant signature component
-    selected_mutations, sequence_type_value= render_signature_composer(
+    signature_result = render_signature_composer(
         covSpectrum,
         component_config,
         session_prefix="compact_"  # Use a prefix to avoid session state conflicts
     )
+    
+    # Handle the case where no mutations are selected yet
+    if signature_result is None:
+        selected_mutations = []
+        sequence_type_value = "nucleotide"
+    else:
+        selected_mutations, sequence_type_value = signature_result
 
     st.markdown("---")
 
@@ -66,50 +74,48 @@ def app():
     # Check if all necessary parameters are available
     if selected_mutations and date_range and len(date_range) == 2 and location:
 
-        start_date = date_range[0].strftime('%Y-%m-%d')
-        end_date = date_range[1].strftime('%Y-%m-%d')
+        # Convert date objects to datetime objects
+        start_date = datetime.combine(date_range[0], datetime.min.time())
+        end_date = datetime.combine(date_range[1], datetime.min.time())
 
-        st.write("NOTE: currently the below GenSpectrum Plot does not show mutations that have zero proportion in the selected date range.")
-        st.write("Absence of the mutation, does not mean no coverage – this ISSUE is currently being considered.")
-
-        # Use the dynamically generated list of mutations string
-        # The formatted_mutations_str variable already contains the string representation
-        # of the list with double quotes, e.g., '["ORF1a:T103L", "ORF1a:N126K"]'
-        # The lapisFilter uses double curly braces {{ and }} to escape the literal
-        # curly braces needed for the JSON object within the f-string.
-        display_mutations = str(selected_mutations).replace("'", '"')
-        components.html(
-            f"""
-            <html>
-            <head>
-            <script type="module" src="https://unpkg.com/@genspectrum/dashboard-components@latest/standalone-bundle/dashboard-components.js"></script>
-            <link rel="stylesheet" href="https://unpkg.com/@genspectrum/dashboard-components@latest/dist/style.css" />
-            </head>
-                <body>
-                <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
-                <gs-app lapis="{wise_server_ip}">
-                    <gs-mutations-over-time
-                    lapisFilter='{{"sampling_dateFrom":"{start_date}", "sampling_dateTo": "{end_date}", "location_name": "{location}"}}'
-                    sequenceType='{sequence_type_value}'
-                    views='["grid"]'
-                    width='100%'
-                    height='100%'
-                    granularity='day'
-                    displayMutations='{display_mutations}'
-                    lapisDateField='sampling_date'
-                    initialMeanProportionInterval='{{"min":0.00,"max":1.0}}'
-                    pageSizes='[50, 30, 20, 10]'
-                    />
-                </gs-app>
-                </head>
-                <body>
-                </body>
-            </html>
-        """,
-            height=1500,
+        st.write("Exploring the signature mutations in wastewater data for the selected parameters.")
+        
+        # Configure the component for signature mutations
+        plot_config = {
+            'show_frequency_filtering': True,
+            'show_date_options': True,
+            'show_download': True,
+            'show_summary_stats': True,
+            'default_min_frequency': 0.01,
+            'default_max_frequency': 1.0,
+            'plot_title': f"Signature Mutations Over Time ({sequence_type_value.title()})",
+            'enable_empty_date_toggle': True,
+            'show_mutation_count': True
+        }
+        
+        # Use the mutation plot component
+        result = render_mutation_plot_component(
+            wiseLoculus=wiseLoculus,
+            mutations=selected_mutations,
+            sequence_type=sequence_type_value,
+            date_range=(start_date, end_date),
+            location=location,
+            config=plot_config,
+            session_prefix="signature_"
         )
+        
+        if result is None:
+            st.info("💡 Try adjusting the date range, location, or signature mutations.")
+        else:
+            st.success(f"Successfully analyzed {len(result['filtered_mutations'])} signature mutations.")
     else:
-        st.warning("Please select mutations, a valid date range, and a location to display the plot.")
+        st.warning("Please select mutations, a valid date range, and a location to display the analysis.")
+        if not selected_mutations:
+            st.info("• No mutations selected from the signature composer above")
+        if not date_range or len(date_range) != 2:
+            st.info("• Please select a complete date range")
+        if not location:
+            st.info("• Please select a location")
 
 
 if __name__ == "__main__":

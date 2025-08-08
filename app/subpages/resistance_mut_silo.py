@@ -122,50 +122,5 @@ def app():
             )
             st.plotly_chart(fig, use_container_width=True)
 
-    st.write("### GenSpectrum Dashboard Dynamic Mutations Over Time")
-    st.write("In the long term, GenSpectrum will provide a dashboard to visualize the mutations over time.")
-    st.write("Yet currently, the below component only shows mutations above an unknown threshold.")
-    st.write("This is under investigation and will be addresed by the GenSpectrum team.")
-
-    # Use the dynamically generated list of mutations string
-    # The formatted_mutations_str variable already contains the string representation
-    # of the list with double quotes, e.g., '["ORF1a:T103L", "ORF1a:N126K"]'
-    # The lapisFilter uses double curly braces {{ and }} to escape the literal
-    # curly braces needed for the JSON object within the f-string.
-    
-    # For browser-based components, we need to use localhost instead of host.docker.internal
-    browser_server_ip = server_ip.replace("host.docker.internal", "localhost")
-    
-    components.html(
-        f"""
-        <html>
-        <head>
-        <script type="module" src="https://unpkg.com/@genspectrum/dashboard-components@latest/standalone-bundle/dashboard-components.js"></script>
-        <link rel="stylesheet" href="https://unpkg.com/@genspectrum/dashboard-components@latest/dist/style.css" />
-        </head>
-            <body>
-            <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
-            <gs-app lapis="{browser_server_ip}">
-                <gs-mutations-over-time
-                lapisFilter='{{"sampling_dateFrom":"{start_date}", "sampling_dateTo": "{end_date}", "location_name": "{location}"}}'
-                sequenceType='{sequence_type_value}'
-                views='["grid"]'
-                width='100%'
-                height='100%'
-                granularity='day'
-                displayMutations='{formatted_mutations_str}'
-                lapisDateField='sampling_date'
-                initialMeanProportionInterval='{{"min":0.00,"max":1.0}}'
-                pageSizes='[50, 30, 20, 10]'
-                />
-            </gs-app>
-            <body>
-            
-            </body>
-        </html>
-    """,
-        height=500,
-    )
-
 if __name__ == "__main__":
     app()

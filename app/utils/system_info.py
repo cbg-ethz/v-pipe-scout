@@ -13,7 +13,7 @@ def get_version_info() -> Dict[str, Optional[str]]:
         Dictionary with version information
     """
     version_info = {
-        'version': '0.1.0-unknown',
+        'version': '0.2.0-unknown',
         'build_date': None,
         'source': 'fallback'
     }
