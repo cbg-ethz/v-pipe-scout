@@ -473,12 +473,12 @@ class WiseLoculusLapis(Lapis):
                 logging.info(f"Fetched date range for {cache_key}: {date_range[0].strftime('%Y-%m-%d')} to {date_range[1].strftime('%Y-%m-%d')}")
             else:
                 # Fallback to default dates
-                date_range = (pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08"))
+                date_range = (pd.to_datetime(FALLBACK_START_DATE), pd.to_datetime(FALLBACK_END_DATE))
                 logging.warning(f"API date range not available for {cache_key}, using defaults: {date_range}")
                 
         except Exception as e:
             # Fallback to default dates
-            date_range = (pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08"))
+            date_range = (pd.to_datetime(FALLBACK_START_DATE), pd.to_datetime(FALLBACK_END_DATE))
             logging.warning(f"Error fetching date range for {cache_key}: {e}, using defaults")
         
         # Cache the result

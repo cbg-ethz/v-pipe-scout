@@ -24,9 +24,9 @@ def app():
     
     st.write("We bring full transparency of Sars-Cov-2 mutations found Swiss wastewater sequencing data for the recent weeks to the browser.")
     
-    st.write("Translation and amino acid alignment was performed for to enable the direct querying for resistance mutations.")
+    st.write("Translation and amino acid alignment was performed to enable the direct querying for resistance mutations.")
 
-    st.success("**First-ever:** Real-time, interactive querying of more than 108 million short seqeucing reads in alignment in seconds in the browser.")
+    st.success("**First-ever:** Real-time, interactive querying of more than 108 million short sequencing reads in alignment in seconds in the browser.")
     st.warning("This project is still experimental and we claim no responsibility for the correctness of the data shown here.")
 
     # Data Overview Section

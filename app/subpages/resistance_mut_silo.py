@@ -22,7 +22,7 @@ wiseLoculus = WiseLoculusLapis(server_ip)
 def app():
     st.title("Resistance Mutations from Wastewater Data")
     st.write("This page allows you to visualize the number of observed resistance mutations over time.")
-    st.write("The sets of resistance mutations are provide from Stanfords Coronavirus Antivirial & Reistance Database.")
+    st.write("The sets of resistance mutations are provided from Stanford's Coronavirus Antiviral & Resistance Database.")
     st.markdown("---")
     st.write("Select from the following resistance mutation sets:")
     # Get absolute path to data directory to handle different working directories
