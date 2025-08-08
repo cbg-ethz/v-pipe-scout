@@ -62,7 +62,7 @@ _Only accessible within ETH Zürich Networks._
 
 2. **Setup environment:**
     ```sh
-    ./setup.sh  # Creates .env with secure Redis password
+    ./setup.sh  # Creates .env with secure Redis password (single source of truth)
     ```
 
 3. **Configure LAPIS connection** in `app/config.yaml`:

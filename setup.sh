@@ -32,7 +32,7 @@ rm .env.bak 2>/dev/null || true
 echo "✅ Environment configuration created!"
 echo ""
 echo "📝 Configuration summary:"
-echo "   - Redis password: [GENERATED]"
+echo "   - Redis password: [GENERATED] (single source of truth in .env)"
 echo "   - Config file: .env"
 echo ""
 echo "🔧 Next steps:"

@@ -7,9 +7,11 @@ services:
     # Removed port exposure - Redis only needs to be accessible within Docker network
     volumes:
       - redis-data:/data
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-defaultpassword123}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-defaultpassword123}
+    command: sh -c 'redis-server --appendonly yes --requirepass $$REDIS_PASSWORD'
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-defaultpassword123}", "ping"]
+      test: ["CMD", "sh", "-c", "redis-cli -a $$REDIS_PASSWORD ping"]
       interval: 5s
       timeout: 3s
       retries: 5
