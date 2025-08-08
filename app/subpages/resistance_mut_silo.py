@@ -143,7 +143,7 @@ def app():
         <script type="module" src="https://unpkg.com/@genspectrum/dashboard-components@latest/standalone-bundle/dashboard-components.js"></script>
         <link rel="stylesheet" href="https://unpkg.com/@genspectrum/dashboard-components@latest/dist/style.css" />
         </head>
-            <body>
+        <body>
             <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
             <gs-app lapis="{browser_server_ip}">
                 <gs-mutations-over-time
@@ -159,9 +159,7 @@ def app():
                 pageSizes='[50, 30, 20, 10]'
                 />
             </gs-app>
-            <body>
-            
-            </body>
+        </body>
         </html>
     """,
         height=500,
