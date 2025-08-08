@@ -21,10 +21,10 @@ wiseLoculus = WiseLoculusLapis(server_ip)
 def app():
 
     ## Add a title
-    st.title("## Dynamic Mutation Heatmap Amino Acids")
+    st.title("Dynamic Mutation Heatmap Amino Acids")
 
     ## Add a subheader
-    st.markdown("### This page allows you to explore mutations over time by proportion.")
+    st.markdown("###Explore mutations over time by proportion")
 
     ## select dat range
     st.write("Select a date range:")
