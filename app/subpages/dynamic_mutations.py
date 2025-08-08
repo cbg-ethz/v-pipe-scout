@@ -3,7 +3,7 @@ import streamlit.components.v1 as components
 import pandas as pd
 import logging 
 
-from api.lapis import Lapis
+from api.wiseloculus import WiseLoculusLapis
 from utils.config import get_wiseloculus_url
 
 # Configure logging
@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Get server configuration from centralized config
 server_ip = get_wiseloculus_url()
 
-wiseLoculus = Lapis(server_ip)
+wiseLoculus = WiseLoculusLapis(server_ip)
 
 def app():
 
@@ -26,7 +26,14 @@ def app():
 
     ## select dat range
     st.write("Select a date range:")
-    date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-8")])
+    # Get dynamic date range from API with bounds to enforce limits
+    default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("dynamic_mutations")
+    date_range = st.date_input(
+        "Select a date range:", 
+        [default_start, default_end],
+        min_value=min_date,
+        max_value=max_date
+    )
 
     ## Add a horizontal line
     st.markdown("---")

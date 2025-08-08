@@ -13,7 +13,8 @@ from interface import MutationType
 
 from process.mutations import get_symbols_for_mutation_type
 
-
+# Constants for fallback date range
+FALLBACK_START_DATE, FALLBACK_END_DATE = datetime(2025, 1, 1), datetime(2025, 12, 31)
 
 class WiseLoculusLapis(Lapis):
     """Wise-Loculus Instance API"""
@@ -386,3 +387,122 @@ class WiseLoculusLapis(Lapis):
                             freq_df.at[mutation, date] = freq_val
         
         return counts_df, freq_df, coverage_freq_df
+
+    async def get_date_range(self) -> Tuple[Optional[datetime], Optional[datetime]]:
+        """
+        Fetches all available sampling dates and returns the earliest and latest dates.
+        
+        Returns:
+            Tuple[Optional[datetime], Optional[datetime]]: (earliest_date, latest_date) or (None, None) if no data
+        """
+        try:
+            timeout = aiohttp.ClientTimeout(total=10)  # 10 second timeout for this query
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(
+                    f'{self.server_ip}/sample/aggregated',
+                    params={'fields': 'sampling_date'},
+                    headers={'accept': 'application/json'}
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        sample_data = data.get('data', [])
+                        
+                        if not sample_data:
+                            logging.warning("No sampling date data available")
+                            return None, None
+                        
+                        # Extract all dates and convert to datetime objects
+                        dates = []
+                        for entry in sample_data:
+                            if 'sampling_date' in entry:
+                                try:
+                                    date_obj = datetime.strptime(entry['sampling_date'], '%Y-%m-%d')
+                                    dates.append(date_obj)
+                                except ValueError as e:
+                                    logging.warning(f"Invalid date format: {entry['sampling_date']}: {e}")
+                        
+                        if not dates:
+                            logging.warning("No valid sampling dates found")
+                            return None, None
+                        
+                        earliest_date = min(dates)
+                        latest_date = max(dates)
+                        
+                        logging.info(f"Date range: {earliest_date.strftime('%Y-%m-%d')} to {latest_date.strftime('%Y-%m-%d')}")
+                        return earliest_date, latest_date
+                        
+                    else:
+                        logging.error(f"Failed to fetch sampling dates: {response.status}")
+                        logging.error(await response.text())
+                        return None, None
+                        
+        except Exception as e:
+            logging.error(f"Error fetching date range: {e}")
+            return None, None
+
+    def get_cached_date_range(self, cache_key: str = "default") -> Tuple[datetime, datetime]:
+        """
+        Get the date range with caching to avoid repeated API calls.
+        Returns pandas Timestamps for compatibility with Streamlit date inputs.
+        
+        Args:
+            cache_key: Unique key for this cache (allows multiple cached ranges)
+            
+        Returns:
+            Tuple[datetime, datetime]: Start and end dates as pandas Timestamps
+        """
+        import streamlit as st
+        import asyncio
+        import pandas as pd
+        
+        # Create a unique session state key
+        session_key = f"wiseloculus_date_range_{cache_key}"
+        
+        # Check if we already have cached date range
+        if session_key in st.session_state:
+            cached_range = st.session_state[session_key]
+            logging.debug(f"Using cached date range for {cache_key}: {cached_range}")
+            return cached_range
+        
+        # Fetch new date range
+        try:
+            earliest, latest = asyncio.run(self.get_date_range())
+            
+            if earliest and latest:
+                # Convert to pandas Timestamps for Streamlit compatibility
+                date_range = (pd.to_datetime(earliest), pd.to_datetime(latest))
+                logging.info(f"Fetched date range for {cache_key}: {date_range[0].strftime('%Y-%m-%d')} to {date_range[1].strftime('%Y-%m-%d')}")
+            else:
+                # Fallback to default dates
+                date_range = (pd.to_datetime(FALLBACK_START_DATE), pd.to_datetime(FALLBACK_END_DATE))
+                logging.warning(f"API date range not available for {cache_key}, using defaults: {date_range}")
+                
+        except Exception as e:
+            # Fallback to default dates
+            date_range = (pd.to_datetime(FALLBACK_START_DATE), pd.to_datetime(FALLBACK_END_DATE))
+            logging.warning(f"Error fetching date range for {cache_key}: {e}, using defaults")
+        
+        # Cache the result
+        st.session_state[session_key] = date_range
+        return date_range
+
+    def get_cached_date_range_with_bounds(self, cache_key: str = "default") -> Tuple[datetime, datetime, datetime, datetime]:
+        """
+        Get the date range with bounds for enforcing min/max in date inputs.
+        
+        Args:
+            cache_key: Unique key for this cache
+            
+        Returns:
+            Tuple[datetime, datetime, datetime, datetime]: (start_date, end_date, min_date, max_date)
+        """
+        start_date, end_date = self.get_cached_date_range(cache_key)
+        
+        # Use the same dates as bounds to enforce API limits
+        # Add a small buffer for edge cases (1 day on each side)
+        import pandas as pd
+        buffer = pd.Timedelta(days=1)
+        min_date = start_date - buffer
+        max_date = end_date + buffer
+        
+        return start_date, end_date, min_date, max_date

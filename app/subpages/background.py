@@ -40,7 +40,14 @@ def app():
     st.markdown("---")
     # Allow the user to choose a date range
     st.write("Choose your data to inspect:")
-    date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08")])
+    # Get dynamic date range from API with bounds to enforce limits
+    default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("background_mutations")
+    date_range = st.date_input(
+        "Select a date range:", 
+        [default_start, default_end],
+        min_value=min_date,
+        max_value=max_date
+    )
 
     # Ensure date_range is a tuple with two elements
     if len(date_range) != 2:
