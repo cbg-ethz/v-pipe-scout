@@ -24,7 +24,7 @@ def app():
     st.title("Dynamic Mutation Heatmap Amino Acids")
 
     ## Add a subheader
-    st.markdown("###Explore mutations over time by proportion")
+    st.markdown("### Explore mutations over time by proportion")
 
     ## select dat range
     st.write("Select a date range:")
