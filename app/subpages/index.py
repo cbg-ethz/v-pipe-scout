@@ -26,7 +26,7 @@ def app():
     
     st.write("Translation and amino acid alignment was performed to enable the direct querying for resistance mutations.")
 
-    st.success("**First-ever:** Real-time, interactive querying of about hundred million short sequencing reads in alignment in seconds in the browser.")
+    st.success("**First-ever:** Real-time, interactive querying of ~100 million short sequencing reads in alignment in seconds in the browser.")
     st.warning("This project is still experimental and we claim no responsibility for the correctness of the data shown here.")
 
     # Data Overview Section
