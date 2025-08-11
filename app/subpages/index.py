@@ -69,8 +69,7 @@ def app():
 
     The following features are available:           
     - *Resistance mutations*: Direct lookup of mature protein mutations known to confer resistance to antiviral drugs.
-    - *Dynamic mutation heatmap (AA)*: Amino acid mutations 
-    - *Dynamic mutation heatmap (Nuc)*: Nucleotide mutations
+    - *Dynamic mutation heatmaps*: Amino acid mutations or Nucleotide mutations
     - *Explore variant signatures*: Plot variant-specific mutations over time.
     - *Explore Background Mutations*: See the mutations not currently accounted for in the variant signatures we track.
     - *Rapid variant abundance*: Estimate variant abundance over time for an interactively defined set of variants.
