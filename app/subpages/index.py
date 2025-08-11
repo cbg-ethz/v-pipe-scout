@@ -26,7 +26,7 @@ def app():
     
     st.write("Translation and amino acid alignment was performed to enable the direct querying for resistance mutations.")
 
-    st.success("**First-ever:** Real-time, interactive querying of more than 108 million short sequencing reads in alignment in seconds in the browser.")
+    st.success("**First-ever:** Real-time, interactive querying of ~100 million short sequencing reads in alignment in seconds in the browser.")
     st.warning("This project is still experimental and we claim no responsibility for the correctness of the data shown here.")
 
     # Data Overview Section
@@ -65,13 +65,13 @@ def app():
     st.markdown("""
     This Proof-of-Concept most remarkably shows the integration of CovSpectrum and expert-defined variant definitions, 
     to enable the on-demand estimation of variant abundances. 
-    Essentially, making the question of "**Is this variant present?**" practically rapidly solvable.           
+    Essentially, making the question of "**Is this variant present?**" practically rapidly solvable.
 
-    - *Resistance mutations*: Custom frontend to look up known amino acid mutations.
-    - *Dynamic mutation heatmap (AA)*: Amino acid mutations hijacking the clinical GenSpectrum frontend.
-    - *Dynamic mutation heatmap (Nuc)*: Nucleotide mutations hijacking the clinical GenSpectrum frontend.
-    - *Explore variant signatures*: See variant-specific mutations over time.
-    - *Explore Background Mutations*: See the mutations not currently accounted for in the variant signatures we track.
+    The following features are available:           
+    - *Resistance mutations*: Direct lookup of mature protein mutations known to confer resistance to antiviral drugs.
+    - *Dynamic mutation heatmaps*: Amino acid mutations or Nucleotide mutations
+    - *Explore variant signatures*: Plot variant-specific mutations over time.
+    - *Explore background mutations*: See the mutations not currently accounted for in the variant signatures we track.
     - *Rapid variant abundance*: Estimate variant abundance over time for an interactively defined set of variants.
     """)
     
