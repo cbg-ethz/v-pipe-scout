@@ -21,10 +21,12 @@ wiseLoculus = WiseLoculusLapis(server_ip)
 def app():
 
     ## Add a title
-    st.title("Dynamic Mutation Heatmap Amino Acids")
+    st.title("Dynamic Mutation Heatmap")
 
     ## Add a subheader
     st.markdown("### Explore mutations over time by proportion")
+
+    st.write("Explore all mutations found and filter by proportions. Notice that this is a heavy operation and may take a while to load.")
 
     ## select dat range
     st.write("Select a date range:")
@@ -48,7 +50,7 @@ def app():
     location = st.selectbox("Select Location:", locations)
 
     # Amino Acids or Nucleotides
-    sequence_type = st.selectbox("Select Sequence Type:", ["Amino Acids", "Nucleotides"])
+    sequence_type = st.selectbox("Select Sequence Type:", ["Nucleotides", "Amino Acids"])
 
     if len(date_range) == 2:
         start_date = datetime.strptime(str(date_range[0]), "%Y-%m-%d")
@@ -60,6 +62,10 @@ def app():
         st.write("### Dynamic Mutation Analysis")
         st.write("Analyzing all mutations found in the selected timeframe and location.")
         
+        # Add performance warning
+        # Add performance warning
+        st.warning("⚠️ **Performance Notice**: Loading this plot may take up to 2 minutes. A major speedup will be implemented soon to improve loading times.")
+
         with st.spinner("Fetching mutations for the selected parameters..."):
             try:
                 # For now, we'll focus on nucleotide mutations since that's what the API supports
