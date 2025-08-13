@@ -26,6 +26,8 @@ def app():
     ## Add a subheader
     st.markdown("### Explore mutations over time by proportion")
 
+    st.write("Explore all mutaitons found and filter by proportions. Notice that this is a heavy operation and may take a while to load.")
+
     ## select dat range
     st.write("Select a date range:")
     # Get dynamic date range from API with bounds to enforce limits
