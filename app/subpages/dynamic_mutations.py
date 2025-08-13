@@ -26,7 +26,7 @@ def app():
     ## Add a subheader
     st.markdown("### Explore mutations over time by proportion")
 
-    st.write("Explore all mutaitons found and filter by proportions. Notice that this is a heavy operation and may take a while to load.")
+    st.write("Explore all mutations found and filter by proportions. Notice that this is a heavy operation and may take a while to load.")
 
     ## select dat range
     st.write("Select a date range:")
@@ -63,7 +63,7 @@ def app():
         st.write("Analyzing all mutations found in the selected timeframe and location.")
         
         # Add performance warning
-         # Add performance warning
+        # Add performance warning
         st.warning("⚠️ **Performance Notice**: Loading this plot may take up to 2 minutes. A major speedup will be implemented soon to improve loading times.")
 
         with st.spinner("Fetching mutations for the selected parameters..."):
