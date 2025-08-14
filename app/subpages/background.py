@@ -33,9 +33,16 @@ def cached_get_variant_names() -> List[str]:
 def app():
 
     
-    st.title("Background Mutations")
+    st.title("Untracked Mutations")
     st.subheader("Explore Mutations currently not in any Variant Signature we track")
-    st.write("This page allows you to visualize background mutations in wastewater samples that are not part of any known variant signature.")
+    st.write("This page allows you to visualize untracked mutations in wastewater samples that are not part of any known variant signature.")
+    
+    # Add explanatory note as requested
+    st.info("**What are Untracked Mutations?** These are mutations currently not part of any variant definition used, or ever used, for wastewater monitoring.")
+    
+    # Add link to the VOC repository as requested
+    st.write("For updates on Variants of Concern, see our [variant definitions repository](https://github.com/cbg-ethz/cowwid/tree/master/voc).")
+    
     st.write("Are we missing something? Please let us know on [GitHub](https://github.com/cbg-ethz/cowwid/issues)")
     st.markdown("---")
     # Allow the user to choose a date range
@@ -94,7 +101,7 @@ def app():
     
     # Create a collapsible section for variant selection
     with st.expander("🔧 Advanced: Select known variants to exclude", expanded=False):
-        st.write("By default, all known variant signatures are excluded from background mutations. You can customize which variants to exclude here.")
+        st.write("By default, all known variant signatures are excluded from untracked mutations. You can customize which variants to exclude here.")
         
         # Create a multi-select box for variants
         selected_curated_variants = st.multiselect(
@@ -118,7 +125,7 @@ def app():
     # remove duplicates from selected_signature_mutations
     selected_signature_mutations = list(set(selected_signature_mutations))
 
-    # Calculate background mutations (all mutations minus the signature mutations)
+    # Calculate untracked mutations (all mutations minus the signature mutations)
     background_mutations = [
         mutation for mutation in mutations_in_timeframe
         if mutation not in selected_signature_mutations
@@ -127,11 +134,11 @@ def app():
     # TODO: add a venn diragram here to visualize the overlap, once the better venn diagram library is available
     st.write(f"Total mutations in timeframe: {len(mutations_in_timeframe)}")
     st.write(f"Signature mutations to exclude: {len(selected_signature_mutations)}")
-    st.write(f"Background mutations to analyze: {len(background_mutations)}")
+    st.write(f"Untracked mutations to analyze: {len(background_mutations)}")
 
     # Use the mutation plot component
     if background_mutations:
-        # Configure the component for background mutations
+        # Configure the component for untracked mutations
         plot_config = {
             'show_frequency_filtering': True,
             'show_date_options': True,
@@ -139,13 +146,13 @@ def app():
             'show_summary_stats': True,
             'default_min_frequency': 0.01,
             'default_max_frequency': 1.0,
-            'plot_title': "Background Mutations Over Time",
+            'plot_title': "Untracked Mutations Over Time",
             'enable_empty_date_toggle': True,
             'show_mutation_count': False  # We already show this above
         }
         
         # Add description
-        st.write("Shows the background mutations (not in variant signatures) over time in wastewater for the selected date range.")
+        st.write("Shows the untracked mutations (not in variant signatures) over time in wastewater for the selected date range.")
         
         # Use the component
         result = render_mutation_plot_component(
@@ -161,7 +168,7 @@ def app():
         if result is None:
             st.info("💡 Try adjusting the date range, location, or variant exclusions.")
     else:
-        st.warning("⚠️ No background mutations available for analysis. This could be due to:")
+        st.warning("⚠️ No untracked mutations available for analysis. This could be due to:")
         st.write("• API connection issues preventing mutation data fetch")
         st.write("• No mutations found in the selected time range and location")
         st.write("• All detected mutations were excluded as variant signatures")
