@@ -175,26 +175,99 @@ class WiseLoculusLapis(Lapis):
         ) -> List[dict[str, Any]]:
         """
         Fetches the mutation counts and coverage for a list of mutations, specifying their type and optional location.
+        Uses the direct nucleotideMutations/aminoAcidMutations endpoints for efficiency.
 
         Note Amino Acid mutations require gene:change name "ORF1a:V3449I" while nucleotide mutations can be in the form "A123T".
         """
   
         try:
-            timeout = aiohttp.ClientTimeout(total=5)  # 5 second timeout
+            # Build payload for the specific mutation endpoint
+            payload = {
+                "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
+                "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
+                "minProportion": 0.0,  # Get all mutations regardless of proportion
+                "orderBy": "proportion",
+                "limit": 10000,
+                "dataFormat": "JSON",
+                "downloadAsFile": "false"
+            }
+
+            # Add location filter if provided
+            if location_name:
+                payload["location_name"] = location_name
+
+            # Add mutation filter based on type
+            if mutation_type == MutationType.NUCLEOTIDE:
+                payload["nucleotideMutations"] = mutations
+                endpoint = "nucleotideMutations"
+            elif mutation_type == MutationType.AMINO_ACID:
+                payload["aminoAcidMutations"] = mutations
+                endpoint = "aminoAcidMutations"
+            else:
+                raise ValueError(f"Unsupported mutation type: {mutation_type}")
+
+            # Make the API call
+            timeout = aiohttp.ClientTimeout(total=10)  # Longer timeout for potentially larger responses
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                combined_results = []
+                async with session.get(
+                    f'{self.server_ip}/sample/{endpoint}',
+                    params=payload,
+                    headers={'accept': 'application/json'}
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        df = pd.DataFrame(data['data'])
+                    else:
+                        logging.error(f"Failed to fetch {endpoint}: {response.status}")
+                        df = pd.DataFrame()
 
-                for mutation in mutations:
-                    # Fetch coverage data for all possible symbols at this position
-                    coverage_data, stratified_results = await self._fetch_coverage_for_mutation(
-                        session, mutation, mutation_type, date_range, location_name
-                    )
+            # Convert to the expected format
+            combined_results = []
+            for mutation in mutations:
+                if not df.empty:
+                    mutation_data = df[df['mutation'] == mutation]
+                else:
+                    mutation_data = pd.DataFrame()
+                
+                if not mutation_data.empty:
+                    # Take the first row (should be unique per mutation for the full date range)
+                    row = mutation_data.iloc[0]
                     
-                    # Calculate and append the result for this mutation
-                    mutation_result = self._calculate_mutation_result(mutation, coverage_data, stratified_results)
-                    combined_results.append(mutation_result)
+                    # Extract target symbol for counts mapping
+                    if mutation_type == MutationType.AMINO_ACID:
+                        # For amino acid mutations like "ORF1a:V3449I", target is "I"
+                        target_symbol = mutation.split(':')[1][-1] if ':' in mutation else mutation[-1]
+                    else:
+                        # For nucleotide mutations like "C241T", target is "T"
+                        target_symbol = mutation[-1]
+                    
+                    result = {
+                        "mutation": mutation,
+                        "coverage": int(row['coverage']),
+                        "frequency": float(row['proportion']),  # proportion equals frequency
+                        "counts": {target_symbol: int(row['count'])},  # Simple count mapping
+                        "stratified": [
+                            {
+                                "sampling_date": date_range[0].strftime('%Y-%m-%d'),
+                                "coverage": int(row['coverage']),
+                                "frequency": float(row['proportion']),
+                                "count": int(row['count'])
+                            }
+                        ]
+                    }
+                else:
+                    # No data found for this mutation
+                    result = {
+                        "mutation": mutation,
+                        "coverage": 0,
+                        "frequency": 0.0,
+                        "counts": {},
+                        "stratified": []
+                    }
+                
+                combined_results.append(result)
 
-                return combined_results
+            return combined_results
         except Exception as e:
             logging.error(f"Error fetching mutation counts and coverage: {e}")
             # Return empty results for all mutations
@@ -261,9 +334,16 @@ class WiseLoculusLapis(Lapis):
             date_range: Tuple[datetime, datetime], 
             location_name: Optional[str] = None,
             min_proportion: float = 0.01,
+            mutations: Optional[List[str]] = None,
         ) -> pd.DataFrame:
         """
         Fetches nucleotide mutations for a given date range and optional location.
+        
+        Args:
+            date_range: Tuple of start and end dates
+            location_name: Optional location filter
+            min_proportion: Minimum proportion threshold
+            mutations: Optional list of specific mutations to query
         
         Returns a DataFrame with 
         Columns: ['mutation', 'count', 'coverage', 'proportion', 'sequenceName', 'mutationFrom', 'mutationTo', 'position']
@@ -272,13 +352,18 @@ class WiseLoculusLapis(Lapis):
         payload = {
             "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
             "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
-            "location_name": location_name,
             "minProportion": min_proportion, 
             "orderBy": "proportion",
             "limit": 10000,  # Adjust limit as needed
             "dataFormat": "JSON",
             "downloadAsFile": "false"
         }
+
+        if location_name:
+            payload["location_name"] = location_name
+
+        if mutations:
+            payload["nucleotideMutations"] = mutations
 
         try:
             timeout = aiohttp.ClientTimeout(total=5)  # 5 second timeout
@@ -304,9 +389,16 @@ class WiseLoculusLapis(Lapis):
             date_range: Tuple[datetime, datetime], 
             location_name: Optional[str] = None,
             min_proportion: float = 0.01,
+            mutations: Optional[List[str]] = None,
         ) -> pd.DataFrame:
         """
         Fetches amino acid mutations for a given date range and optional location.
+        
+        Args:
+            date_range: Tuple of start and end dates
+            location_name: Optional location filter
+            min_proportion: Minimum proportion threshold
+            mutations: Optional list of specific mutations to query
         
         Returns a DataFrame with 
         Columns: ['mutation', 'count', 'coverage', 'proportion', 'sequenceName', 'mutationFrom', 'mutationTo', 'position']
@@ -315,13 +407,18 @@ class WiseLoculusLapis(Lapis):
         payload = {
             "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
             "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
-            "location_name": location_name,
             "minProportion": min_proportion, 
             "orderBy": "proportion",
             "limit": 10000,  # Adjust limit as needed
             "dataFormat": "JSON",
             "downloadAsFile": "false"
         }
+
+        if location_name:
+            payload["location_name"] = location_name
+
+        if mutations:
+            payload["aminoAcidMutations"] = mutations
 
         try:
             timeout = aiohttp.ClientTimeout(total=5)  # 5 second timeout
