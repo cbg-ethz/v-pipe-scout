@@ -37,7 +37,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-defaultpassword123}
-
+      - GA_MEASUREMENT_ID=${GA_MEASUREMENT_ID:-}
+         
   # Celery worker: Processes background tasks
   worker:
     build:

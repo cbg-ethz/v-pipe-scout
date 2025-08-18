@@ -82,8 +82,18 @@ def app():
     st.markdown("**27 Mio Reads × 2.5 GB/Mio Reads = 67.5 GB of RAM**")
     st.markdown("**4 weeks x 67.5 GB/week =  270 GB of RAM**")
 
-    # Debug Information Section (Collapsible)
     st.markdown("---")
+    # Short Privacy Notice (Collapsible)
+    with st.expander("🔒 Privacy (short notice)", expanded=False):
+        st.write(
+            "We use Google Analytics 4 in Consent Mode with analytics and ad storage denied. "
+            "This prevents analytics cookies from being set and sends only cookieless, aggregated pings. "
+            "The app does not collect personal identifiers through the UI. Background processing via Celery/Redis "
+            "supports analysis features only; no personal user data is stored."
+        )
+
+    # Debug Information Section (Collapsible)
+
     with st.expander("🛠️ Debug Information", expanded=False):
         st.markdown("### System Information")
         

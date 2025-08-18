@@ -1,5 +1,6 @@
 import streamlit as st
 import logging
+import os
 from streamlit_theme import st_theme
 
 import subpages.index as index
@@ -18,6 +19,41 @@ if __name__ == "__main__":
         page_icon="https://cbg-ethz.github.io/V-pipe/favicon-32x32.png",
         layout="wide"
     )
+
+    # --- Google Analytics (GA4) injection using .env only (cookieless via Consent Mode v2) ---
+    GA_ID = os.environ.get("GA_MEASUREMENT_ID")
+    if GA_ID:
+        ga_html = f"""
+                <script>
+                    // Consent Mode v2: deny analytics/ad storage to avoid analytics cookies (cookieless pings only)
+                    window.dataLayer = window.dataLayer || [];
+                    function gtag(){{dataLayer.push(arguments);}}
+                    gtag('consent', 'default', {{
+                        'ad_storage': 'denied',
+                        'analytics_storage': 'denied',
+                        'ad_user_data': 'denied',
+                        'ad_personalization': 'denied',
+                        'functionality_storage': 'denied',
+                        'security_storage': 'granted'
+                    }});
+                </script>
+                <script async src="https://www.googletagmanager.com/gtag/js?id={GA_ID}"></script>
+                <script>
+                    gtag('js', new Date());
+                    gtag('config', '{GA_ID}', {{
+                        'anonymize_ip': true,
+                        'allow_google_signals': false,
+                        'send_page_view': true
+                    }});
+                </script>
+                """
+        # Streamlit 1.47 supports st.html; fallback to components.html if needed.
+        try:
+            st.html(ga_html)  # type: ignore[attr-defined]
+        except Exception:
+            import streamlit.components.v1 as components
+            components.html(f"<div style='display:none'>{ga_html}</div>", height=0, scrolling=False)
+    # --- end GA injection ---
     
     # Initialize health monitoring session state
     initialize_health_monitoring()
@@ -31,7 +67,7 @@ if __name__ == "__main__":
         {"app": dynamic_mutations.app, "title": "Dynamic Mutation Heatmap", "icon": "🧮", "url_path": "dynamic-mutations"},
         {"app": background.app, "title": "Untracked Mutations", "icon": "👀", "url_path": "background"},
         {"app": signature_explorer.app, "title": "Variant Signature Explorer", "icon": "🔍", "url_path": "signature-explorer"},
-        {"app": abundance_estimator.app, "title": "Variant Abundances", "icon": "🧩", "url_path": "abundance-estimator"}
+    {"app": abundance_estimator.app, "title": "Variant Abundances", "icon": "🧩", "url_path": "abundance-estimator"}
     ]
     
     # Create pages dynamically from configurations
