@@ -23,6 +23,7 @@ if __name__ == "__main__":
     # --- Google Analytics (GA4) injection using .env only (cookieless via Consent Mode v2) ---
     GA_ID = os.environ.get("GA_MEASUREMENT_ID")
     if GA_ID:
+        import streamlit.components.v1 as components
         ga_html = f"""
                 <script>
                     // Consent Mode v2: deny analytics/ad storage to avoid analytics cookies (cookieless pings only)
@@ -47,12 +48,7 @@ if __name__ == "__main__":
                     }});
                 </script>
                 """
-        # Streamlit 1.47 supports st.html; fallback to components.html if needed.
-        try:
-            st.html(ga_html)  # type: ignore[attr-defined]
-        except Exception:
-            import streamlit.components.v1 as components
-            components.html(f"<div style='display:none'>{ga_html}</div>", height=0, scrolling=False)
+        components.html(f"<div style='display:none'>{ga_html}</div>", height=0, scrolling=False)
     # --- end GA injection ---
     
     # Initialize health monitoring session state

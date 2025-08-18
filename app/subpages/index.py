@@ -84,7 +84,7 @@ def app():
 
     st.markdown("---")
     # Short Privacy Notice (Collapsible)
-    with st.expander("🔒 Privacy (short notice)", expanded=False):
+    with st.expander("🔒 Privacy Notice", expanded=False):
         st.write(
             "We use Google Analytics 4 in Consent Mode with analytics and ad storage denied. "
             "This prevents analytics cookies from being set and sends only cookieless, aggregated pings. "
