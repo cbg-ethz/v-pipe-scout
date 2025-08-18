@@ -299,6 +299,49 @@ class WiseLoculusLapis(Lapis):
             logging.error(f"Error fetching nucleotide mutations: {e}")
             return pd.DataFrame()
 
+    async def sample_aminoAcidMutations(
+            self, 
+            date_range: Tuple[datetime, datetime], 
+            location_name: Optional[str] = None,
+            min_proportion: float = 0.01,
+        ) -> pd.DataFrame:
+        """
+        Fetches amino acid mutations for a given date range and optional location.
+        
+        Returns a DataFrame with 
+        Columns: ['mutation', 'count', 'coverage', 'proportion', 'sequenceName', 'mutationFrom', 'mutationTo', 'position']
+        """
+
+        payload = {
+            "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
+            "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
+            "location_name": location_name,
+            "minProportion": min_proportion, 
+            "orderBy": "proportion",
+            "limit": 10000,  # Adjust limit as needed
+            "dataFormat": "JSON",
+            "downloadAsFile": "false"
+        }
+
+        try:
+            timeout = aiohttp.ClientTimeout(total=5)  # 5 second timeout
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(
+                    f'{self.server_ip}/sample/aminoAcidMutations',
+                    params=payload,
+                    headers={'accept': 'application/json'}
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        df = pd.DataFrame(data['data'])
+                        return df
+                    else:
+                        logging.error(f"Failed to fetch amino acid mutations: {response.status}")
+                        return pd.DataFrame()
+        except Exception as e:
+            logging.error(f"Error fetching amino acid mutations: {e}")
+            return pd.DataFrame()
+
     def mutations_over_time_dfs(
         self, 
         formatted_mutations: List[str], 
