@@ -98,25 +98,36 @@ class ApiHealthChecker:
         
         try:
             # Use a simple endpoint that should always be available
-            health_endpoint = f"{server_url.rstrip('/')}/sample/aggregated"
+            health_endpoint = f"{server_url.rstrip('/')}"
             
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout)) as session:
-                # Simple health check with minimal payload
+                # Simple health check with minimal LAPIS v2 payload
                 payload = {
-                    "fields": ["location_name"],
-                    "limit": 1,
-                    "orderBy": ["location_name"],
-                    "dataFormat": "JSON"
+                    "action": {
+                        "type": "Aggregated",
+                        "groupByFields": ["location_name"]
+                    },
+                    "filterExpression": {
+                        "type": "True"
+                    }
                 }
                 
-                async with session.get(health_endpoint, params=payload) as response:
+                async with session.post(
+                    health_endpoint, 
+                    json=payload,
+                    headers={
+                        'accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                ) as response:
                     response_time = (time.time() - start_time) * 1000
                     
                     if response.status == 200:
-                        # Check if we get valid JSON response
+                        # Check if we get valid NDJSON response
                         try:
-                            data = await response.json()
-                            if isinstance(data, dict) and 'data' in data:
+                            response_text = await response.text()
+                            lines = response_text.strip().split('\n')
+                            if lines and lines[0].strip():  # At least one non-empty line
                                 status = HealthStatus.HEALTHY if response_time < self.warning_threshold_ms else HealthStatus.WARNING
                                 result = ApiHealthResult(
                                     status=status,

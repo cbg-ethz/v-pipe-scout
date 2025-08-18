@@ -175,50 +175,87 @@ class WiseLoculusLapis(Lapis):
         ) -> List[dict[str, Any]]:
         """
         Fetches the mutation counts and coverage for a list of mutations, specifying their type and optional location.
-        Uses the direct nucleotideMutations/aminoAcidMutations endpoints for efficiency.
+        Uses the LAPIS v2 Mutations action for efficiency.
 
         Note Amino Acid mutations require gene:change name "ORF1a:V3449I" while nucleotide mutations can be in the form "A123T".
         """
   
         try:
-            # Build payload for the specific mutation endpoint
-            payload = {
-                "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
-                "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
-                "minProportion": 0.0,  # Get all mutations regardless of proportion
-                "orderBy": "proportion",
-                "limit": 10000,
-                "dataFormat": "JSON",
-                "downloadAsFile": "false"
-            }
-
+            # Build filter expression for date range and location
+            filter_children = []
+            
+            # Add date range filter - using range comparison
+            filter_children.append({
+                "type": "StringGreaterThanOrEqual",
+                "column": "sampling_date",
+                "value": date_range[0].strftime('%Y-%m-%d')
+            })
+            filter_children.append({
+                "type": "StringLessThanOrEqual", 
+                "column": "sampling_date",
+                "value": date_range[1].strftime('%Y-%m-%d')
+            })
+            
             # Add location filter if provided
             if location_name:
-                payload["location_name"] = location_name
+                filter_children.append({
+                    "type": "StringEquals",
+                    "column": "location_name", 
+                    "value": location_name
+                })
+            
+            # Add mutation filters
+            if mutations:
+                if mutation_type == MutationType.NUCLEOTIDE:
+                    filter_children.append({
+                        "type": "StringInSet",
+                        "column": "nucleotide_mutations",
+                        "values": mutations
+                    })
+                elif mutation_type == MutationType.AMINO_ACID:
+                    filter_children.append({
+                        "type": "StringInSet", 
+                        "column": "amino_acid_mutations",
+                        "values": mutations
+                    })
+            
+            # Build the LAPIS v2 payload
+            payload = {
+                "action": {
+                    "type": "Mutations",
+                    "sequenceType": "nucleotide" if mutation_type == MutationType.NUCLEOTIDE else "aminoAcid",
+                    "minProportion": 0.0,
+                    "orderBy": [{"field": "proportion", "type": "descending"}],
+                    "limit": 10000
+                },
+                "filterExpression": {
+                    "type": "And",
+                    "children": filter_children
+                } if filter_children else {
+                    "type": "True"
+                }
+            }
 
-            # Add mutation filter based on type
-            if mutation_type == MutationType.NUCLEOTIDE:
-                payload["nucleotideMutations"] = mutations
-                endpoint = "nucleotideMutations"
-            elif mutation_type == MutationType.AMINO_ACID:
-                payload["aminoAcidMutations"] = mutations
-                endpoint = "aminoAcidMutations"
-            else:
-                raise ValueError(f"Unsupported mutation type: {mutation_type}")
-
-            # Make the API call
+            # Make the API call using LAPIS v2 format
             timeout = aiohttp.ClientTimeout(total=10)  # Longer timeout for potentially larger responses
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(
-                    f'{self.server_ip}/sample/{endpoint}',
-                    params=payload,
-                    headers={'accept': 'application/json'}
+                async with session.post(
+                    f'{self.server_ip}',
+                    json=payload,
+                    headers={
+                        'accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
                 ) as response:
                     if response.status == 200:
-                        data = await response.json()
-                        df = pd.DataFrame(data['data'])
+                        # Parse NDJSON response
+                        response_text = await response.text()
+                        lines = response_text.strip().split('\n')
+                        data = [pd.read_json(line, typ='series').to_dict() for line in lines if line.strip()]
+                        df = pd.DataFrame(data)
                     else:
-                        logging.error(f"Failed to fetch {endpoint}: {response.status}")
+                        logging.error(f"Failed to fetch mutations: {response.status}")
+                        logging.error(await response.text())
                         df = pd.DataFrame()
 
             # Convert to the expected format
@@ -349,36 +386,75 @@ class WiseLoculusLapis(Lapis):
         Columns: ['mutation', 'count', 'coverage', 'proportion', 'sequenceName', 'mutationFrom', 'mutationTo', 'position']
         """
 
-        payload = {
-            "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
-            "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
-            "minProportion": min_proportion, 
-            "orderBy": "proportion",
-            "limit": 10000,  # Adjust limit as needed
-            "dataFormat": "JSON",
-            "downloadAsFile": "false"
-        }
-
+        # Build filter expression for date range and location
+        filter_children = []
+        
+        # Add date range filter
+        filter_children.append({
+            "type": "StringGreaterThanOrEqual",
+            "column": "sampling_date",
+            "value": date_range[0].strftime('%Y-%m-%d')
+        })
+        filter_children.append({
+            "type": "StringLessThanOrEqual", 
+            "column": "sampling_date",
+            "value": date_range[1].strftime('%Y-%m-%d')
+        })
+        
+        # Add location filter if provided
         if location_name:
-            payload["location_name"] = location_name
-
+            filter_children.append({
+                "type": "StringEquals",
+                "column": "location_name", 
+                "value": location_name
+            })
+        
+        # Add specific mutations filter if provided
         if mutations:
-            payload["nucleotideMutations"] = mutations
+            filter_children.append({
+                "type": "StringInSet",
+                "column": "nucleotide_mutations",
+                "values": mutations
+            })
+
+        # Build the LAPIS v2 payload
+        payload = {
+            "action": {
+                "type": "Mutations",
+                "sequenceType": "nucleotide",
+                "minProportion": min_proportion,
+                "orderBy": [{"field": "proportion", "type": "descending"}],
+                "limit": 10000
+            },
+            "filterExpression": {
+                "type": "And",
+                "children": filter_children
+            } if filter_children else {
+                "type": "True"
+            }
+        }
 
         try:
             timeout = aiohttp.ClientTimeout(total=5)  # 5 second timeout
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(
-                    f'{self.server_ip}/sample/nucleotideMutations',
-                    params=payload,
-                    headers={'accept': 'application/json'}
+                async with session.post(
+                    f'{self.server_ip}',
+                    json=payload,
+                    headers={
+                        'accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
                 ) as response:
                     if response.status == 200:
-                        data = await response.json()
-                        df = pd.DataFrame(data['data'])
+                        # Parse NDJSON response
+                        response_text = await response.text()
+                        lines = response_text.strip().split('\n')
+                        data = [pd.read_json(line, typ='series').to_dict() for line in lines if line.strip()]
+                        df = pd.DataFrame(data)
                         return df
                     else:
                         logging.error(f"Failed to fetch nucleotide mutations: {response.status}")
+                        logging.error(await response.text())
                         return pd.DataFrame()
         except Exception as e:
             logging.error(f"Error fetching nucleotide mutations: {e}")
@@ -404,36 +480,75 @@ class WiseLoculusLapis(Lapis):
         Columns: ['mutation', 'count', 'coverage', 'proportion', 'sequenceName', 'mutationFrom', 'mutationTo', 'position']
         """
 
-        payload = {
-            "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
-            "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
-            "minProportion": min_proportion, 
-            "orderBy": "proportion",
-            "limit": 10000,  # Adjust limit as needed
-            "dataFormat": "JSON",
-            "downloadAsFile": "false"
-        }
-
+        # Build filter expression for date range and location
+        filter_children = []
+        
+        # Add date range filter
+        filter_children.append({
+            "type": "StringGreaterThanOrEqual",
+            "column": "sampling_date",
+            "value": date_range[0].strftime('%Y-%m-%d')
+        })
+        filter_children.append({
+            "type": "StringLessThanOrEqual", 
+            "column": "sampling_date",
+            "value": date_range[1].strftime('%Y-%m-%d')
+        })
+        
+        # Add location filter if provided
         if location_name:
-            payload["location_name"] = location_name
-
+            filter_children.append({
+                "type": "StringEquals",
+                "column": "location_name", 
+                "value": location_name
+            })
+        
+        # Add specific mutations filter if provided
         if mutations:
-            payload["aminoAcidMutations"] = mutations
+            filter_children.append({
+                "type": "StringInSet",
+                "column": "amino_acid_mutations",
+                "values": mutations
+            })
+
+        # Build the LAPIS v2 payload
+        payload = {
+            "action": {
+                "type": "Mutations",
+                "sequenceType": "aminoAcid",
+                "minProportion": min_proportion,
+                "orderBy": [{"field": "proportion", "type": "descending"}],
+                "limit": 10000
+            },
+            "filterExpression": {
+                "type": "And",
+                "children": filter_children
+            } if filter_children else {
+                "type": "True"
+            }
+        }
 
         try:
             timeout = aiohttp.ClientTimeout(total=5)  # 5 second timeout
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(
-                    f'{self.server_ip}/sample/aminoAcidMutations',
-                    params=payload,
-                    headers={'accept': 'application/json'}
+                async with session.post(
+                    f'{self.server_ip}',
+                    json=payload,
+                    headers={
+                        'accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
                 ) as response:
                     if response.status == 200:
-                        data = await response.json()
-                        df = pd.DataFrame(data['data'])
+                        # Parse NDJSON response
+                        response_text = await response.text()
+                        lines = response_text.strip().split('\n')
+                        data = [pd.read_json(line, typ='series').to_dict() for line in lines if line.strip()]
+                        df = pd.DataFrame(data)
                         return df
                     else:
                         logging.error(f"Failed to fetch amino acid mutations: {response.status}")
+                        logging.error(await response.text())
                         return pd.DataFrame()
         except Exception as e:
             logging.error(f"Error fetching amino acid mutations: {e}")
@@ -536,16 +651,32 @@ class WiseLoculusLapis(Lapis):
             Tuple[Optional[datetime], Optional[datetime]]: (earliest_date, latest_date) or (None, None) if no data
         """
         try:
+            # Build the LAPIS v2 payload for aggregated data with sampling_date grouping
+            payload = {
+                "action": {
+                    "type": "Aggregated",
+                    "groupByFields": ["sampling_date"]
+                },
+                "filterExpression": {
+                    "type": "True"
+                }
+            }
+            
             timeout = aiohttp.ClientTimeout(total=10)  # 10 second timeout for this query
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(
-                    f'{self.server_ip}/sample/aggregated',
-                    params={'fields': 'sampling_date'},
-                    headers={'accept': 'application/json'}
+                async with session.post(
+                    f'{self.server_ip}',
+                    json=payload,
+                    headers={
+                        'accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
                 ) as response:
                     if response.status == 200:
-                        data = await response.json()
-                        sample_data = data.get('data', [])
+                        # Parse NDJSON response
+                        response_text = await response.text()
+                        lines = response_text.strip().split('\n')
+                        sample_data = [pd.read_json(line, typ='series').to_dict() for line in lines if line.strip()]
                         
                         if not sample_data:
                             logging.warning("No sampling date data available")

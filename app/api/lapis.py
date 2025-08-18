@@ -37,7 +37,7 @@ class Lapis:
     def fetch_locations(self, default_locations=None):
         """Fetches locations from the API endpoint."""
         if default_locations is None:
-            default_locations = ["Zürich (ZH)"]
+            default_locations = []
         # Use the full server_ip URL directly instead of parsing it
         location_url = f'{self.server_ip.rstrip("/")}/sample/aggregated?fields=location_name&limit=100&orderBy=location_name&dataFormat=JSON&downloadAsFile=false'
         try:
