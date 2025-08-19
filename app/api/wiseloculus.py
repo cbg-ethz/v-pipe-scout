@@ -528,19 +528,22 @@ class WiseLoculusLapis(Lapis):
         return start_date, end_date, min_date, max_date
     
 
-    async def component_aminoAcidMutationsOverTime(
-            self, 
+    async def _component_mutations_over_time(
+            self,
+            endpoint: str,
+            mutation_type_name: str,
             mutations: List[str], 
             date_ranges: List[Tuple[datetime, datetime]],
             location_name: str
         ) -> dict[str, Any]:
         """
-        Fetches amino acid mutations over time for a given location and specific date ranges.
-        Returns counts and coverage for each mutation and date range.
+        Helper method for fetching mutations over time data from component endpoints.
         
         Args:
-            mutations: List of amino acid mutations in format ["S:N501Y", "N:N8N"]
-            date_ranges: List of date range tuples [(start_date, end_date), ...]
+            endpoint: The API endpoint name (e.g., "aminoAcidMutationsOverTime")
+            mutation_type_name: Display name for logging (e.g., "amino acid")
+            mutations: List of mutations
+            date_ranges: List of date range tuples
             location_name: Location name to filter by
             
         Returns:
@@ -561,13 +564,13 @@ class WiseLoculusLapis(Lapis):
             "dateField": "sampling_date"
         }
 
-        logging.debug(f"Fetching amino acid mutations over time with payload: {payload}")
+        logging.debug(f"Fetching {mutation_type_name} mutations over time with payload: {payload}")
         
         try:
             timeout = aiohttp.ClientTimeout(total=10)  # 10 second timeout
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(
-                    f'{self.server_ip}/component/aminoAcidMutationsOverTime',
+                    f'{self.server_ip}/component/{endpoint}',
                     headers={
                         'accept': 'application/json',
                         'Content-Type': 'application/json'
@@ -578,7 +581,7 @@ class WiseLoculusLapis(Lapis):
                         data = await response.json()
                         return data
                     else:
-                        logging.error(f"Failed to fetch amino acid mutations over time.")
+                        logging.error(f"Failed to fetch {mutation_type_name} mutations over time.")
                         logging.error(f"Status code: {response.status}")
                         error_text = await response.text()
                         logging.error(error_text)
@@ -588,8 +591,60 @@ class WiseLoculusLapis(Lapis):
                             "data": None
                         }
         except Exception as e:
-            logging.error(f"Connection error fetching amino acid mutations over time: {e}")
+            logging.error(f"Connection error fetching {mutation_type_name} mutations over time: {e}")
             return {
                 "error": str(e),
                 "data": None
             }
+
+    async def component_aminoAcidMutationsOverTime(
+            self, 
+            mutations: List[str], 
+            date_ranges: List[Tuple[datetime, datetime]],
+            location_name: str
+        ) -> dict[str, Any]:
+        """
+        Fetches amino acid mutations over time for a given location and specific date ranges.
+        Returns counts and coverage for each mutation and date range.
+        
+        Args:
+            mutations: List of amino acid mutations in format ["S:N501Y", "N:N8N"]
+            date_ranges: List of date range tuples [(start_date, end_date), ...]
+            location_name: Location name to filter by
+            
+        Returns:
+            Dict containing the API response with mutations, dateRanges, and data matrix
+        """
+        return await self._component_mutations_over_time(
+            endpoint="aminoAcidMutationsOverTime",
+            mutation_type_name="amino acid",
+            mutations=mutations,
+            date_ranges=date_ranges,
+            location_name=location_name
+        )
+
+    async def component_nucleotideMutationsOverTime(
+            self, 
+            mutations: List[str], 
+            date_ranges: List[Tuple[datetime, datetime]],
+            location_name: str
+        ) -> dict[str, Any]:
+        """
+        Fetches nucleotide mutations over time for a given location and specific date ranges.
+        Returns counts and coverage for each mutation and date range.
+        
+        Args:
+            mutations: List of nucleotide mutations in format ["A5341C", "C34G"]
+            date_ranges: List of date range tuples [(start_date, end_date), ...]
+            location_name: Location name to filter by
+            
+        Returns:
+            Dict containing the API response with mutations, dateRanges, and data matrix
+        """
+        return await self._component_mutations_over_time(
+            endpoint="nucleotideMutationsOverTime",
+            mutation_type_name="nucleotide",
+            mutations=mutations,
+            date_ranges=date_ranges,
+            location_name=location_name
+        )
