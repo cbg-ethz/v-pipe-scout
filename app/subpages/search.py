@@ -1,6 +1,9 @@
+import numpy as np
 import streamlit as st
 import pandas as pd
 import asyncio
+import streamlit.components.v1 as components
+import plotly.graph_objects as go 
 import pathlib
 
 from interface import MutationType
@@ -61,9 +64,6 @@ def app():
 
     start_date = date_range[0].strftime('%Y-%m-%d')
     end_date = date_range[1].strftime('%Y-%m-%d')
-
-    start_date = pd.to_datetime(start_date)
-    end_date = pd.to_datetime(end_date)
     
 
     ## Fetch locations from API
@@ -75,6 +75,10 @@ def app():
 
     location = st.selectbox("Select Location:", locations)
     
+    sequence_type_value = "amino acid"
+
+    formatted_mutations_str = str(formatted_mutations).replace("'", '"')
+
     st.markdown("---")
     st.write("### Resistance Mutations Over Time")
     st.write("Shows the mutations over time in wastewater for the selected date range.")
@@ -88,28 +92,7 @@ def app():
 
     with st.spinner("Fetching resistance mutation data..."):
         try:
-            # Get data using the new mutations_over_time function
-            mutations_over_time_df = asyncio.run(wiseLoculus.mutations_over_time(
-                mutations=formatted_mutations,
-                mutation_type=MutationType.AMINO_ACID,
-                date_range=(start_date, end_date),
-                location_name=location
-            ))
-
-            # Transform the data to match mutations_over_time_dfs signature:
-            # 1. counts_df and freq_df: mutations as rows, dates as columns
-            # 2. coverage_freq_df: keep the MultiIndex structure for compatibility
-            
-            # Reset index to access mutation and sampling_date as columns
-            df_reset = mutations_over_time_df.reset_index()
-            
-            # Create the expected format: mutations as index, dates as columns
-            counts_df = df_reset.pivot(index='mutation', columns='sampling_date', values='count')
-            freq_df = df_reset.pivot(index='mutation', columns='sampling_date', values='frequency')
-            
-            # Keep the original MultiIndex structure for coverage_freq_df for compatibility with visualization
-            coverage_freq_df = mutations_over_time_df
-
+            counts_df, freq_df, coverage_freq_df = wiseLoculus.mutations_over_time_dfs(formatted_mutations, MutationType.AMINO_ACID, date_range, location)
         except Exception as e:
             st.error(f"⚠️ Error fetching resistance mutation data: {str(e)}")
             st.info("This could be due to API connectivity issues. Please try again later.")
@@ -134,7 +117,7 @@ def app():
             fig = mutations_over_time(
                 plot_freq_df, 
                 plot_counts_df, 
-                coverage_freq_df,  # Now using the original MultiIndex structure
+                coverage_freq_df,
                 title="Proportion of Resistance Mutations Over Time"
             )
             st.plotly_chart(fig, use_container_width=True)

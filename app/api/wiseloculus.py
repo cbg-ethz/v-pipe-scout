@@ -760,7 +760,7 @@ class WiseLoculusLapis(Lapis):
                         coverage = mutation_data.get("coverage", 0)
                         
                         # Calculate frequency from count and coverage
-                        frequency = count / coverage if coverage > 0 else 0
+                        frequency = count / coverage if coverage > 0 else pd.NA
                         
                         # For interval-based data, use the start date as the sampling_date
                         # or use the midpoint for better representation
