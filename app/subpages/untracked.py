@@ -74,28 +74,37 @@ def app():
 
     location = st.selectbox("Select Location:", locations)
 
-    mutations_in_timeframe_df =  asyncio.run(wiseLoculus.sample_mutations(
-        type=MutationType.NUCLEOTIDE,
-        date_range=(
-            start_date,
-            end_date
-        ),
-        location_name=location
-    ))
+    # Add button to trigger data fetching
+    if st.button("Fetch Untracked Mutations"):
+        with st.spinner("Fetching mutation data..."):
+            try:
+                mutations_in_timeframe_df = asyncio.run(wiseLoculus.sample_mutations(
+                    type=MutationType.NUCLEOTIDE,
+                    date_range=(
+                        start_date,
+                        end_date
+                    ),
+                    location_name=location
+                ))
 
-    # Handle case where no mutations were found or API call failed
-    if mutations_in_timeframe_df.empty:
-        st.info("ℹ️ No mutations found for the selected date range and location.")
-        st.write("This could be due to:")
-        st.write("• No mutations present in the specified time period")
-        st.write("• The selected location having no data for this date range")
-        mutations_in_timeframe = []  # Empty list as fallback
-    elif 'mutation' not in mutations_in_timeframe_df.columns:
-        st.error("⚠️ Unexpected data format received from the API. Please try again or contact support.")
-        st.info("The API response doesn't contain the expected mutation data structure.")
-        mutations_in_timeframe = []  # Empty list as fallback
+                # Handle case where no mutations were found or API call failed
+                if mutations_in_timeframe_df.empty:
+                    st.info("ℹ️ No mutations found for the selected date range and location.")
+                    st.write("This could be due to:")
+                    st.write("• No mutations present in the specified time period")
+                    st.write("• The selected location having no data for this date range")
+                    mutations_in_timeframe = []  # Empty list as fallback
+                elif 'mutation' not in mutations_in_timeframe_df.columns:
+                    st.error("⚠️ Unexpected data format received from the API. Please try again or contact support.")
+                    st.info("The API response doesn't contain the expected mutation data structure.")
+                    mutations_in_timeframe = []  # Empty list as fallback
+                else:
+                    mutations_in_timeframe = mutations_in_timeframe_df['mutation'].to_list()  
+            except Exception as e:
+                st.error(f"Error fetching mutations: {str(e)}")
+                mutations_in_timeframe = []
     else:
-        mutations_in_timeframe = mutations_in_timeframe_df['mutation'].to_list()  
+        mutations_in_timeframe = []
 
     # Get the available variant names from the signatures API (cached)
     available_variants = cached_get_variant_names()
@@ -112,68 +121,70 @@ def app():
             help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team"
         )
     
-    # from selected_curated_variants get each variant's signature mutations
-    all_curated_variants = cached_get_variant_list()
-    
-    # Filter to only the selected variants and extract their signature mutations
-    selected_signature_mutations = [
-        mutation 
-        for variant in all_curated_variants.variants
-        if variant.name in selected_curated_variants
-        for mutation in variant.signature_mutations
-    ]
-
-    # remove duplicates from selected_signature_mutations
-    selected_signature_mutations = list(set(selected_signature_mutations))
-
-    # Calculate untracked mutations (all mutations minus the signature mutations)
-    background_mutations = [
-        mutation for mutation in mutations_in_timeframe
-        if mutation not in selected_signature_mutations
-    ]
-
-    # TODO: add a venn diragram here to visualize the overlap, once the better venn diagram library is available
-    st.write(f"Total mutations in timeframe: {len(mutations_in_timeframe)}")
-    st.write(f"Signature mutations to exclude: {len(selected_signature_mutations)}")
-    st.write(f"Untracked mutations to analyze: {len(background_mutations)}")
-
-    # Use the mutation plot component
-    if background_mutations:
-        # Configure the component for untracked mutations
-        plot_config = {
-            'show_frequency_filtering': True,
-            'show_date_options': True,
-            'show_download': True,
-            'show_summary_stats': True,
-            'default_min_frequency': 0.01,
-            'default_max_frequency': 1.0,
-            'plot_title': "Untracked Mutations Over Time",
-            'enable_empty_date_toggle': True,
-            'show_mutation_count': False  # We already show this above
-        }
+    # Only process if mutations_in_timeframe is defined and has data
+    if 'mutations_in_timeframe' in locals() and mutations_in_timeframe:
+        # from selected_curated_variants get each variant's signature mutations
+        all_curated_variants = cached_get_variant_list()
         
-        # Add description
-        st.write("Shows the untracked mutations (not in variant signatures) over time in wastewater for the selected date range.")
-        
-        # Use the component
-        result = render_mutation_plot_component(
-            wiseLoculus=wiseLoculus,
-            mutations=background_mutations,
-            sequence_type="nucleotide",  # Background mutations are always nucleotide
-            date_range=(start_date, end_date),
-            location=location,
-            config=plot_config,
-            session_prefix="background_"
-        )
-        
-        if result is None:
+        # Filter to only the selected variants and extract their signature mutations
+        selected_signature_mutations = [
+            mutation 
+            for variant in all_curated_variants.variants
+            if variant.name in selected_curated_variants
+            for mutation in variant.signature_mutations
+        ]
+
+        # remove duplicates from selected_signature_mutations
+        selected_signature_mutations = list(set(selected_signature_mutations))
+
+        # Calculate untracked mutations (all mutations minus the signature mutations)
+        background_mutations = [
+            mutation for mutation in mutations_in_timeframe
+            if mutation not in selected_signature_mutations
+        ]
+
+        # TODO: add a venn diragram here to visualize the overlap, once the better venn diagram library is available
+        st.write(f"Total mutations in timeframe: {len(mutations_in_timeframe)}")
+        st.write(f"Signature mutations to exclude: {len(selected_signature_mutations)}")
+        st.write(f"Untracked mutations to analyze: {len(background_mutations)}")
+
+        # Use the mutation plot component
+        if background_mutations:
+            # Configure the component for untracked mutations
+            plot_config = {
+                'show_frequency_filtering': True,
+                'show_date_options': True,
+                'show_download': True,
+                'show_summary_stats': True,
+                'default_min_frequency': 0.01,
+                'default_max_frequency': 1.0,
+                'plot_title': "Untracked Mutations Over Time",
+                'enable_empty_date_toggle': True,
+                'show_mutation_count': False  # We already show this above
+            }
+            
+            # Add description
+            st.write("Shows the untracked mutations (not in variant signatures) over time in wastewater for the selected date range.")
+            
+            # Use the component
+            result = render_mutation_plot_component(
+                wiseLoculus=wiseLoculus,
+                mutations=background_mutations,
+                sequence_type="nucleotide",  # Background mutations are always nucleotide
+                date_range=(start_date, end_date),
+                location=location,
+                config=plot_config,
+                session_prefix="background_"
+            )
+            
+            if result is None:
+                st.info("💡 Try adjusting the date range, location, or variant exclusions.")
+        else:
+            st.warning("⚠️ No untracked mutations available for analysis. This could be due to:")
+            st.write("• API connection issues preventing mutation data fetch")
+            st.write("• No mutations found in the selected time range and location")
+            st.write("• All detected mutations were excluded as variant signatures")
             st.info("💡 Try adjusting the date range, location, or variant exclusions.")
-    else:
-        st.warning("⚠️ No untracked mutations available for analysis. This could be due to:")
-        st.write("• API connection issues preventing mutation data fetch")
-        st.write("• No mutations found in the selected time range and location")
-        st.write("• All detected mutations were excluded as variant signatures")
-        st.info("💡 Try adjusting the date range, location, or variant exclusions.")
 
 if __name__ == "__main__":
     app()
