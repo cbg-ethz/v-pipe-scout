@@ -648,3 +648,160 @@ class WiseLoculusLapis(Lapis):
             date_ranges=date_ranges,
             location_name=location_name
         )
+
+    def _generate_date_ranges(
+            self, 
+            date_range: Tuple[datetime, datetime], 
+            interval: str = "daily"
+        ) -> List[Tuple[datetime, datetime]]:
+        """
+        Generate date ranges based on the specified interval.
+        
+        Args:
+            date_range: Tuple of (start_date, end_date)
+            interval: "daily", "weekly", or "monthly"
+            
+        Returns:
+            List of date range tuples
+        """
+        start_date, end_date = date_range
+        date_ranges = []
+        
+        if interval == "daily":
+            current_date = start_date
+            while current_date <= end_date:
+                date_ranges.append((current_date, current_date))
+                current_date += pd.Timedelta(days=1)
+                
+        elif interval == "weekly":
+            current_date = start_date
+            while current_date <= end_date:
+                week_end = min(current_date + pd.Timedelta(days=6), end_date)
+                date_ranges.append((current_date, week_end))
+                current_date = week_end + pd.Timedelta(days=1)
+                
+        elif interval == "monthly":
+            current_date = start_date
+            while current_date <= end_date:
+                # Get the last day of the current month
+                if current_date.month == 12:
+                    next_month = current_date.replace(year=current_date.year + 1, month=1, day=1)
+                else:
+                    next_month = current_date.replace(month=current_date.month + 1, day=1)
+                month_end = min(next_month - pd.Timedelta(days=1), end_date)
+                date_ranges.append((current_date, month_end))
+                current_date = next_month
+                
+        else:
+            raise ValueError(f"Unsupported interval: {interval}. Use 'daily', 'weekly', or 'monthly'")
+            
+        return date_ranges
+
+    async def mutations_over_time(
+            self, 
+            mutations: List[str], 
+            mutation_type: MutationType, 
+            date_range: Tuple[datetime, datetime], 
+            location_name: str,
+            interval: str = "daily"
+        ) -> pd.DataFrame:
+        """
+        Fetches mutation counts, coverage, and frequency using component endpoints for specified time intervals.
+
+        Args:
+            mutations (List[str]): List of mutations to fetch data for.
+            mutation_type (MutationType): Type of mutations (NUCLEOTIDE or AMINO_ACID).
+            date_range (Tuple[datetime, datetime]): Tuple containing start and end dates for the data range.
+            location_name (str): Location name to filter by.
+            interval (str): Time interval - "daily" (default), "weekly", or "monthly".
+
+        Returns:
+            pd.DataFrame: A MultiIndex DataFrame with mutation and sampling_date as the index, 
+                         and count, coverage, and frequency as columns.
+        """
+        try:
+            # Generate date ranges based on the specified interval
+            date_ranges = self._generate_date_ranges(date_range, interval)
+            
+            # Choose the appropriate component endpoint based on mutation type
+            if mutation_type == MutationType.AMINO_ACID:
+                api_data = await self.component_aminoAcidMutationsOverTime(mutations, date_ranges, location_name)
+            elif mutation_type == MutationType.NUCLEOTIDE:
+                api_data = await self.component_nucleotideMutationsOverTime(mutations, date_ranges, location_name)
+            else:
+                raise ValueError(f"Unsupported mutation type: {mutation_type}")
+
+            # Check for API errors
+            if "error" in api_data:
+                logging.error(f"API error in mutations_over_time: {api_data['error']}")
+                # Return empty DataFrame with proper structure
+                df = pd.DataFrame(columns=["count", "coverage", "frequency"])
+                df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
+                return df
+
+            # Parse the API response
+            records = []
+            api_data_content = api_data.get("data", {})
+            api_mutations = api_data_content.get("mutations", [])
+            api_date_ranges = api_data_content.get("dateRanges", [])
+            data_matrix = api_data_content.get("data", [])
+
+            # Debug logging
+            logging.debug(f"mutations_over_time: Received {len(api_mutations)} mutations, {len(api_date_ranges)} date ranges")
+
+            # Process the data matrix
+            for i, mutation in enumerate(api_mutations):
+                for j, date_range_info in enumerate(api_date_ranges):
+                    if i < len(data_matrix) and j < len(data_matrix[i]):
+                        mutation_data = data_matrix[i][j]
+                        
+                        # Extract count and coverage from the API response
+                        count = mutation_data.get("count", 0)
+                        coverage = mutation_data.get("coverage", 0)
+                        
+                        # Calculate frequency from count and coverage
+                        frequency = count / coverage if coverage > 0 else 0
+                        
+                        # For interval-based data, use the start date as the sampling_date
+                        # or use the midpoint for better representation
+                        start_date = pd.to_datetime(date_range_info["dateFrom"])
+                        end_date = pd.to_datetime(date_range_info["dateTo"])
+                        
+                        if interval == "daily":
+                            sampling_date = start_date.strftime('%Y-%m-%d')
+                        else:
+                            # Use midpoint for weekly/monthly intervals
+                            midpoint = start_date + (end_date - start_date) / 2
+                            sampling_date = midpoint.strftime('%Y-%m-%d')
+                        
+                        # Add all records, even those with coverage = 0
+                        # This allows us to see when data is missing vs when mutations don't exist
+                        records.append({
+                            "mutation": mutation,
+                            "sampling_date": sampling_date,
+                            "count": count,
+                            "coverage": coverage,
+                            "frequency": frequency
+                        })
+
+            logging.debug(f"Created {len(records)} records from component API data")
+
+            # Create DataFrame from records
+            df = pd.DataFrame(records)
+
+            # Set MultiIndex if we have data
+            if not df.empty and "mutation" in df.columns and "sampling_date" in df.columns:
+                df.set_index(["mutation", "sampling_date"], inplace=True)
+            else:
+                # Create empty DataFrame with proper MultiIndex structure
+                df = pd.DataFrame(columns=["count", "coverage", "frequency"])
+                df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
+            return df
+
+        except Exception as e:
+            logging.error(f"Error in mutations_over_time: {e}")
+            # Return empty DataFrame with proper MultiIndex structure
+            df = pd.DataFrame(columns=["count", "coverage", "frequency"])
+            df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
+            return df
+
