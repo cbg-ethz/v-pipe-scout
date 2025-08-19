@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-APP_PATH = os.getenv("APP_PATH", default="app.py")
+APP_PATH = os.getenv("APP_PATH", default=str(Path(__file__).parent.parent / "app.py"))
 
 def test_navigation_links():
     """Test that all navigation links are present in the sidebar."""
