@@ -169,6 +169,7 @@ class TestWiseLoculusLapis:
         assert result.iloc[1]["count"] == 80
 
         # Use shared MockResponse and MockSession classes
+    @pytest.mark.asyncio
     async def test_sample_mutations_amino_acid_success(self):
         """Test sample_mutations for amino acid mutations with successful response."""
         mock_response_data = {
