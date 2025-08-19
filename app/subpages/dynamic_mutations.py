@@ -52,35 +52,49 @@ def app():
     # Amino Acids or Nucleotides
     sequence_type = st.selectbox("Select Sequence Type:", ["Nucleotides", "Amino Acids"])
 
-    if len(date_range) == 2:
-        start_date = datetime.strptime(str(date_range[0]), "%Y-%m-%d")
-        end_date = datetime.strptime(str(date_range[1]), "%Y-%m-%d")
+    # the sequence type selection determines the default value for min_proportion
+    if sequence_type == "Nucleotides":
+        default_min_proportion = 0.10
+    elif sequence_type == "Amino Acids":
+        default_min_proportion = 0.30
+    else:
+        default_min_proportion = 0.05
+    
 
-        sequence_type_value = "amino acid" if sequence_type == "Amino Acids" else "nucleotide"
+    # text box with min_proportion – mutaiton has to occure at least once to this proportion to show up
+    min_proportion = st.number_input(
+        "Minimum Proportion of Mutation to fetch (the lower the longer the loading time)",
+        min_value=0.01,
+        max_value=1.0,
+        value=default_min_proportion,  # Default value
+        step=0.01,
+        help="Set the minimum proportion of mutation to fetch in the heatmap."
+    )
 
-        # Fetch all mutations for the given parameters
-        st.write("### Dynamic Mutation Analysis")
-        st.write("Analyzing all mutations found in the selected timeframe and location.")
-        
-        # Add performance warning
-        # Add performance warning
-        st.warning("⚠️ **Performance Notice**: Loading this plot may take up to 2 minutes. A major speedup will be implemented soon to improve loading times.")
+    # Add performance warning before the button
+    st.warning("⚠️ **Performance Notice**: Loading this plot may take up to a minute for proportions below 10%. A major speedup will be implemented soon to improve loading times.")
 
-        with st.spinner("Fetching mutations for the selected parameters..."):
+    # Add button to trigger data fetching
+    if st.button("Fetch Mutation Data"):
+        if len(date_range) == 2:
+            start_date = datetime.strptime(str(date_range[0]), "%Y-%m-%d")
+            end_date = datetime.strptime(str(date_range[1]), "%Y-%m-%d")
+
+            sequence_type_value = "amino acid" if sequence_type == "Amino Acids" else "nucleotide"
+
+            # Fetch all mutations for the given parameters
+            st.write("### Dynamic Mutation Analysis")
+            st.write("Analyzing all mutations found in the selected timeframe and location.")
+            
             try:
-                # For now, we'll focus on nucleotide mutations since that's what the API supports
-                # TODO: Add amino acid mutation support when API method becomes available
-                if sequence_type_value == "nucleotide":
-                    # Get all nucleotide mutations in the timeframe
-                    mutations_in_timeframe_df = asyncio.run(wiseLoculus.sample_nucleotideMutations(
-                        date_range=(start_date, end_date),
-                        location_name=location,
-                        min_proportion=0.001  # Lower threshold to get more mutations
-                    ))
-                else:
-                    st.warning("⚠️ Amino acid mutation analysis is not yet available through this interface.")
-                    st.info("Please select 'Nucleotides' for now. Amino acid support will be added in a future update.")
-                    return
+                mutation_type = MutationType.NUCLEOTIDE if sequence_type_value == "nucleotide" else MutationType.AMINO_ACID
+                # Get all nucleotide mutations in the timeframe
+                mutations_in_timeframe_df = asyncio.run(wiseLoculus.sample_mutations(
+                    type=mutation_type,
+                    date_range=(start_date, end_date),
+                    location_name=location,
+                    min_proportion=min_proportion  # Lower threshold to get more mutations
+                ))
 
                 if mutations_in_timeframe_df.empty or 'mutation' not in mutations_in_timeframe_df.columns:
                     st.warning("⚠️ No mutations found for the selected parameters.")
@@ -95,7 +109,7 @@ def app():
                     'show_date_options': True,
                     'show_download': True,
                     'show_summary_stats': True,
-                    'default_min_frequency': 0.01,
+                    'default_min_frequency': min_proportion,
                     'default_max_frequency': 1.0,
                     'plot_title': f"Dynamic {sequence_type} Mutations Over Time",
                     'enable_empty_date_toggle': True,
@@ -116,8 +130,8 @@ def app():
             except Exception as e:
                 st.error(f"⚠️ Error fetching mutation data: {str(e)}")
                 st.info("This could be due to API connectivity issues. Please try again later.")
-    else:
-        st.warning("Please select a valid date range with both start and end dates.")
+        else:
+            st.warning("Please select a valid date range with both start and end dates.")
 
 
 if __name__ == "__main__":

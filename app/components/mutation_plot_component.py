@@ -85,7 +85,10 @@ def render_mutation_plot_component(
         try:
             # Convert sequence_type string to MutationType enum
             mutation_type = MutationType.NUCLEOTIDE if sequence_type == "nucleotide" else MutationType.AMINO_ACID
-            
+
+            if mutation_type ==  MutationType.AMINO_ACID:
+                st.warning("⚠️ Amino acid mutations are not yet supported in this component. Please use nucleotide mutations instead.")
+                return None
             counts_df, freq_df, coverage_freq_df = wiseLoculus.mutations_over_time_dfs(
                 mutations,
                 mutation_type,
@@ -110,7 +113,7 @@ def render_mutation_plot_component(
     if config['show_frequency_filtering']:
         target.markdown("---")
         target.write("### Frequency Filtering")
-        target.write("Filter mutations based on their frequency ranges to focus on mutations of interest.")
+        target.write("Filter mutations to plot based on their frequency ranges to focus on mutations of interest.")
         
         col1, col2 = target.columns(2)
         
