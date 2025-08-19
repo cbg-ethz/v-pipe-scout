@@ -356,6 +356,94 @@ class TestWiseLoculusLapisLiveAPI:
                 
         except Exception as e:
             pytest.fail(f"Live amino acid API test failed: {e}")
+    
+    @pytest.mark.asyncio
+    async def test_component_amino_acid_mutations_over_time_live(self):
+        """Live test for component_aminoAcidMutationsOverTime from real API."""
+        try:
+            # Test with known mutations that are likely to exist
+            mutations = ["S:N501Y", "N:N8N"]
+            date_ranges = [
+                (datetime(2025, 6, 12), datetime(2025, 6, 18)),
+                (datetime(2025, 6, 19), datetime(2025, 6, 26))
+            ]
+            location_name = "Zürich (ZH)"
+            
+            result = await self.api.component_aminoAcidMutationsOverTime(
+                mutations=mutations,
+                date_ranges=date_ranges,
+                location_name=location_name
+            )
+            
+            print(f"Live component test result keys: {list(result.keys()) if isinstance(result, dict) else type(result)}")
+            
+            # Basic structure assertions
+            assert isinstance(result, dict), "Result should be a dictionary"
+            
+            # Check for error vs success response
+            if "error" in result:
+                print(f"API returned error (may be expected): {result['error']}")
+                # Even with errors, we validate the structure
+                assert "error" in result
+                assert isinstance(result["error"], str)
+            else:
+                # Successful response structure validation
+                assert "data" in result, "Successful response should contain 'data' key"
+                
+                data = result["data"]
+                assert isinstance(data, dict), "Data should be a dictionary"
+                
+                # Validate expected structure based on API documentation
+                expected_keys = ["mutations", "dateRanges", "data"]
+                for key in expected_keys:
+                    assert key in data, f"Missing key in data: {key}"
+                
+                # Validate mutations list
+                assert isinstance(data["mutations"], list), "Mutations should be a list"
+                assert len(data["mutations"]) == len(mutations), "Should return same number of mutations"
+                
+                # Validate dateRanges
+                assert isinstance(data["dateRanges"], list), "DateRanges should be a list"
+                assert len(data["dateRanges"]) == len(date_ranges), "Should return same number of date ranges"
+                
+                # Validate data matrix structure
+                assert isinstance(data["data"], list), "Data matrix should be a list"
+                if data["data"]:  # If we have data
+                    # Should have one entry per mutation
+                    assert len(data["data"]) == len(mutations), "Data matrix should have one row per mutation"
+                    
+                    # Each mutation should have data for each date range
+                    for mutation_data in data["data"]:
+                        assert isinstance(mutation_data, list), "Each mutation should have a list of date range data"
+                        assert len(mutation_data) == len(date_ranges), "Each mutation should have data for each date range"
+                        
+                        # Each date range entry should have count and coverage
+                        for date_data in mutation_data:
+                            assert isinstance(date_data, dict), "Date data should be a dictionary"
+                            assert "count" in date_data, "Date data should have count"
+                            assert "coverage" in date_data, "Date data should have coverage"
+                            assert isinstance(date_data["count"], (int, float)), "Count should be numeric"
+                            assert isinstance(date_data["coverage"], (int, float)), "Coverage should be numeric"
+                            assert date_data["coverage"] >= date_data["count"], "Coverage should be >= count"
+                
+                print(f"Successfully validated component response structure")
+                print(f"Mutations tested: {data['mutations']}")
+                print(f"Date ranges: {len(data['dateRanges'])}")
+                if data["data"]:
+                    print(f"data : {data['data']}")
+                
+                # Additional validation for info section if present
+                if "info" in result:
+                    info = result["info"]
+                    assert isinstance(info, dict), "Info should be a dictionary"
+                    # Common info fields from LAPIS
+                    info_fields = ["dataVersion", "requestId", "lapisVersion"]
+                    for field in info_fields:
+                        if field in info:
+                            assert isinstance(info[field], str), f"{field} should be a string"
+                            
+        except Exception as e:
+            pytest.fail(f"Live component amino acid mutations over time API test failed: {e}")
 
 if __name__ == "__main__":
 

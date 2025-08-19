@@ -526,3 +526,70 @@ class WiseLoculusLapis(Lapis):
         max_date = end_date + buffer
         
         return start_date, end_date, min_date, max_date
+    
+
+    async def component_aminoAcidMutationsOverTime(
+            self, 
+            mutations: List[str], 
+            date_ranges: List[Tuple[datetime, datetime]],
+            location_name: str
+        ) -> dict[str, Any]:
+        """
+        Fetches amino acid mutations over time for a given location and specific date ranges.
+        Returns counts and coverage for each mutation and date range.
+        
+        Args:
+            mutations: List of amino acid mutations in format ["S:N501Y", "N:N8N"]
+            date_ranges: List of date range tuples [(start_date, end_date), ...]
+            location_name: Location name to filter by
+            
+        Returns:
+            Dict containing the API response with mutations, dateRanges, and data matrix
+        """
+        payload = {
+            "filters": {
+                "location_name": location_name
+            },
+            "includeMutations": mutations,
+            "dateRanges": [
+                {
+                    "dateFrom": date_range[0].strftime('%Y-%m-%d'),
+                    "dateTo": date_range[1].strftime('%Y-%m-%d')
+                }
+                for date_range in date_ranges
+            ],
+            "dateField": "sampling_date"
+        }
+
+        logging.debug(f"Fetching amino acid mutations over time with payload: {payload}")
+        
+        try:
+            timeout = aiohttp.ClientTimeout(total=10)  # 10 second timeout
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(
+                    f'{self.server_ip}/component/aminoAcidMutationsOverTime',
+                    headers={
+                        'accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    json=payload
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return data
+                    else:
+                        logging.error(f"Failed to fetch amino acid mutations over time.")
+                        logging.error(f"Status code: {response.status}")
+                        error_text = await response.text()
+                        logging.error(error_text)
+                        return {
+                            "error": f"API request failed with status {response.status}",
+                            "details": error_text,
+                            "data": None
+                        }
+        except Exception as e:
+            logging.error(f"Connection error fetching amino acid mutations over time: {e}")
+            return {
+                "error": str(e),
+                "data": None
+            }
