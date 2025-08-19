@@ -256,15 +256,18 @@ class WiseLoculusLapis(Lapis):
             df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
             return df
 
-    async def sample_Mutations(
+    async def sample_mutations(
             self, 
             type: MutationType,
             date_range: Tuple[datetime, datetime], 
             location_name: Optional[str] = None,
             min_proportion: float = 0.01,
+            nucleotide_mutations: Optional[List[str]] = None,
+            amino_acid_mutations: Optional[List[str]] = None,
         ) -> pd.DataFrame:
         """
         Fetches nucleotide mutations for a given date range and optional location.
+        Filters for sequences /reads with particular nucleotide or amino acid mutations.
         
         Returns a DataFrame with 
         Columns: ['mutation', 'count', 'coverage', 'proportion', 'sequenceName', 'mutationFrom', 'mutationTo', 'position']
@@ -280,6 +283,12 @@ class WiseLoculusLapis(Lapis):
             "dataFormat": "JSON",
             "downloadAsFile": "false"
         }
+
+        # Add mutation filters if provided
+        if nucleotide_mutations:
+            payload["nucleotideMutations"] = nucleotide_mutations
+        if amino_acid_mutations:
+            payload["aminoAcidMutations"] = amino_acid_mutations
 
         if type == MutationType.AMINO_ACID:
             endpoint = f'{self.server_ip}/sample/aminoAcidMutations'

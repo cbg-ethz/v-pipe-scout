@@ -86,7 +86,7 @@ class TestWiseLoculusLapis:
 
     @pytest.mark.asyncio
     async def test_sample_mutations_nucleotide_success(self):
-        """Test sample_Mutations for nucleotide mutations with successful response."""
+        """Test sample_mutations for nucleotide mutations with successful response."""
         # Mock aiohttp session and response
         mock_response_data = {
             "data": [
@@ -147,7 +147,7 @@ class TestWiseLoculusLapis:
 
         with patch('aiohttp.ClientSession', return_value=mock_session):
             with patch('aiohttp.ClientTimeout'):
-                result = await self.api.sample_Mutations(
+                result = await self.api.sample_mutations(
                     type=MutationType.NUCLEOTIDE,
                     date_range=self.date_range,
                     location_name="Zurich",
@@ -170,7 +170,7 @@ class TestWiseLoculusLapis:
 
     @pytest.mark.asyncio
     async def test_sample_mutations_amino_acid_success(self):
-        """Test sample_Mutations for amino acid mutations with successful response."""
+        """Test sample_mutations for amino acid mutations with successful response."""
         mock_response_data = {
             "data": [
                 {
@@ -218,7 +218,7 @@ class TestWiseLoculusLapis:
 
         with patch('aiohttp.ClientSession', return_value=mock_session):
             with patch('aiohttp.ClientTimeout'):
-                result = await self.api.sample_Mutations(
+                result = await self.api.sample_mutations(
                     type=MutationType.AMINO_ACID,
                     date_range=self.date_range,
                     location_name="Zurich"
@@ -232,7 +232,7 @@ class TestWiseLoculusLapis:
 
 
     def test_sample_mutations_payload_construction(self):
-        """Test that the payload is constructed correctly for sample_Mutations."""
+        """Test that the payload is constructed correctly for sample_mutations."""
         # This tests the payload construction logic without making actual HTTP calls
         date_range = (datetime(2024, 1, 1), datetime(2024, 1, 31))
         location_name = "Zurich"
@@ -287,7 +287,7 @@ class TestWiseLoculusLapisLiveAPI:
     async def test_sample_mutations_live_nucleotide(self):
         """Live test for nucleotide mutations from real API."""
         try:
-            result = await self.api.sample_Mutations(
+            result = await self.api.sample_mutations(
                 type=MutationType.NUCLEOTIDE,
                 date_range=self.date_range,
                 location_name="Zürich (ZH)",
@@ -329,7 +329,7 @@ class TestWiseLoculusLapisLiveAPI:
     async def test_sample_mutations_live_amino_acid(self):
         """Live test for amino acid mutations from real API."""
         try:
-            result = await self.api.sample_Mutations(
+            result = await self.api.sample_mutations(
                 type=MutationType.AMINO_ACID,
                 date_range=self.date_range,
                 location_name="Zürich (ZH)",
