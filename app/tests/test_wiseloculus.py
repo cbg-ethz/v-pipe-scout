@@ -168,7 +168,7 @@ class TestWiseLoculusLapis:
         assert result.iloc[1]["mutation"] == "C456G"
         assert result.iloc[1]["count"] == 80
 
-    @pytest.mark.asyncio
+        # Use shared MockResponse and MockSession classes
     async def test_sample_mutations_amino_acid_success(self):
         """Test sample_mutations for amino acid mutations with successful response."""
         mock_response_data = {
@@ -298,7 +298,6 @@ class TestWiseLoculusLapisLiveAPI:
             
             # Basic structure assertions
             assert isinstance(result, pd.DataFrame)
-            print(f"Live nucleotide test: Retrieved {len(result)} mutations")
             
             if not result.empty:
                 # Check that expected columns exist

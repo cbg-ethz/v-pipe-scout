@@ -267,7 +267,8 @@ class WiseLoculusLapis(Lapis):
         ) -> pd.DataFrame:
         """
         Fetches nucleotide mutations for a given date range and optional location.
-        Filters for sequences /reads with particular nucleotide or amino acid mutations.
+        Fetches mutations (nucleotide or amino acid) for a given date range and optional location.
+        Filters for sequences/reads with particular nucleotide or amino acid mutations, depending on the specified mutation type and provided filters.
         
         Returns a DataFrame with 
         Columns: ['mutation', 'count', 'coverage', 'proportion', 'sequenceName', 'mutationFrom', 'mutationTo', 'position']
@@ -314,7 +315,7 @@ class WiseLoculusLapis(Lapis):
                         logging.error(f"Failed to fetch nucleotide mutations: {response.status}")
                         return pd.DataFrame()
         except Exception as e:
-            logging.error(f"Error fetching nucleotide mutations: {e}")
+            logging.error(f"Error fetching mutations: {e}")
             return pd.DataFrame()
     
 
