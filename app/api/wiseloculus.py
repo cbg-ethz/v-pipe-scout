@@ -3,7 +3,7 @@
 import logging
 import aiohttp
 import asyncio
-from typing import Optional, List, Tuple, Any, Union
+from typing import Optional, List, Tuple, Any
 from datetime import datetime
 
 import pandas as pd
