@@ -74,7 +74,8 @@ def app():
 
     location = st.selectbox("Select Location:", locations)
 
-    mutations_in_timeframe_df =  asyncio.run(wiseLoculus.sample_nucleotideMutations(
+    mutations_in_timeframe_df =  asyncio.run(wiseLoculus.sample_mutations(
+        type=MutationType.NUCLEOTIDE,
         date_range=(
             start_date,
             end_date
