@@ -1,5 +1,5 @@
 server:
-  lapis_address: "http://host.docker.internal:8083"
+  lapis_address: "https://lapis.wasap.genspectrum.org/"
   cov_spectrum_api: "https://lapis.cov-spectrum.org"
 
 curated_variant_definitions:

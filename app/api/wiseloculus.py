@@ -3,7 +3,7 @@
 import logging
 import aiohttp
 import asyncio
-from typing import Optional, List, Tuple, Any, Union
+from typing import Optional, List, Tuple, Any
 from datetime import datetime
 
 import pandas as pd
@@ -256,14 +256,19 @@ class WiseLoculusLapis(Lapis):
             df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
             return df
 
-    async def sample_nucleotideMutations(
+    async def sample_mutations(
             self, 
+            type: MutationType,
             date_range: Tuple[datetime, datetime], 
             location_name: Optional[str] = None,
             min_proportion: float = 0.01,
+            nucleotide_mutations: Optional[List[str]] = None,
+            amino_acid_mutations: Optional[List[str]] = None,
         ) -> pd.DataFrame:
         """
         Fetches nucleotide mutations for a given date range and optional location.
+        Fetches mutations (nucleotide or amino acid) for a given date range and optional location.
+        Filters for sequences/reads with particular nucleotide or amino acid mutations, depending on the specified mutation type and provided filters.
         
         Returns a DataFrame with 
         Columns: ['mutation', 'count', 'coverage', 'proportion', 'sequenceName', 'mutationFrom', 'mutationTo', 'position']
@@ -280,11 +285,25 @@ class WiseLoculusLapis(Lapis):
             "downloadAsFile": "false"
         }
 
+        # Add mutation filters if provided
+        if nucleotide_mutations:
+            payload["nucleotideMutations"] = nucleotide_mutations
+        if amino_acid_mutations:
+            payload["aminoAcidMutations"] = amino_acid_mutations
+
+        if type == MutationType.AMINO_ACID:
+            endpoint = f'{self.server_ip}/sample/aminoAcidMutations'
+        elif type == MutationType.NUCLEOTIDE:
+            endpoint = f'{self.server_ip}/sample/nucleotideMutations'
+        else:
+            logging.error(f"Unknown mutation type: {type}")
+            return pd.DataFrame()
+
         try:
             timeout = aiohttp.ClientTimeout(total=5)  # 5 second timeout
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
-                    f'{self.server_ip}/sample/nucleotideMutations',
+                    endpoint,
                     params=payload,
                     headers={'accept': 'application/json'}
                 ) as response:
@@ -296,8 +315,9 @@ class WiseLoculusLapis(Lapis):
                         logging.error(f"Failed to fetch nucleotide mutations: {response.status}")
                         return pd.DataFrame()
         except Exception as e:
-            logging.error(f"Error fetching nucleotide mutations: {e}")
+            logging.error(f"Error fetching mutations: {e}")
             return pd.DataFrame()
+    
 
     def mutations_over_time_dfs(
         self, 

@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import logging 
 import asyncio
 from datetime import datetime
@@ -60,11 +61,7 @@ def app():
         default_min_proportion = 0.05
     
 
-<<<<<<< HEAD
-    # text box with min_proportion – mutation has to occur at least once to this proportion to show up
-=======
     # text box with min_proportion – mutaiton has to occure at least once to this proportion to show up
->>>>>>> 7a4e82a (renames)
     min_proportion = st.number_input(
         "Minimum Proportion of Mutation to fetch (the lower the longer the loading time)",
         min_value=0.01,

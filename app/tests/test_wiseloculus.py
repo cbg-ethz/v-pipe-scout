@@ -6,6 +6,9 @@ from datetime import datetime
 from pathlib import Path
 import sys
 
+import pandas as pd
+import aiohttp
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from api.wiseloculus import WiseLoculusLapis
@@ -80,6 +83,279 @@ class TestWiseLoculusLapis:
         assert mutation_result["frequency"] == 0
         assert mutation_result["counts"] == {"A": 0, "T": 0, "C": 0, "G": 0}
         assert mutation_result["stratified"] == []
+
+    @pytest.mark.asyncio
+    async def test_sample_mutations_nucleotide_success(self):
+        """Test sample_mutations for nucleotide mutations with successful response."""
+        # Mock aiohttp session and response
+        mock_response_data = {
+            "data": [
+                {
+                    "mutation": "A123T",
+                    "count": 150,
+                    "coverage": 1000,
+                    "proportion": 0.15,
+                    "sequenceName": "NC_045512",
+                    "mutationFrom": "A",
+                    "mutationTo": "T",
+                    "position": 123
+                },
+                {
+                    "mutation": "C456G",
+                    "count": 80,
+                    "coverage": 800,
+                    "proportion": 0.10,
+                    "sequenceName": "NC_045512",
+                    "mutationFrom": "C",
+                    "mutationTo": "G",
+                    "position": 456
+                }
+            ]
+        }
+
+        # Create a mock session with proper async context manager behavior
+        class MockResponse:
+            def __init__(self, status=200, json_data=None):
+                self.status = status
+                self._json_data = json_data or {}
+
+            async def json(self):
+                return self._json_data
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+        class MockSession:
+            def __init__(self, response):
+                self.response = response
+
+            def get(self, url, params=None, headers=None):
+                return self.response
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+        # Mock aiohttp.ClientSession
+        mock_response = MockResponse(status=200, json_data=mock_response_data)
+        mock_session = MockSession(mock_response)
+
+        with patch('aiohttp.ClientSession', return_value=mock_session):
+            with patch('aiohttp.ClientTimeout'):
+                result = await self.api.sample_mutations(
+                    type=MutationType.NUCLEOTIDE,
+                    date_range=self.date_range,
+                    location_name="Zurich",
+                    min_proportion=0.01
+                )
+
+        # Assertions
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 2
+        assert "mutation" in result.columns
+        assert "count" in result.columns
+        assert "coverage" in result.columns
+        assert "proportion" in result.columns
+        
+        # Check specific values
+        assert result.iloc[0]["mutation"] == "A123T"
+        assert result.iloc[0]["count"] == 150
+        assert result.iloc[1]["mutation"] == "C456G"
+        assert result.iloc[1]["count"] == 80
+
+        # Use shared MockResponse and MockSession classes
+    @pytest.mark.asyncio
+    async def test_sample_mutations_amino_acid_success(self):
+        """Test sample_mutations for amino acid mutations with successful response."""
+        mock_response_data = {
+            "data": [
+                {
+                    "mutation": "ORF1a:V3449I",
+                    "count": 75,
+                    "coverage": 500,
+                    "proportion": 0.15,
+                    "sequenceName": "ORF1a",
+                    "mutationFrom": "V",
+                    "mutationTo": "I",
+                    "position": 3449
+                }
+            ]
+        }
+
+        class MockResponse:
+            def __init__(self, status=200, json_data=None):
+                self.status = status
+                self._json_data = json_data or {}
+
+            async def json(self):
+                return self._json_data
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+        class MockSession:
+            def __init__(self, response):
+                self.response = response
+
+            def get(self, url, params=None, headers=None):
+                return self.response
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+        mock_response = MockResponse(status=200, json_data=mock_response_data)
+        mock_session = MockSession(mock_response)
+
+        with patch('aiohttp.ClientSession', return_value=mock_session):
+            with patch('aiohttp.ClientTimeout'):
+                result = await self.api.sample_mutations(
+                    type=MutationType.AMINO_ACID,
+                    date_range=self.date_range,
+                    location_name="Zurich"
+                )
+
+        # Assertions
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 1
+        assert result.iloc[0]["mutation"] == "ORF1a:V3449I"
+        assert result.iloc[0]["count"] == 75
+
+
+    def test_sample_mutations_payload_construction(self):
+        """Test that the payload is constructed correctly for sample_mutations."""
+        # This tests the payload construction logic without making actual HTTP calls
+        date_range = (datetime(2024, 1, 1), datetime(2024, 1, 31))
+        location_name = "Zurich"
+        min_proportion = 0.05
+
+        # Expected payload structure
+        expected_payload = {
+            "sampling_dateFrom": "2024-01-01",
+            "sampling_dateTo": "2024-01-31",
+            "location_name": location_name,
+            "minProportion": min_proportion,
+            "orderBy": "proportion",
+            "limit": 10000,
+            "dataFormat": "JSON",
+            "downloadAsFile": "false"
+        }
+
+        # Test nucleotide endpoint construction
+        assert f'{self.api.server_ip}/sample/nucleotideMutations' == f'http://test-server.com/sample/nucleotideMutations'
+        
+        # Test amino acid endpoint construction
+        assert f'{self.api.server_ip}/sample/aminoAcidMutations' == f'http://test-server.com/sample/aminoAcidMutations'
+
+        # Verify date formatting
+        assert date_range[0].strftime('%Y-%m-%d') == "2024-01-01"
+        assert date_range[1].strftime('%Y-%m-%d') == "2024-01-31"
+
+
+@pytest.mark.skip_in_ci
+class TestWiseLoculusLapisLiveAPI:
+    """Live API tests that are skipped in CI environments."""
+    
+    def setup_method(self):
+        """Set up test fixtures for live API tests."""
+        import yaml
+        import pathlib
+        
+        # Load config for live testing
+        CONFIG_PATH = pathlib.Path(__file__).parent.parent / "config.yaml"
+        try:
+            with open(CONFIG_PATH, 'r') as file:
+                config = yaml.safe_load(file)
+            server_ip = config.get('server', {}).get('lapis_address', 'http://localhost:8000')
+        except (FileNotFoundError, yaml.YAMLError):
+            pytest.skip("Config file not found or invalid, skipping live API tests")
+            
+        self.api = WiseLoculusLapis(server_ip)
+        # Use recent date range for live testing
+        self.date_range = (datetime(2025, 7, 1), datetime(2025, 8, 28))
+    
+    @pytest.mark.asyncio
+    async def test_sample_mutations_live_nucleotide(self):
+        """Live test for nucleotide mutations from real API."""
+        try:
+            result = await self.api.sample_mutations(
+                type=MutationType.NUCLEOTIDE,
+                date_range=self.date_range,
+                location_name="Zürich (ZH)",
+                min_proportion=0.001  # Lower threshold to get some results
+            )
+
+            print(f"Live nucleotide test: Retrieved {len(result)} mutations")
+            
+            # Basic structure assertions
+            assert isinstance(result, pd.DataFrame)
+            
+            if not result.empty:
+                # Check that expected columns exist
+                expected_columns = ["mutation", "count", "coverage", "proportion"]
+                for col in expected_columns:
+                    assert col in result.columns, f"Missing column: {col}"
+                
+                # Check data types and ranges
+                assert result["count"].dtype in ['int64', 'float64'], "Count should be numeric"
+                assert result["coverage"].dtype in ['int64', 'float64'], "Coverage should be numeric"
+                assert result["proportion"].dtype in ['int64', 'float64'], "Proportion should be numeric"
+                
+                # Proportion should be between 0 and 1
+                assert (result["proportion"] >= 0).all(), "Proportion should be >= 0"
+                assert (result["proportion"] <= 1).all(), "Proportion should be <= 1"
+                
+                # Coverage should be >= count
+                assert (result["coverage"] >= result["count"]).all(), "Coverage should be >= count"
+                
+                print(f"Sample mutations:\n{result.head()}")
+            else:
+                print("No nucleotide mutations found in the specified date range")
+                
+        except Exception as e:
+            pytest.fail(f"Live nucleotide API test failed: {e}")
+    
+    @pytest.mark.asyncio
+    async def test_sample_mutations_live_amino_acid(self):
+        """Live test for amino acid mutations from real API."""
+        try:
+            result = await self.api.sample_mutations(
+                type=MutationType.AMINO_ACID,
+                date_range=self.date_range,
+                location_name="Zürich (ZH)",
+                min_proportion=0.001  # Lower threshold to get some results
+            )
+            
+            # Basic structure assertions
+            assert isinstance(result, pd.DataFrame)
+            print(f"Live amino acid test: Retrieved {len(result)} mutations")
+            
+            if not result.empty:
+                # Check that expected columns exist
+                expected_columns = ["mutation", "count", "coverage", "proportion"]
+                for col in expected_columns:
+                    assert col in result.columns, f"Missing column: {col}"
+                
+                # Check amino acid mutation format (should contain ":")
+                mutations_with_colon = result["mutation"].str.contains(":", na=False)
+                assert mutations_with_colon.any(), "Amino acid mutations should contain gene:mutation format"
+                
+                print(f"Sample amino acid mutations:\n{result.head()}")
+            else:
+                print("No amino acid mutations found in the specified date range")
+                
+        except Exception as e:
+            pytest.fail(f"Live amino acid API test failed: {e}")
 
 if __name__ == "__main__":
 

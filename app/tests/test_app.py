@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-APP_PATH = os.getenv("APP_PATH", default="app.py")
+APP_PATH = os.getenv("APP_PATH", default=str(Path(__file__).parent.parent / "app.py"))
 
 def test_navigation_links():
     """Test that all navigation links are present in the sidebar."""
@@ -17,11 +17,11 @@ def test_navigation_links():
     # Get all page links from the sidebar
     page_links = at.sidebar.get("page_link")
     
-    # Check that we have the expected number of navigation links (5 pages)
+    # Check that we have the expected number of navigation links (6 pages)
     assert len(page_links) == 6
     
     # Check that all expected page titles are present in the navigation
-    expected_pages = ["Home", "Resistance Mutations", "Dynamic Mutation Heatmap", "Untracked Mutations", 
+    expected_pages = ["Home", "Resistance Mutations", "Search by Proportion", "Untracked Mutations", 
                      "Variant Signature Explorer", "Variant Abundances"]
     
     page_titles = [link.label for link in page_links] # type: ignore
