@@ -21,7 +21,7 @@ wiseLoculus = WiseLoculusLapis(server_ip)
 def app():
 
     ## Add a title
-    st.title("Dynamic Mutation Heatmap")
+    st.title("Search by Proportion")
 
     ## Add a subheader
     st.markdown("### Explore mutations over time by proportion")
@@ -83,7 +83,7 @@ def app():
             sequence_type_value = "amino acid" if sequence_type == "Amino Acids" else "nucleotide"
 
             # Fetch all mutations for the given parameters
-            st.write("### Dynamic Mutation Analysis")
+            st.write("### Mutation Analysis by Proportion")
             st.write("Analyzing all mutations found in the selected timeframe and location.")
             
             try:
@@ -111,7 +111,7 @@ def app():
                     'show_summary_stats': True,
                     'default_min_frequency': min_proportion,
                     'default_max_frequency': 1.0,
-                    'plot_title': f"Dynamic {sequence_type} Mutations Over Time",
+                    'plot_title': f"{sequence_type} Mutations by Proportion Over Time",
                     'enable_empty_date_toggle': True,
                     'show_mutation_count': True
                 }

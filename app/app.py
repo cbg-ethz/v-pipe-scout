@@ -28,7 +28,7 @@ if __name__ == "__main__":
     PAGE_CONFIGS = [
         {"app": index.app, "title": "Home", "icon": "🏠", "default": True, "url_path": None},
         {"app": resistance_mut_silo.app, "title": "Resistance Mutations", "icon": "🧬", "url_path": "resistance"},
-        {"app": dynamic_mutations.app, "title": "Dynamic Mutation Heatmap", "icon": "🧮", "url_path": "dynamic-mutations"},
+        {"app": dynamic_mutations.app, "title": "Search by Proportion", "icon": "🧮", "url_path": "dynamic-mutations"},
         {"app": background.app, "title": "Untracked Mutations", "icon": "👀", "url_path": "background"},
         {"app": signature_explorer.app, "title": "Variant Signature Explorer", "icon": "🔍", "url_path": "signature-explorer"},
         {"app": abundance_estimator.app, "title": "Variant Abundances", "icon": "🧩", "url_path": "abundance-estimator"}
