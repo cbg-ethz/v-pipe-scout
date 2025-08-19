@@ -256,8 +256,9 @@ class WiseLoculusLapis(Lapis):
             df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
             return df
 
-    async def sample_nucleotideMutations(
+    async def sample_Mutations(
             self, 
+            type: MutationType,
             date_range: Tuple[datetime, datetime], 
             location_name: Optional[str] = None,
             min_proportion: float = 0.01,
@@ -280,11 +281,19 @@ class WiseLoculusLapis(Lapis):
             "downloadAsFile": "false"
         }
 
+        if type == MutationType.AMINO_ACID:
+            endpoint = f'{self.server_ip}/sample/aminoAcidMutations'
+        elif type == MutationType.NUCLEOTIDE:
+            endpoint = f'{self.server_ip}/sample/nucleotideMutations'
+        else:
+            logging.error(f"Unknown mutation type: {type}")
+            return pd.DataFrame()
+
         try:
             timeout = aiohttp.ClientTimeout(total=5)  # 5 second timeout
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
-                    f'{self.server_ip}/sample/nucleotideMutations',
+                    endpoint,
                     params=payload,
                     headers={'accept': 'application/json'}
                 ) as response:
@@ -298,6 +307,7 @@ class WiseLoculusLapis(Lapis):
         except Exception as e:
             logging.error(f"Error fetching nucleotide mutations: {e}")
             return pd.DataFrame()
+    
 
     def mutations_over_time_dfs(
         self, 
