@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 from datetime import datetime
 
 from api.wiseloculus import WiseLoculusLapis

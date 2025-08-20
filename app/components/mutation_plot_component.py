@@ -118,9 +118,6 @@ def render_mutation_plot_component(
             if api_err.status_code == 500:
                 target.error("🚨 **Internal Server Error (500)**")
                 target.error("The backend API server is experiencing technical difficulties. This is **not** an issue with this web application.")
-                target.write("**Technical Details:**")
-                target.write(f"• Server: {api_err.payload.get('endpoint', 'Unknown') if api_err.payload else 'Unknown'}")
-                target.write(f"• Status Code: {api_err.status_code}")
                 target.write("• Error Type: Backend infrastructure failure")
                 
                 with target.expander("🔍 Debug Information", expanded=False):
@@ -131,9 +128,8 @@ def render_mutation_plot_component(
                         target.json(api_err.payload)
                 
                 target.info("💡 **What you can try:**")
-                target.write("• Try again – we are aware that the backened is experiencing issues.")
+                target.write("• Try again – we are aware that the backened may have transient failures.")
                 target.write("• Reduce the number of mutations or date range")
-                target.write("• Contact the API administrators if the issue persists")
             else:
                 target.error(f"🚨 **API Error ({api_err.status_code})**")
                 target.error("The API request failed. This may be a temporary issue.")
