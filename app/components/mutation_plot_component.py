@@ -13,6 +13,7 @@ from typing import List, Dict, Optional, Tuple, Any
 
 from interface import MutationType
 from visualize.mutations import mutations_over_time
+from api.exceptions import APIError
 
 
 def render_mutation_plot_component(
@@ -89,12 +90,58 @@ def render_mutation_plot_component(
             if mutation_type ==  MutationType.AMINO_ACID:
                 st.warning("⚠️ Amino acid mutations are not yet supported in this component. Please use nucleotide mutations instead.")
                 return None
-            counts_df, freq_df, coverage_freq_df = wiseLoculus.mutations_over_time_dfs(
-                mutations,
-                mutation_type,
+            
+            # Get data using the mutations_over_time function
+            mutations_over_time_df = asyncio.run(wiseLoculus.mutations_over_time(
+                mutations=mutations,
+                mutation_type=mutation_type,
                 date_range=(start_date, end_date),
                 location_name=location
-            )
+            ))
+
+            # Transform the data to match mutations_over_time_dfs signature:
+            # 1. counts_df and freq_df: mutations as rows, dates as columns
+            # 2. coverage_freq_df: keep the MultiIndex structure for compatibility
+            
+            # Reset index to access mutation and sampling_date as columns
+            df_reset = mutations_over_time_df.reset_index()
+            
+            # Create the expected format: mutations as index, dates as columns
+            counts_df = df_reset.pivot(index='mutation', columns='sampling_date', values='count')
+            freq_df = df_reset.pivot(index='mutation', columns='sampling_date', values='frequency')
+            
+            # Keep the original MultiIndex structure for coverage_freq_df for compatibility with visualization
+            coverage_freq_df = mutations_over_time_df
+
+        except APIError as api_err:
+            # Handle API-specific errors with clear messaging
+            if api_err.status_code == 500:
+                target.error("🚨 **Internal Server Error (500)**")
+                target.error("The backend API server is experiencing technical difficulties. This is **not** an issue with this web application.")
+                target.write("**Technical Details:**")
+                target.write(f"• Server: {api_err.payload.get('endpoint', 'Unknown') if api_err.payload else 'Unknown'}")
+                target.write(f"• Status Code: {api_err.status_code}")
+                target.write("• Error Type: Backend infrastructure failure")
+                
+                with target.expander("🔍 Debug Information", expanded=False):
+                    target.write("**Error Details:**")
+                    target.code(str(api_err.details) if api_err.details else "No additional details available")
+                    if api_err.payload:
+                        target.write("**Request Payload:**")
+                        target.json(api_err.payload)
+                
+                target.info("💡 **What you can try:**")
+                target.write("• Wait a few minutes and try again")
+                target.write("• Reduce the number of mutations or date range")
+                target.write("• Contact the API administrators if the issue persists")
+            else:
+                target.error(f"🚨 **API Error ({api_err.status_code})**")
+                target.error("The API request failed. This may be a temporary issue.")
+                target.write(f"**Error:** {str(api_err)}")
+                if api_err.details:
+                    with target.expander("🔍 Debug Information", expanded=False):
+                        target.code(str(api_err.details))
+            return None
         except Exception as e:
             target.error(f"⚠️ Error fetching mutation analysis data: {str(e)}")
             target.info("This could be due to API connectivity issues. Please try again later.")

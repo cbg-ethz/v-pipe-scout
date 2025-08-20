@@ -54,9 +54,9 @@ def app():
 
     # the sequence type selection determines the default value for min_proportion
     if sequence_type == "Nucleotides":
-        default_min_proportion = 0.10
+        default_min_proportion = 0.01
     elif sequence_type == "Amino Acids":
-        default_min_proportion = 0.30
+        default_min_proportion = 0.1
     else:
         default_min_proportion = 0.05
     

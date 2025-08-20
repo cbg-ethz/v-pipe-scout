@@ -9,6 +9,7 @@ from datetime import datetime
 import pandas as pd
 
 from .lapis import Lapis
+from .exceptions import APIError
 from interface import MutationType
 
 from process.mutations import get_symbols_for_mutation_type
@@ -180,7 +181,7 @@ class WiseLoculusLapis(Lapis):
         """
   
         try:
-            timeout = aiohttp.ClientTimeout(total=5)  # 5 second timeout
+            timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 combined_results = []
 
@@ -300,7 +301,7 @@ class WiseLoculusLapis(Lapis):
             return pd.DataFrame()
 
         try:
-            timeout = aiohttp.ClientTimeout(total=5)  # 5 second timeout
+            timeout = aiohttp.ClientTimeout(total=30) 
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
                     endpoint,
@@ -416,7 +417,7 @@ class WiseLoculusLapis(Lapis):
             Tuple[Optional[datetime], Optional[datetime]]: (earliest_date, latest_date) or (None, None) if no data
         """
         try:
-            timeout = aiohttp.ClientTimeout(total=10)  # 10 second timeout for this query
+            timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout for this query
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
                     f'{self.server_ip}/sample/aggregated',
@@ -580,22 +581,42 @@ class WiseLoculusLapis(Lapis):
                     if response.status == 200:
                         data = await response.json()
                         return data
+                    elif response.status == 500:
+                        # Log the failed query for debugging
+                        logging.error(f"Internal Server Error (500) for {mutation_type_name} mutations over time")
+                        logging.error(f"Failed POST query: {self.server_ip}/component/{endpoint}")
+                        logging.error(f"Payload: {payload}")
+                        error_text = await response.text()
+                        logging.error(f"Server response: {error_text}")
+                        
+                        # Raise custom APIError for better frontend handling
+                        raise APIError(
+                            f"Internal Server Error: The backend API server is experiencing issues. This is not an application error.",
+                            status_code=500,
+                            details=error_text,
+                            payload=payload
+                        )
                     else:
                         logging.error(f"Failed to fetch {mutation_type_name} mutations over time.")
                         logging.error(f"Status code: {response.status}")
                         error_text = await response.text()
                         logging.error(error_text)
-                        return {
-                            "error": f"API request failed with status {response.status}",
-                            "details": error_text,
-                            "data": None
-                        }
+                        raise APIError(
+                            f"API request failed with status {response.status}",
+                            status_code=response.status,
+                            details=error_text,
+                            payload=payload
+                        )
+        except APIError:
+            # Re-raise our custom APIError
+            raise
         except Exception as e:
             logging.error(f"Connection error fetching {mutation_type_name} mutations over time: {e}")
-            return {
-                "error": str(e),
-                "data": None
-            }
+            raise APIError(
+                f"Connection error: {str(e)}",
+                details=str(e),
+                payload=payload
+            )
 
     async def component_aminoAcidMutationsOverTime(
             self, 
@@ -731,15 +752,7 @@ class WiseLoculusLapis(Lapis):
             else:
                 raise ValueError(f"Unsupported mutation type: {mutation_type}")
 
-            # Check for API errors
-            if "error" in api_data:
-                logging.error(f"API error in mutations_over_time: {api_data['error']}")
-                # Return empty DataFrame with proper structure
-                df = pd.DataFrame(columns=["count", "coverage", "frequency"])
-                df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
-                return df
-
-            # Parse the API response
+            # Parse the API response (no need to check for "error" key anymore as we raise APIError)
             records = []
             api_data_content = api_data.get("data", {})
             api_mutations = api_data_content.get("mutations", [])
@@ -798,6 +811,9 @@ class WiseLoculusLapis(Lapis):
                 df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
             return df
 
+        except APIError:
+            # Re-raise APIError so components can handle it properly
+            raise
         except Exception as e:
             logging.error(f"Error in mutations_over_time: {e}")
             # Return empty DataFrame with proper MultiIndex structure

@@ -88,7 +88,7 @@ def app():
 
     with st.spinner("Fetching resistance mutation data..."):
         try:
-            # Get data using the new mutations_over_time function
+            # Get data using the mutations_over_time function
             mutations_over_time_df = asyncio.run(wiseLoculus.mutations_over_time(
                 mutations=formatted_mutations,
                 mutation_type=MutationType.AMINO_ACID,
