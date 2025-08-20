@@ -825,10 +825,7 @@ def app():
                 help="Select the date range for which you want to fetch mutation counts and coverage data."
             )
 
-            # Fetch locations using the new function
-            if "locations" not in st.session_state:
-                st.session_state.locations = wiseLoculus.fetch_locations()
-            locations = st.session_state.locations
+            locations = wiseLoculus.fetch_locations()
             location = st.selectbox("Select Location:", locations)
 
             # Add a button to trigger fetching
