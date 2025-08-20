@@ -118,7 +118,6 @@ def render_mutation_plot_component(
             if api_err.status_code == 500:
                 target.error("🚨 **Internal Server Error (500)**")
                 target.error("The backend API server is experiencing technical difficulties. This is **not** an issue with this web application.")
-                target.write("• Error Type: Backend infrastructure failure")
                 
                 with target.expander("🔍 Debug Information", expanded=False):
                     target.write("**Error Details:**")

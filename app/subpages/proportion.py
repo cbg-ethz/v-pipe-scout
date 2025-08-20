@@ -101,11 +101,6 @@ def app():
                 st.info("Try adjusting the date range or location.")
             else:
                 mutations_list = mutations_in_timeframe_df['mutation'].tolist()
-
-                # if mutations are more than 250 sshow a warning and set a limit to 250
-                if len(mutations_list) > 250:
-                    st.warning(f"⚠️ Too many mutations found ({len(mutations_list)}). Limiting to 250 mutations for performance reasons. We are working on improving this in the future.")
-                    mutations_list = mutations_list[:250]
                 
                 # Configure the component for dynamic mutations
                 plot_config = {

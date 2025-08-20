@@ -29,7 +29,7 @@ if __name__ == "__main__":
     PAGE_CONFIGS = [
         {"app": index.app, "title": "Home", "icon": "🏠", "default": True, "url_path": None},
         {"app": resistance.app, "title": "Resistance Mutations", "icon": "🧬", "url_path": "resistance"},
-        {"app": proportion.app, "title": "Search by Proportion", "icon": "🧮", "url_path": "dynamic-mutations"},
+        {"app": proportion.app, "title": "Search by Proportion", "icon": "🧮", "url_path": "proportion"},
         {"app": untracked.app, "title": "Untracked Mutations", "icon": "👀", "url_path": "untracked"},
         {"app": signature_explorer.app, "title": "Variant Signature Explorer", "icon": "🔍", "url_path": "signature-explorer"},
         {"app": abundance_estimator.app, "title": "Variant Abundances", "icon": "🧩", "url_path": "abundance-estimator"}
