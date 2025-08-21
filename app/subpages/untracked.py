@@ -118,6 +118,10 @@ def app():
             default=cached_get_variant_names(),
             help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team"
         )
+   
+    # Add performance warning
+    st.warning("⚠️ **Performance Notice**: Loading this plot may take up to a minute due to the high number of datapoints to fetch.")
+
     
     # Only process if mutations_in_timeframe is defined and has data
     if 'mutations_in_timeframe' in locals() and mutations_in_timeframe:
