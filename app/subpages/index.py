@@ -78,7 +78,7 @@ def app():
 
     st.write("#### What does W-ASAP stand for?")
     st.markdown("""
-    V-Pipe Scout is the first step toward a holistic Wastewater Analysis and Sharing Platform (W-ASAP) –– a joint effort of the Computational Biology Group (CBG) and Computational Evolution Group (cEVO) at ETH Zürich.
+    V-Pipe Scout is the first step toward a holistic Wastewater Analysis and Sharing Platform (W-ASAP) — a joint effort of the Computational Biology Group (CBG) and Computational Evolution Group (cEVO) at ETH Zürich.
     It is built on the [Loculus](https://loculus.org/) software and its high-performance SILO query engine, both developed by the cEVO Group.
     """)
     st.write("#### Technical Challenges")
