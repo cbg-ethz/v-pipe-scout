@@ -99,6 +99,22 @@ def render_mutation_plot_component(
                 location_name=location
             ))
 
+            # Check if fallback was used and notify user
+            if hasattr(mutations_over_time_df, 'attrs') and mutations_over_time_df.attrs.get('fallback_used', False):
+                if mutations_over_time_df.attrs.get('fallback_failed', False):
+                    target.error("🚨 **Both primary and fallback methods failed**")
+                    target.error("Unable to retrieve mutation data at this time.")
+                    if mutations_over_time_df.attrs.get('fallback_reason'):
+                        with target.expander("🔍 Error Details", expanded=False):
+                            target.code(mutations_over_time_df.attrs['fallback_reason'])
+                    return None
+                else:
+                    target.warning("⚠️ **Primary API endpoint failed - switched to slower fallback method**")
+                    target.info("✅ Data retrieved successfully using legacy endpoint. This may be slower but should provide complete results.")
+                    if mutations_over_time_df.attrs.get('fallback_reason'):
+                        with target.expander("🔍 Fallback Reason", expanded=False):
+                            target.text(mutations_over_time_df.attrs['fallback_reason'])
+
             # Transform the data to match mutations_over_time_dfs signature:
             # 1. counts_df and freq_df: mutations as rows, dates as columns
             # 2. coverage_freq_df: keep the MultiIndex structure for compatibility
