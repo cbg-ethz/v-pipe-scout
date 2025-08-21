@@ -202,7 +202,7 @@ class WiseLoculusLapis(Lapis):
             return [{"mutation": mutation, "coverage": 0, "frequency": 0, "counts": {}, "stratified": []} for mutation in mutations]
         
     
-    async def fetch_counts_coverage_freq(self, mutations: List[str], mutation_type : MutationType, date_range: Tuple[datetime, datetime], location_name: str) -> pd.DataFrame:
+    async def fetch_counts_coverage_freq(self, mutations: List[str], mutation_type: MutationType, date_range: Tuple[datetime, datetime], location_name: str) -> pd.DataFrame:
         """Fetches mutation counts, coverage, and frequency for a list of nucleotide mutations over a date range.
 
         Args:
