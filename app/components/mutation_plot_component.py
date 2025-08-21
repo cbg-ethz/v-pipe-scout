@@ -127,7 +127,7 @@ def render_mutation_plot_component(
                         target.json(api_err.payload)
                 
                 target.info("💡 **What you can try:**")
-                target.write("• Try again – we are aware that the backened may have transient failures.")
+                target.write("• Try again – we are aware that the backend may have transient failures.")
                 target.write("• Reduce the number of mutations or date range")
             else:
                 target.error(f"🚨 **API Error ({api_err.status_code})**")

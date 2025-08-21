@@ -568,7 +568,7 @@ class WiseLoculusLapis(Lapis):
         logging.debug(f"Fetching {mutation_type_name} mutations over time with payload: {payload}")
         
         try:
-            timeout = aiohttp.ClientTimeout(total=10)  # 10 second timeout
+            timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout (consistent with other API calls)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(
                     f'{self.server_ip}/component/{endpoint}',
