@@ -9,6 +9,7 @@ from datetime import datetime
 import pandas as pd
 
 from .lapis import Lapis
+from .exceptions import APIError
 from interface import MutationType
 
 from process.mutations import get_symbols_for_mutation_type
@@ -180,7 +181,7 @@ class WiseLoculusLapis(Lapis):
         """
   
         try:
-            timeout = aiohttp.ClientTimeout(total=5)  # 5 second timeout
+            timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 combined_results = []
 
@@ -300,7 +301,7 @@ class WiseLoculusLapis(Lapis):
             return pd.DataFrame()
 
         try:
-            timeout = aiohttp.ClientTimeout(total=5)  # 5 second timeout
+            timeout = aiohttp.ClientTimeout(total=30) 
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
                     endpoint,
@@ -416,7 +417,7 @@ class WiseLoculusLapis(Lapis):
             Tuple[Optional[datetime], Optional[datetime]]: (earliest_date, latest_date) or (None, None) if no data
         """
         try:
-            timeout = aiohttp.ClientTimeout(total=10)  # 10 second timeout for this query
+            timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout for this query
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
                     f'{self.server_ip}/sample/aggregated',
@@ -526,3 +527,297 @@ class WiseLoculusLapis(Lapis):
         max_date = end_date + buffer
         
         return start_date, end_date, min_date, max_date
+    
+
+    async def _component_mutations_over_time(
+            self,
+            endpoint: str,
+            mutation_type_name: str,
+            mutations: List[str], 
+            date_ranges: List[Tuple[datetime, datetime]],
+            location_name: str
+        ) -> dict[str, Any]:
+        """
+        Helper method for fetching mutations over time data from component endpoints.
+        
+        Args:
+            endpoint: The API endpoint name (e.g., "aminoAcidMutationsOverTime")
+            mutation_type_name: Display name for logging (e.g., "amino acid")
+            mutations: List of mutations
+            date_ranges: List of date range tuples
+            location_name: Location name to filter by
+            
+        Returns:
+            Dict containing the API response with mutations, dateRanges, and data matrix
+        """
+        payload = {
+            "filters": {
+                "location_name": location_name
+            },
+            "includeMutations": mutations,
+            "dateRanges": [
+                {
+                    "dateFrom": date_range[0].strftime('%Y-%m-%d'),
+                    "dateTo": date_range[1].strftime('%Y-%m-%d')
+                }
+                for date_range in date_ranges
+            ],
+            "dateField": "sampling_date"
+        }
+
+        logging.debug(f"Fetching {mutation_type_name} mutations over time with payload: {payload}")
+        
+        try:
+            timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout (consistent with other API calls)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(
+                    f'{self.server_ip}/component/{endpoint}',
+                    headers={
+                        'accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    json=payload
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return data
+                    elif response.status == 500:
+                        # Log the failed query for debugging
+                        logging.error(f"Internal Server Error (500) for {mutation_type_name} mutations over time")
+                        logging.error(f"Failed POST query: {self.server_ip}/component/{endpoint}")
+                        logging.error(f"Payload: {payload}")
+                        error_text = await response.text()
+                        logging.error(f"Server response: {error_text}")
+                        
+                        # Raise custom APIError for better frontend handling
+                        raise APIError(
+                            f"Internal Server Error: The backend API server is experiencing issues. This is not an application error.",
+                            status_code=500,
+                            details=error_text,
+                            payload=payload
+                        )
+                    else:
+                        logging.error(f"Failed to fetch {mutation_type_name} mutations over time.")
+                        logging.error(f"Status code: {response.status}")
+                        error_text = await response.text()
+                        logging.error(error_text)
+                        raise APIError(
+                            f"API request failed with status {response.status}",
+                            status_code=response.status,
+                            details=error_text,
+                            payload=payload
+                        )
+        except APIError:
+            # Re-raise our custom APIError
+            raise
+        except Exception as e:
+            logging.error(f"Connection error fetching {mutation_type_name} mutations over time: {e}")
+            raise APIError(
+                f"Connection error: {str(e)}",
+                details=str(e),
+                payload=payload
+            )
+
+    async def component_aminoAcidMutationsOverTime(
+            self, 
+            mutations: List[str], 
+            date_ranges: List[Tuple[datetime, datetime]],
+            location_name: str
+        ) -> dict[str, Any]:
+        """
+        Fetches amino acid mutations over time for a given location and specific date ranges.
+        Returns counts and coverage for each mutation and date range.
+        
+        Args:
+            mutations: List of amino acid mutations in format ["S:N501Y", "N:N8N"]
+            date_ranges: List of date range tuples [(start_date, end_date), ...]
+            location_name: Location name to filter by
+            
+        Returns:
+            Dict containing the API response with mutations, dateRanges, and data matrix
+        """
+        return await self._component_mutations_over_time(
+            endpoint="aminoAcidMutationsOverTime",
+            mutation_type_name="amino acid",
+            mutations=mutations,
+            date_ranges=date_ranges,
+            location_name=location_name
+        )
+
+    async def component_nucleotideMutationsOverTime(
+            self, 
+            mutations: List[str], 
+            date_ranges: List[Tuple[datetime, datetime]],
+            location_name: str
+        ) -> dict[str, Any]:
+        """
+        Fetches nucleotide mutations over time for a given location and specific date ranges.
+        Returns counts and coverage for each mutation and date range.
+        
+        Args:
+            mutations: List of nucleotide mutations in format ["A5341C", "C34G"]
+            date_ranges: List of date range tuples [(start_date, end_date), ...]
+            location_name: Location name to filter by
+            
+        Returns:
+            Dict containing the API response with mutations, dateRanges, and data matrix
+        """
+        return await self._component_mutations_over_time(
+            endpoint="nucleotideMutationsOverTime",
+            mutation_type_name="nucleotide",
+            mutations=mutations,
+            date_ranges=date_ranges,
+            location_name=location_name
+        )
+
+    def _generate_date_ranges(
+            self, 
+            date_range: Tuple[datetime, datetime], 
+            interval: str = "daily"
+        ) -> List[Tuple[datetime, datetime]]:
+        """
+        Generate date ranges based on the specified interval.
+        
+        Args:
+            date_range: Tuple of (start_date, end_date)
+            interval: "daily", "weekly", or "monthly"
+            
+        Returns:
+            List of date range tuples
+        """
+        start_date, end_date = date_range
+        date_ranges = []
+        
+        if interval == "daily":
+            current_date = start_date
+            while current_date <= end_date:
+                date_ranges.append((current_date, current_date))
+                current_date += pd.Timedelta(days=1)
+                
+        elif interval == "weekly":
+            current_date = start_date
+            while current_date <= end_date:
+                week_end = min(current_date + pd.Timedelta(days=6), end_date)
+                date_ranges.append((current_date, week_end))
+                current_date = week_end + pd.Timedelta(days=1)
+                
+        elif interval == "monthly":
+            current_date = start_date
+            while current_date <= end_date:
+                # Get the last day of the current month
+                if current_date.month == 12:
+                    next_month = current_date.replace(year=current_date.year + 1, month=1, day=1)
+                else:
+                    next_month = current_date.replace(month=current_date.month + 1, day=1)
+                month_end = min(next_month - pd.Timedelta(days=1), end_date)
+                date_ranges.append((current_date, month_end))
+                current_date = next_month
+                
+        else:
+            raise ValueError(f"Unsupported interval: {interval}. Use 'daily', 'weekly', or 'monthly'")
+            
+        return date_ranges
+
+    async def mutations_over_time(
+            self, 
+            mutations: List[str], 
+            mutation_type: MutationType, 
+            date_range: Tuple[datetime, datetime], 
+            location_name: str,
+            interval: str = "daily"
+        ) -> pd.DataFrame:
+        """
+        Fetches mutation counts, coverage, and frequency using component endpoints for specified time intervals.
+
+        Args:
+            mutations (List[str]): List of mutations to fetch data for.
+            mutation_type (MutationType): Type of mutations (NUCLEOTIDE or AMINO_ACID).
+            date_range (Tuple[datetime, datetime]): Tuple containing start and end dates for the data range.
+            location_name (str): Location name to filter by.
+            interval (str): Time interval - "daily" (default), "weekly", or "monthly".
+
+        Returns:
+            pd.DataFrame: A MultiIndex DataFrame with mutation and sampling_date as the index, 
+                         and count, coverage, and frequency as columns.
+        """
+        try:
+            # Generate date ranges based on the specified interval
+            date_ranges = self._generate_date_ranges(date_range, interval)
+            
+            # Choose the appropriate component endpoint based on mutation type
+            if mutation_type == MutationType.AMINO_ACID:
+                api_data = await self.component_aminoAcidMutationsOverTime(mutations, date_ranges, location_name)
+            elif mutation_type == MutationType.NUCLEOTIDE:
+                api_data = await self.component_nucleotideMutationsOverTime(mutations, date_ranges, location_name)
+            else:
+                raise ValueError(f"Unsupported mutation type: {mutation_type}")
+
+            # Parse the API response (no need to check for "error" key anymore as we raise APIError)
+            records = []
+            api_data_content = api_data.get("data", {})
+            api_mutations = api_data_content.get("mutations", [])
+            api_date_ranges = api_data_content.get("dateRanges", [])
+            data_matrix = api_data_content.get("data", [])
+
+            # Debug logging
+            logging.debug(f"mutations_over_time: Received {len(api_mutations)} mutations, {len(api_date_ranges)} date ranges")
+
+            # Process the data matrix
+            for i, mutation in enumerate(api_mutations):
+                for j, date_range_info in enumerate(api_date_ranges):
+                    if i < len(data_matrix) and j < len(data_matrix[i]):
+                        mutation_data = data_matrix[i][j]
+                        
+                        # Extract count and coverage from the API response
+                        count = mutation_data.get("count", 0)
+                        coverage = mutation_data.get("coverage", 0)
+                        
+                        # Calculate frequency from count and coverage
+                        frequency = count / coverage if coverage > 0 else pd.NA
+                        
+                        # For interval-based data, use the start date as the sampling_date
+                        # or use the midpoint for better representation
+                        start_date = pd.to_datetime(date_range_info["dateFrom"])
+                        end_date = pd.to_datetime(date_range_info["dateTo"])
+                        
+                        if interval == "daily":
+                            sampling_date = start_date.strftime('%Y-%m-%d')
+                        else:
+                            # Use midpoint for weekly/monthly intervals
+                            midpoint = start_date + (end_date - start_date) / 2
+                            sampling_date = midpoint.strftime('%Y-%m-%d')
+                        
+                        # Add all records, even those with coverage = 0
+                        # This allows us to see when data is missing vs when mutations don't exist
+                        records.append({
+                            "mutation": mutation,
+                            "sampling_date": sampling_date,
+                            "count": count,
+                            "coverage": coverage,
+                            "frequency": frequency
+                        })
+
+            logging.debug(f"Created {len(records)} records from component API data")
+
+            # Create DataFrame from records
+            df = pd.DataFrame(records)
+
+            # Set MultiIndex if we have data
+            if not df.empty and "mutation" in df.columns and "sampling_date" in df.columns:
+                df.set_index(["mutation", "sampling_date"], inplace=True)
+            else:
+                # Create empty DataFrame with proper MultiIndex structure
+                df = pd.DataFrame(columns=["count", "coverage", "frequency"])
+                df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
+            return df
+
+        except APIError:
+            # Re-raise APIError so components can handle it properly
+            raise
+        except Exception as e:
+            logging.error(f"Error in mutations_over_time: {e}")
+            # Return empty DataFrame with proper MultiIndex structure
+            df = pd.DataFrame(columns=["count", "coverage", "frequency"])
+            df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
+            return df
+

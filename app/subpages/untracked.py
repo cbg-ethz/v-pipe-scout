@@ -66,16 +66,14 @@ def app():
     
 
     ## Fetch locations from API
-    default_locations = [
-        "Zürich (ZH)",
-    ]  # Define default locations
+    default_locations = []  
     # Fetch locations using the fetch_locations function
     locations = wiseLoculus.fetch_locations(default_locations)
 
     location = st.selectbox("Select Location:", locations)
 
     # Add button to trigger data fetching
-    if st.button("Fetch Untracked Mutations"):
+    if date_range and len(date_range) == 2 and location:
         with st.spinner("Fetching mutation data..."):
             try:
                 mutations_in_timeframe_df = asyncio.run(wiseLoculus.sample_mutations(

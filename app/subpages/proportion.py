@@ -54,9 +54,9 @@ def app():
 
     # the sequence type selection determines the default value for min_proportion
     if sequence_type == "Nucleotides":
-        default_min_proportion = 0.10
+        default_min_proportion = 0.2
     elif sequence_type == "Amino Acids":
-        default_min_proportion = 0.30
+        default_min_proportion = 0.4
     else:
         default_min_proportion = 0.05
     
@@ -71,36 +71,35 @@ def app():
         help="Set the minimum proportion of mutation to fetch in the heatmap."
     )
 
-    # Add performance warning before the button
-    st.warning("⚠️ **Performance Notice**: Loading this plot may take up to a minute for proportions below 10%. A major speedup will be implemented soon to improve loading times.")
+    # Add performance warning
+    st.warning("⚠️ **Performance Notice**: Loading this plot may take up to a minute for proportions below 15% due to the high number of datapoints to fetch.")
 
-    # Add button to trigger data fetching
-    if st.button("Fetch Mutation Data"):
-        if len(date_range) == 2:
-            start_date = datetime.strptime(str(date_range[0]), "%Y-%m-%d")
-            end_date = datetime.strptime(str(date_range[1]), "%Y-%m-%d")
+    # Check if all necessary parameters are available
+    if date_range and len(date_range) == 2 and location and min_proportion:
+        start_date = datetime.strptime(str(date_range[0]), "%Y-%m-%d")
+        end_date = datetime.strptime(str(date_range[1]), "%Y-%m-%d")
 
-            sequence_type_value = "amino acid" if sequence_type == "Amino Acids" else "nucleotide"
+        sequence_type_value = "amino acid" if sequence_type == "Amino Acids" else "nucleotide"
 
-            # Fetch all mutations for the given parameters
-            st.write("### Mutation Analysis by Proportion")
-            st.write("Analyzing all mutations found in the selected timeframe and location.")
-            
-            try:
-                mutation_type = MutationType.NUCLEOTIDE if sequence_type_value == "nucleotide" else MutationType.AMINO_ACID
-                # Get all nucleotide mutations in the timeframe
-                mutations_in_timeframe_df = asyncio.run(wiseLoculus.sample_mutations(
-                    type=mutation_type,
-                    date_range=(start_date, end_date),
-                    location_name=location,
-                    min_proportion=min_proportion  # Lower threshold to get more mutations
-                ))
+        # Fetch all mutations for the given parameters
+        st.write("### Mutation Analysis by Proportion")
+        st.write("Analyzing all mutations found in the selected timeframe and location.")
+        
+        try:
+            mutation_type = MutationType.NUCLEOTIDE if sequence_type_value == "nucleotide" else MutationType.AMINO_ACID
+            # Get all nucleotide mutations in the timeframe
+            mutations_in_timeframe_df = asyncio.run(wiseLoculus.sample_mutations(
+                type=mutation_type,
+                date_range=(start_date, end_date),
+                location_name=location,
+                min_proportion=min_proportion  # Lower threshold to get more mutations
+            ))
 
-                if mutations_in_timeframe_df.empty or 'mutation' not in mutations_in_timeframe_df.columns:
-                    st.warning("⚠️ No mutations found for the selected parameters.")
-                    st.info("Try adjusting the date range or location.")
-                    return
-                
+
+            if mutations_in_timeframe_df.empty or 'mutation' not in mutations_in_timeframe_df.columns:
+                st.warning("⚠️ No mutations found for the selected parameters.")
+                st.info("Try adjusting the date range or location.")
+            else:
                 mutations_list = mutations_in_timeframe_df['mutation'].tolist()
                 
                 # Configure the component for dynamic mutations
@@ -124,14 +123,25 @@ def app():
                     date_range=(start_date, end_date),
                     location=location,
                     config=plot_config,
-                    session_prefix="dynamic_"
+                    session_prefix="proportion_"
                 )
                 
-            except Exception as e:
-                st.error(f"⚠️ Error fetching mutation data: {str(e)}")
-                st.info("This could be due to API connectivity issues. Please try again later.")
-        else:
-            st.warning("Please select a valid date range with both start and end dates.")
+                if result is None:
+                    st.info("💡 Try adjusting the date range, location, or minimum proportion.")
+                else:
+                    st.success(f"Successfully analyzed {len(result['filtered_mutations'])} mutations.")
+                
+        except Exception as e:
+            st.error(f"⚠️ Error fetching mutation data: {str(e)}")
+            st.info("This could be due to API connectivity issues. Please try again later.")
+    else:
+        st.info("Please configure all parameters above to display the mutation analysis.")
+        if not date_range or len(date_range) != 2:
+            st.info("• Please select a complete date range")
+        if not location:
+            st.info("• Please select a location")
+        if not min_proportion:
+            st.info("• Please set a minimum proportion value")
 
 
 if __name__ == "__main__":
