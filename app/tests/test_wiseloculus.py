@@ -664,19 +664,26 @@ class TestWiseLoculusLapisLiveAPI:
                     # Check data types and ranges
                     assert mutation_data["count"].dtype in ['int64', 'float64'], "Count should be numeric"
                     assert mutation_data["coverage"].dtype in ['int64', 'float64'], "Coverage should be numeric"
-                    assert mutation_data["frequency"].dtype in ['int64', 'float64'], "Frequency should be numeric"
+                    # Frequency can be numeric or object dtype when containing NA values
+                    assert mutation_data["frequency"].dtype in ['int64', 'float64', 'object'], "Frequency should be numeric or contain NA values"
                     
-                    # Frequency should be between 0 and 1
-                    assert (mutation_data["frequency"] >= 0).all(), "Frequency should be >= 0"
-                    assert (mutation_data["frequency"] <= 1).all(), "Frequency should be <= 1"
+                    # Frequency should be between 0 and 1 for non-NA values
+                    non_na_freq = mutation_data["frequency"].dropna()
+                    if not non_na_freq.empty:
+                        assert (non_na_freq >= 0).all(), "Frequency should be >= 0"
+                        assert (non_na_freq <= 1).all(), "Frequency should be <= 1"
                     
                     # Coverage should be >= count
                     assert (mutation_data["coverage"] >= mutation_data["count"]).all(), "Coverage should be >= count"
                     
                     # Verify frequency calculation
                     for _, row in mutation_data.iterrows():
-                        expected_freq = row["count"] / row["coverage"] if row["coverage"] > 0 else 0
-                        assert abs(row["frequency"] - expected_freq) < 1e-10, "Frequency should be calculated correctly"
+                        if pd.notna(row["frequency"]):
+                            expected_freq = row["count"] / row["coverage"] if row["coverage"] > 0 else 0
+                            assert abs(row["frequency"] - expected_freq) < 1e-10, "Frequency should be calculated correctly"
+                        else:
+                            # If frequency is NA, both count and coverage should be 0
+                            assert row["count"] == 0 and row["coverage"] == 0, "NA frequency should only occur when count and coverage are both 0"
                 
                 print(f"Sample data:\n{result.head()}")
             else:
