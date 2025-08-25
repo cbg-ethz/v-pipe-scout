@@ -1,11 +1,12 @@
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, date
 
 from api.wiseloculus import WiseLoculusLapis
 from api.covspectrum import CovSpectrumLapis
 from components.variant_signature_component import render_signature_composer
 from components.mutation_plot_component import render_mutation_plot_component
 from utils.config import get_wiseloculus_url, get_covspectrum_url
+from utils.url_state import create_url_state_manager
 
 
 # Get server configuration from centralized config
@@ -16,6 +17,8 @@ wiseLoculus = WiseLoculusLapis(wise_server_ip)
 covSpectrum = CovSpectrumLapis(cov_spectrum_api)
 
 def app():
+    # Initialize URL state manager for this page
+    url_state = create_url_state_manager("signature")
 
     st.title("Variant Signature Explorer")
     st.subheader("Explore the variant signatures in the wastewater data.")
@@ -59,16 +62,39 @@ def app():
     #### #3) Select the date range
     # Get dynamic date range from API with bounds to enforce limits
     default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("signature_explorer")
+    
+    # Load date range from URL or use defaults
+    url_start_date = url_state.load_from_url("start_date", default_start, date)
+    url_end_date = url_state.load_from_url("end_date", default_end, date)
+    
     date_range = st.date_input(
         "Select a date range:", 
-        [default_start, default_end],
+        [url_start_date, url_end_date],
         min_value=min_date,
         max_value=max_date
     )
+    
+    # Save date range to URL
+    if len(date_range) == 2:
+        url_state.save_to_url(start_date=date_range[0], end_date=date_range[1])
+    
     #### #4) Select the location
     default_locations = ["Zürich (ZH)"]  # Define default locations
     locations = wiseLoculus.fetch_locations(default_locations)
-    location = st.selectbox("Select Location:", locations)
+    
+    # Load location from URL or use default
+    default_location = locations[0] if locations else ""
+    url_location = url_state.load_from_url("location", default_location, str)
+    
+    # Make sure the URL location is still valid
+    if url_location not in locations:
+        url_location = default_location
+    
+    location_index = locations.index(url_location) if url_location in locations else 0
+    location = st.selectbox("Select Location:", locations, index=location_index)
+    
+    # Save location to URL
+    url_state.save_to_url(location=location)
 
     # Check if all necessary parameters are available
     if selected_mutations and date_range and len(date_range) == 2 and location:
