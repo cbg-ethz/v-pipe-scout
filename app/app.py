@@ -9,6 +9,7 @@ import subpages.proportion as proportion
 import subpages.signature_explorer as signature_explorer
 import subpages.abundance_estimator as abundance_estimator
 import subpages.untracked as untracked
+import subpages.region as region
 from utils.system_health import initialize_health_monitoring, display_global_system_status
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -32,7 +33,8 @@ if __name__ == "__main__":
         {"app": proportion.app, "title": "Search by Proportion", "icon": "🧮", "url_path": "dynamic-mutations"},
         {"app": untracked.app, "title": "Untracked Mutations", "icon": "👀", "url_path": "untracked"},
         {"app": signature_explorer.app, "title": "Variant Signature Explorer", "icon": "🔍", "url_path": "signature-explorer"},
-        {"app": abundance_estimator.app, "title": "Variant Abundances", "icon": "🧩", "url_path": "abundance-estimator"}
+        {"app": abundance_estimator.app, "title": "Variant Abundances", "icon": "🧩", "url_path": "abundance-estimator"},
+        {"app": region.app, "title": "Region Explorer", "icon": "📍", "url_path": "region"},
     ]
     
     # Create pages dynamically from configurations

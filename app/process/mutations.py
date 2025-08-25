@@ -8,6 +8,7 @@ extracting genomic positions, and validating mutation formats.
 import re
 from typing import List
 from interface import MutationType
+from typing import Optional
 
 
 def get_symbols_for_mutation_type(mutation_type: MutationType) -> List[str]:
@@ -116,3 +117,81 @@ def sort_mutations_by_position(mutations: List[str]) -> List[str]:
         ["A100G", "T300C", "C500T"]
     """
     return sorted(mutations, key=extract_position)
+
+
+def validate_mutation(mutation_str: str, mutation_type: MutationType) -> bool:
+    """Validate if a mutation string conforms to the expected format for the given mutation type.
+    
+    Args:
+        mutation_str (str): The mutation string to validate
+        mutation_type (MutationType): The type of mutation (AMINO_ACID or NUCLEOTIDE)
+        
+    Returns:
+        bool: True if the mutation string is valid, False otherwise
+        
+    Examples:
+        >>> validate_mutation("C345T", MutationType.NUCLEOTIDE)
+        True
+        >>> validate_mutation("ORF1a:T103L", MutationType.AMINO_ACID)
+        True
+        >>> validate_mutation("X123Y", MutationType.AMINO_ACID)
+        False
+    """
+    mutation_str = mutation_str.strip()
+    
+    if mutation_type == MutationType.AMINO_ACID:
+        # Amino acid mutation format: "ORF1a:T103L", "S:N126K"
+        if ':' not in mutation_str:
+            return False
+        try:
+            gene_part, mutation_part = mutation_str.split(':', 1)
+            amino_acids = get_symbols_for_mutation_type(MutationType.AMINO_ACID)
+            amino_acid_pattern = '|'.join(amino_acids)
+            match = re.match(rf"^({amino_acid_pattern})?(\d+)({amino_acid_pattern}|-)?$", mutation_part.upper())
+            return match is not None
+        except (ValueError, IndexError):
+            return False
+            
+    elif mutation_type == MutationType.NUCLEOTIDE:
+        # Nucleotide mutation format: "C345T", "456-", "748G"
+        try:
+            nucleotides = get_symbols_for_mutation_type(MutationType.NUCLEOTIDE)
+            nucleotide_pattern = '|'.join(nucleotides)
+            match = re.match(rf"^({nucleotide_pattern})?(\d+)({nucleotide_pattern}|-)?$", mutation_str.upper())
+            return match is not None
+        except ValueError:
+            return False
+            
+    return False  # Unknown mutation type
+
+
+def possible_mutations_at_position(position: int, mutation_type: MutationType, gene: Optional[str] = None) -> List[str]:
+    """Generate all possible mutations at a given genomic position for the specified mutation type.
+    
+    Args:
+        position (int): The genomic position number
+        mutation_type (MutationType): The type of mutation (AMINO_ACID or NUCLEOTIDE)
+        gene (str, optional): The gene name for amino acid mutations (e.g., "ORF1ab", "S")
+        
+    Returns:
+        List[str]: List of possible mutation strings at the given position
+        
+    Examples:
+        >>> possible_mutations_at_position(100, MutationType.NUCLEOTIDE)
+        ["A100T", "A100C", "A100G", "T100A", "T100C", "T100G", ...]
+        
+        >>> possible_mutations_at_position(50, MutationType.AMINO_ACID, "ORF1ab")
+        ["ORF1ab:A50C", "ORF1ab:A50D", "ORF1ab:A50E", ..., "ORF1ab:Y50W"]
+    """
+    symbols = get_symbols_for_mutation_type(mutation_type)
+    mutations = []
+    
+    for ref in symbols:
+        for alt in symbols:
+            if ref != alt:
+                if mutation_type == MutationType.AMINO_ACID and gene:
+                    mutations.append(f"{gene}:{ref}{position}{alt}")
+                else:
+                    mutations.append(f"{ref}{position}{alt}")
+    
+    return mutations
