@@ -23,6 +23,8 @@ import os
 import json
 import pickle  
 import base64 
+import asyncio
+from datetime import datetime
 from celery import Celery
 import redis
 
@@ -826,21 +828,34 @@ def app():
             )
 
             locations = wiseLoculus.fetch_locations()
-            location = st.selectbox("Select Location:", locations)
+            if locations is None:
+                st.error("Unable to fetch locations. Please check your connection to the Loculus server.")
+                location = None
+            else:
+                location = st.selectbox("Select Location:", locations)
 
             # Add a button to trigger fetching
             if st.button("Fetch Data"):
                 # Get the latest mutation list
                 mutations = matrix_df["Mutation"].tolist()
                 
+                # Convert date range to datetime tuples
+                if len(date_range) == 2:
+                    start_date = datetime.combine(date_range[0], datetime.min.time())
+                    end_date = datetime.combine(date_range[1], datetime.min.time())
+                    datetime_range = (start_date, end_date)
+                else:
+                    st.error("Please select a valid date range with both start and end dates.")
+                    st.stop()
+                
                 with st.spinner('Fetching mutation counts and coverage data...'):
                     # Store the result in session state
-                    st.session_state.counts_df3d = wiseLoculus.fetch_counts_coverage_freq(
+                    st.session_state.counts_df3d = asyncio.run(wiseLoculus.fetch_counts_coverage_freq(
                     mutations,
                     MutationType.NUCLEOTIDE,  
-                    date_range,
+                    datetime_range,
                     location
-                    )
+                    ))
                 st.success("Data fetched successfully!")
                 
             # Only show download buttons if data exists

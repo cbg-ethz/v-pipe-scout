@@ -18,7 +18,7 @@ covSpectrum = CovSpectrumLapis(cov_spectrum_api)
 def app():
 
     st.title("Variant Signature Explorer")
-    st.subheader("Explore the variant signatures in the wastewater data.")
+    st.subheader("Explore variant signatures in the wastewater data.")
     st.write("First make a variant definition based on live queries to CovSpectrum.")
     st.write("Then explore the variant signature in the wastewater data, on read level.")
 
