@@ -828,7 +828,11 @@ def app():
             )
 
             locations = wiseLoculus.fetch_locations()
-            location = st.selectbox("Select Location:", locations)
+            if locations is None:
+                st.error("Unable to fetch locations. Please check your connection to the Loculus server.")
+                location = None
+            else:
+                location = st.selectbox("Select Location:", locations)
 
             # Add a button to trigger fetching
             if st.button("Fetch Data"):
