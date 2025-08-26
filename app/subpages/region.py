@@ -1,10 +1,13 @@
 import streamlit as st
 import pandas as pd
 
+from datetime import datetime
+
 from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
 from visualize.mutations import mutations_over_time
 from utils.config import get_wiseloculus_url
+
 
 pd.set_option('future.no_silent_downcasting', True)
 
@@ -39,7 +42,7 @@ def app():
     if mode == "Custom Mutation Set":
         st.write("### Input Mutations")
         st.write("Enter a comma-separated list of mutations (e.g., C43T, G96A, T456C).")
-        st.write("Mutations should be in nucleotide format (e.g., A123T).")
+        st.write("Mutations should be in nucleotide format (e.g., A123T), you may also skip the reference base (e.g., 123T, 456-).")
         mutation_input = st.text_area("Mutations:", value="C43T, G96A, T456C", height=100)
         # Split input into a list and strip whitespace
         mutations = [mut.strip() for mut in mutation_input.split(",") if mut.strip()]
@@ -56,7 +59,7 @@ def app():
     st.write("Choose your data to inspect:")
     # Get dynamic date range from API with bounds to enforce limits
     default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("resistance_mutations")
-    date_range = st.date_input(
+    date_range_input = st.date_input(
         "Select a date range:", 
         [default_start, default_end],
         min_value=min_date,
@@ -64,26 +67,26 @@ def app():
     )
 
     # Ensure date_range is a tuple with two elements
-    if len(date_range) != 2:
+    if len(date_range_input) != 2:
         st.error("Please select a valid date range with a start and end date.")
         return
 
-    start_date = date_range[0].strftime('%Y-%m-%d')
-    end_date = date_range[1].strftime('%Y-%m-%d')
-    
+    start_date = datetime.fromisoformat(date_range_input[0].strftime('%Y-%m-%d'))
+    end_date = datetime.fromisoformat(date_range_input[1].strftime('%Y-%m-%d'))
+
+    date_range = (start_date, end_date)
 
     ## Fetch locations from API
     default_locations = [
         "Zürich (ZH)",
     ]  # Define default locations
-    # Fetch locations using the fetch_locations function
-    locations = wiseLoculus.fetch_locations(default_locations)
+    
+    # Fetch locations using cached session state
+    if "locations" not in st.session_state:
+        st.session_state.locations = wiseLoculus.fetch_locations(default_locations)
+    locations = st.session_state.locations
 
     location = st.selectbox("Select Location:", locations)
-    
-    sequence_type_value = "amino acid"
-
-    formatted_mutations_str = str(formatted_mutations).replace("'", '"')
 
     st.markdown("---")
     st.write("### Resistance Mutations Over Time")
@@ -98,7 +101,7 @@ def app():
 
     with st.spinner("Fetching resistance mutation data..."):
         try:
-            counts_df, freq_df, coverage_freq_df = wiseLoculus.mutations_over_time_dfs(formatted_mutations, MutationType.NUCLEOTIDE, date_range, location)
+            counts_df, freq_df, coverage_freq_df = wiseLoculus.mutations_over_time_dfs(formatted_mutations, mutation_type_value, date_range, location)
         except Exception as e:
             st.error(f"⚠️ Error fetching resistance mutation data: {str(e)}")
             st.info("This could be due to API connectivity issues. Please try again later.")
