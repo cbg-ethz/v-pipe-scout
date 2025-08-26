@@ -19,7 +19,6 @@ wiseLoculus = WiseLoculusLapis(server_ip)
 
 
 def app():
-    mutations = []
     st.title("Region Explorer")
     st.write("This page allows you to visualize a custom set or genomic range of mutations over time.")
     st.write("This feature may be useful for positions of interest or primer design and redesign.")
@@ -83,7 +82,14 @@ def app():
         st.write("### Input Genomic Ranges")
         st.write("Enter genomic ranges in the format 'start-end' (e.g., 100-200). You can enter multiple ranges separated by commas.")
         st.write("For amino acid mutations, please also specify the gene (e.g., ORF1a:100-200).")
-        range_input = st.text_area("Genomic Ranges:", value="100-105, 200-204", height=100)
+        
+        # Set dynamic default based on mutation type
+        if mutation_type_value == MutationType.AMINO_ACID:
+            default_ranges = "ORF1a:20-23, S:34-42"
+        else:
+            default_ranges = "100-105, 200-204"
+            
+        range_input = st.text_area("Genomic Ranges:", value=default_ranges, height=100)
         # Split input into a list and strip whitespace
         ranges = [r.strip() for r in range_input.split(",") if r.strip()]
         # Generate possible mutations for each range
@@ -114,8 +120,14 @@ def app():
                     mutations.extend(possible_muts)
             except ValueError:
                 st.warning(f"Invalid range format: {r}. Please ensure you enter valid integers for start and end.")
-        # Remove duplicates
+        # Remove duplicates and log statistics
+        original_count = len(mutations)
         mutations = list(set(mutations))
+        deduplicated_count = len(mutations)
+        
+        if original_count != deduplicated_count:
+            st.info(f"Removed {original_count - deduplicated_count} duplicate mutations. Final count: {deduplicated_count}")
+            
         if not mutations:
             st.warning("No valid mutations generated from the provided ranges.")
 

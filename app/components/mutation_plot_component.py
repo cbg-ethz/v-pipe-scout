@@ -122,7 +122,24 @@ def render_mutation_plot_component(
             # Reset index to access mutation and sampling_date as columns
             df_reset = mutations_over_time_df.reset_index()
             
-            # Create the expected format: mutations as index, dates as columns
+            # Check for duplicate entries and throw error if found
+            duplicates = df_reset.duplicated(subset=['mutation', 'sampling_date'], keep=False)
+            if duplicates.any():
+                duplicate_rows = df_reset[duplicates]
+                error_msg = f"Duplicate mutation-date combinations detected: {len(duplicate_rows)} entries"
+                target.error(f"🚨 **Data Integrity Error**: {error_msg}")
+                
+                with target.expander("🔍 Duplicate entries details", expanded=True):
+                    target.write("**Duplicate entries found:**")
+                    target.dataframe(duplicate_rows[['mutation', 'sampling_date', 'count', 'frequency']])
+                    target.write("**This indicates a problem with data processing that needs to be fixed.**")
+                
+                # Throw a detailed error for debugging
+                duplicate_details = duplicate_rows[['mutation', 'sampling_date', 'count', 'frequency']].to_string()
+                raise ValueError(f"Index contains duplicate entries, cannot reshape. "
+                               f"Found {len(duplicate_rows)} duplicate mutation-date combinations:\n{duplicate_details}")
+            
+            # No duplicates, use regular pivot
             counts_df = df_reset.pivot(index='mutation', columns='sampling_date', values='count')
             freq_df = df_reset.pivot(index='mutation', columns='sampling_date', values='frequency')
             
