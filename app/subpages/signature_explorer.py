@@ -33,7 +33,9 @@ def app():
         'show_plot': True,
         'title': "Variant Signature Explorer",
         'show_title': True,
-        'show_description': True
+        'show_description': True,
+        'default_min_abundance': 0.8,
+        'default_min_coverage': 9,  # Lowered to 9 to for better UX
     }
 
     # Render the variant signature component
