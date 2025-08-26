@@ -7,7 +7,7 @@ from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
 from components.mutation_plot_component import render_mutation_plot_component
 from utils.config import get_wiseloculus_url
-from process.mutations import get_symbols_for_mutation_type, possible_mutations_at_position, extract_position, validate_mutation
+from process.mutations import possible_mutations_at_position, extract_position, validate_mutation
 
 
 pd.set_option('future.no_silent_downcasting', True)
@@ -83,11 +83,17 @@ def app():
         st.write("Enter genomic ranges in the format 'start-end' (e.g., 100-200). You can enter multiple ranges separated by commas.")
         st.write("For amino acid mutations, please also specify the gene (e.g., ORF1a:100-200).")
         
+        # Add guidance about mutation counts
+        if mutation_type_value == MutationType.AMINO_ACID:
+            st.info("💡 **Amino acid ranges**: Each position generates ~21 mutations (20 amino acids + deletion). You can use larger ranges (~14 positions max) to stay under the 300 mutation limit.")
+        else:
+            st.info("💡 **Nucleotide ranges**: Each position generates ~5 mutations (4 nucleotides + deletion). You can use larger ranges (~60 positions max).")
+        
         # Set dynamic default based on mutation type
         if mutation_type_value == MutationType.AMINO_ACID:
-            default_ranges = "ORF1a:20-23, S:34-42"
+            default_ranges = "ORF1a:20-25, S:34-40"
         else:
-            default_ranges = "100-105, 200-204"
+            default_ranges = "100-120, 200-220"
             
         range_input = st.text_area("Genomic Ranges:", value=default_ranges, height=100)
         # Split input into a list and strip whitespace
@@ -116,7 +122,7 @@ def app():
                     continue
                 
                 for pos in range(start, end + 1):
-                    possible_muts = possible_mutations_at_position(pos, mutation_type_value, gene)
+                    possible_muts = possible_mutations_at_position(pos, mutation_type_value, gene, include_reference=False)
                     mutations.extend(possible_muts)
             except ValueError:
                 st.warning(f"Invalid range format: {r}. Please ensure you enter valid integers for start and end.")
@@ -209,7 +215,7 @@ def app():
             return
         
         if mode == "Genomic Ranges":
-            st.success(f"Processing {total_genomic_sites} genomic loci for visualization ({len(mutations)} total mutations). Note the number of mutations we query is times 4 by nucleotides and times 20 by amino acids.")
+            st.success(f"Processing {total_genomic_sites} genomic loci for visualization ({len(mutations)} total mutations). Note: Mutations are generated without reference bases (e.g., '100A' instead of 'C100A') since reference doesn't affect the analysis.")
 
         if mode == "Custom Mutation Set":
             st.success(f"Processing {len(mutations)} mutations for visualization ({total_genomic_sites} unique genomic positions).")

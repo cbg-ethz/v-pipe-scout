@@ -165,33 +165,53 @@ def validate_mutation(mutation_str: str, mutation_type: MutationType) -> bool:
     return False  # Unknown mutation type
 
 
-def possible_mutations_at_position(position: int, mutation_type: MutationType, gene: Optional[str] = None) -> List[str]:
+def possible_mutations_at_position(position: int, mutation_type: MutationType, gene: Optional[str] = None, include_reference: bool = True) -> List[str]:
     """Generate all possible mutations at a given genomic position for the specified mutation type.
     
     Args:
         position (int): The genomic position number
         mutation_type (MutationType): The type of mutation (AMINO_ACID or NUCLEOTIDE)
         gene (str, optional): The gene name for amino acid mutations (e.g., "ORF1ab", "S")
+        include_reference (bool): Whether to include reference base in mutation strings.
+                                If False, generates simpler mutations like "100T" instead of "A100T"
         
     Returns:
         List[str]: List of possible mutation strings at the given position
         
     Examples:
-        >>> possible_mutations_at_position(100, MutationType.NUCLEOTIDE)
+        >>> possible_mutations_at_position(100, MutationType.NUCLEOTIDE, include_reference=True)
         ["A100T", "A100C", "A100G", "T100A", "T100C", "T100G", ...]
         
-        >>> possible_mutations_at_position(50, MutationType.AMINO_ACID, "ORF1ab")
-        ["ORF1ab:A50C", "ORF1ab:A50D", "ORF1ab:A50E", ..., "ORF1ab:Y50W"]
+        >>> possible_mutations_at_position(100, MutationType.NUCLEOTIDE, include_reference=False)
+        ["100A", "100T", "100C", "100G", "100-"]
+        
+        >>> possible_mutations_at_position(50, MutationType.AMINO_ACID, "ORF1ab", include_reference=False)
+        ["ORF1ab:50A", "ORF1ab:50C", "ORF1ab:50D", ..., "ORF1ab:50Y"]
     """
     symbols = get_symbols_for_mutation_type(mutation_type)
     mutations = []
     
-    for ref in symbols:
+    if include_reference:
+        # Original behavior: generate all ref->alt combinations
+        for ref in symbols:
+            for alt in symbols:
+                if ref != alt:
+                    if mutation_type == MutationType.AMINO_ACID and gene:
+                        mutations.append(f"{gene}:{ref}{position}{alt}")
+                    else:
+                        mutations.append(f"{ref}{position}{alt}")
+    else:
+        # Simplified behavior: generate position->alt mutations (no reference base)
         for alt in symbols:
-            if ref != alt:
-                if mutation_type == MutationType.AMINO_ACID and gene:
-                    mutations.append(f"{gene}:{ref}{position}{alt}")
-                else:
-                    mutations.append(f"{ref}{position}{alt}")
+            if mutation_type == MutationType.AMINO_ACID and gene:
+                mutations.append(f"{gene}:{position}{alt}")
+            else:
+                mutations.append(f"{position}{alt}")
+        
+        # Add deletion mutation
+        if mutation_type == MutationType.AMINO_ACID and gene:
+            mutations.append(f"{gene}:{position}-")
+        else:
+            mutations.append(f"{position}-")
     
     return mutations
