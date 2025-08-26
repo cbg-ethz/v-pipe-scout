@@ -202,7 +202,7 @@ def app():
         if mode == "Custom Mutation Set":
             st.success(f"Processing {len(mutations)} mutations for visualization ({total_genomic_sites} unique genomic positions).")
 
-        with st.spinner("Fetching resistance mutation data..."):
+        with st.spinner("Fetching genomic regions data..."):
             try:
                 counts_df, freq_df, coverage_freq_df = wiseLoculus.mutations_over_time_dfs(mutations, mutation_type_value, date_range, location)
             except Exception as e:
@@ -230,7 +230,7 @@ def app():
                     plot_freq_df, 
                     plot_counts_df, 
                     coverage_freq_df,
-                    title="Proportion of Resistance Mutations Over Time"
+                    title=f"Proportion of {mode} Over Time"
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
