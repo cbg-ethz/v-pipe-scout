@@ -5,6 +5,7 @@ that can be embedded in different pages with custom configurations.
 """
 
 import streamlit as st
+import asyncio
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -86,8 +87,8 @@ def render_mutation_plot_component(
             # Convert sequence_type string to MutationType enum
             mutation_type = sequence_type
 
-            if mutation_type ==  MutationType.AMINO_ACID:
-                st.warning("⚠️ Amino acid mutations are not yet supported in this component. Please use nucleotide mutations instead.")
+            if mutation_type not in [MutationType.NUCLEOTIDE, MutationType.AMINO_ACID]:
+                target.error("⚠️ Invalid sequence type. Must be 'nucleotide' or 'amino acid'.")
                 return None
             
             # Get data using the mutations_over_time function
