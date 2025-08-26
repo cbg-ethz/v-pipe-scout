@@ -129,7 +129,8 @@ def app():
             date_range=(start_date, end_date),
             location=location,
             config=plot_config,
-            session_prefix="signature_"
+            session_prefix="signature_",
+            url_state_manager=url_state
         )
         
         if result is None:

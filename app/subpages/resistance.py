@@ -87,8 +87,7 @@ def app():
 
     
     locations = wiseLoculus.fetch_locations()
-    location = st.selectbox("Select Location:", locations)
-
+    
     # Load location from URL or use default
     default_location = locations[0] if locations else ""
     url_location = url_state.load_from_url("location", default_location, str)
@@ -143,7 +142,8 @@ def app():
                 date_range=date_range,
                 location=location,
                 config=plot_config,
-                session_prefix="proportion_"
+                session_prefix="resistance_",
+                url_state_manager=url_state
             )
             
             if result is None:

@@ -1,12 +1,13 @@
 import streamlit as st
 import pandas as pd
 
-from datetime import datetime
+from datetime import datetime, date
 
 from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
 from components.mutation_plot_component import render_mutation_plot_component
 from utils.config import get_wiseloculus_url
+from utils.url_state import create_url_state_manager
 from process.mutations import possible_mutations_at_position, extract_position, validate_mutation
 
 
@@ -22,25 +23,40 @@ wiseLoculus = WiseLoculusLapis(server_ip)
 
 
 def app():
+    # Initialize URL state manager for this page
+    url_state = create_url_state_manager("region")
+    
     st.title("Region Explorer")
     st.write("This page allows you to visualize a custom set or genomic range of mutations over time.")
     st.write("This feature may be useful for positions of interest or primer design and redesign.")
     st.markdown("---")
     
     # select mutation type - nucleotide or amino acid, mutli-selcted default to nucleotide
+    url_mutation_type = url_state.load_from_url("mutation_type", "Nucleotide", str)
+    mutation_type_options = ["Nucleotide", "Amino Acid"]
+    mutation_type_index = mutation_type_options.index(url_mutation_type) if url_mutation_type in mutation_type_options else 0
     mutation_type = st.radio(
         "Select mutation type:",
-        options=["Nucleotide", "Amino Acid"],
-        index=0  # Default to Nucleotide
+        options=mutation_type_options,
+        index=mutation_type_index
     )
     mutation_type_value = MutationType.NUCLEOTIDE if mutation_type == "Nucleotide" else MutationType.AMINO_ACID
+    
+    # Save mutation type to URL
+    url_state.save_to_url(mutation_type=mutation_type)
 
     # select mode - seleced mutations or genomic range
+    url_mode = url_state.load_from_url("mode", "Custom Mutation Set", str)
+    mode_options = ["Custom Mutation Set", "Genomic Ranges"]
+    mode_index = mode_options.index(url_mode) if url_mode in mode_options else 0
     mode = st.radio(
         "Select mode:",
-        options=["Custom Mutation Set", "Genomic Ranges"],
-        index=0  # Default to "Custom Mutation Set"
+        options=mode_options,
+        index=mode_index
     )
+    
+    # Save mode to URL
+    url_state.save_to_url(mode=mode)
 
     # Initialize variables
     mutations = []
@@ -51,11 +67,16 @@ def app():
         if mutation_type_value == MutationType.NUCLEOTIDE:
             st.write("Enter a comma-separated list of nucleotide mutations (e.g., C43T, G96A, T456C).")
             st.write("Mutations should be in nucleotide format (e.g., A123T), you may also skip the reference base (e.g., 123T, 456-).")
-            mutation_input = st.text_area("Mutations:", value="C43T, G96A, T456C", height=100)
+            url_mutation_input = url_state.load_from_url("mutation_input", "C43T, G96A, T456C", str)
+            mutation_input = st.text_area("Mutations:", value=url_mutation_input, height=100)
         else:
             st.write("Enter a comma-separated list of amino acid mutations (e.g., ORF1a:T103L, S:N126K).")
             st.write("Mutations should include the gene name (e.g., ORF1a:T103L, S:N126K).")
-            mutation_input = st.text_area("Mutations:", value="ORF1a:T103L, S:N126K", height=100)
+            url_mutation_input = url_state.load_from_url("mutation_input", "ORF1a:T103L, S:N126K", str)
+            mutation_input = st.text_area("Mutations:", value=url_mutation_input, height=100)
+        
+        # Save mutation input to URL
+        url_state.save_to_url(mutation_input=mutation_input)
         
         # Split input into a list and strip whitespace
         input_mutations = [mut.strip() for mut in mutation_input.split(",") if mut.strip()]
@@ -97,8 +118,12 @@ def app():
             default_ranges = "ORF1a:20-25, S:34-40"
         else:
             default_ranges = "100-120, 200-220"
-            
-        range_input = st.text_area("Genomic Ranges:", value=default_ranges, height=100)
+        
+        url_range_input = url_state.load_from_url("range_input", default_ranges, str)
+        range_input = st.text_area("Genomic Ranges:", value=url_range_input, height=100)
+        
+        # Save range input to URL
+        url_state.save_to_url(range_input=range_input)
         # Split input into a list and strip whitespace
         ranges = [r.strip() for r in range_input.split(",") if r.strip()]
         # Generate possible mutations for each range
@@ -146,9 +171,14 @@ def app():
     st.write("Choose your data to inspect:")
     # Get dynamic date range from API with bounds to enforce limits
     default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("resistance_mutations")
+    
+    # Load date range from URL or use defaults
+    url_start_date = url_state.load_from_url("start_date", default_start, date)
+    url_end_date = url_state.load_from_url("end_date", default_end, date)
+    
     date_range_input = st.date_input(
         "Select a date range:", 
-        [default_start, default_end],
+        [url_start_date, url_end_date],
         min_value=min_date,
         max_value=max_date
     )
@@ -157,6 +187,9 @@ def app():
     if len(date_range_input) != 2:
         st.error("Please select a valid date range with a start and end date.")
         return
+
+    # Save date range to URL
+    url_state.save_to_url(start_date=date_range_input[0], end_date=date_range_input[1])
 
     start_date = datetime.fromisoformat(date_range_input[0].strftime('%Y-%m-%d'))
     end_date = datetime.fromisoformat(date_range_input[1].strftime('%Y-%m-%d'))
@@ -173,18 +206,34 @@ def app():
         st.session_state.locations = wiseLoculus.fetch_locations(default_locations)
     locations = st.session_state.locations
 
-    location = st.selectbox("Select Location:", locations)
+    # Load location from URL or use default
+    default_location = locations[0] if locations else ""
+    url_location = url_state.load_from_url("location", default_location, str)
+    
+    # Make sure the URL location is still valid
+    if url_location not in locations:
+        url_location = default_location
+    
+    location_index = locations.index(url_location) if url_location in locations else 0
+    location = st.selectbox("Select Location:", locations, index=location_index)
+    
+    # Save location to URL
+    url_state.save_to_url(location=location)
 
     st.markdown("---")
     st.write("### Resistance Mutations Over Time")
     st.write("Shows the mutations over time in wastewater for the selected date range.")
 
     # Add radio button for showing/hiding dates with no data
+    url_show_empty = url_state.load_from_url("show_empty", "Show all dates", str)
     show_empty_dates = st.radio(
         "Date display options:",
         options=["Show all dates", "Skip dates with no coverage"],
-        index=0  # Default to showing all dates (off)
+        index=0 if url_show_empty == "Show all dates" else 1
     )
+    
+    # Save radio button selection to URL
+    url_state.save_to_url(show_empty=show_empty_dates)
     if mutations not in (None, []):
         # Calculate unique genomic positions for display
         unique_positions = set()
@@ -246,7 +295,8 @@ def app():
                 date_range=(start_date, end_date),
                 location=location,
                 config=plot_config,
-                session_prefix="dynamic_"
+                session_prefix="region_",
+                url_state_manager=url_state
             )
 
 

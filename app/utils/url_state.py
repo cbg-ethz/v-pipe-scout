@@ -237,3 +237,17 @@ def load_variants_from_url(default_variants: List[str] = None, page_name: str = 
     """Load variant list from URL."""
     manager = URLStateManager(page_name)
     return manager.load_from_url("variants", default_variants or [], list)
+
+
+def save_frequency_thresholds_to_url(min_freq: float, max_freq: float, page_name: str = "") -> None:
+    """Save frequency thresholds to URL."""
+    manager = URLStateManager(page_name)
+    manager.save_to_url(min_frequency=min_freq, max_frequency=max_freq)
+
+
+def load_frequency_thresholds_from_url(default_min: float = 0.01, default_max: float = 1.0, page_name: str = "") -> tuple:
+    """Load frequency thresholds from URL."""
+    manager = URLStateManager(page_name)
+    min_freq = manager.load_from_url("min_frequency", default_min, float)
+    max_freq = manager.load_from_url("max_frequency", default_max, float)
+    return min_freq, max_freq

@@ -205,7 +205,8 @@ def app():
                 date_range=(start_date, end_date),
                 location=location,
                 config=plot_config,
-                session_prefix="background_"
+                session_prefix="untracked_",
+                url_state_manager=url_state
             )
             
             if result is None:

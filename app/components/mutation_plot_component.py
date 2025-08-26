@@ -24,7 +24,8 @@ def render_mutation_plot_component(
     location: str,
     config: Optional[Dict] = None,
     session_prefix: str = "",
-    container = None
+    container = None,
+    url_state_manager = None
 ) -> Optional[Dict]:
     """
     Render a configurable mutation plot with frequency filtering.
@@ -38,6 +39,7 @@ def render_mutation_plot_component(
         config: Configuration dictionary with plotting options
         session_prefix: Optional prefix for session state keys to avoid conflicts
         container: Streamlit container to render in (optional)
+        url_state_manager: Optional URLStateManager instance for URL state persistence
     
     Returns:
         Dict containing:
@@ -190,6 +192,14 @@ def render_mutation_plot_component(
         target.write("### Frequency Filtering")
         target.write("Filter mutations to plot based on their frequency ranges to focus on mutations of interest.")
         
+        # Load frequency thresholds from URL if URL state manager is provided
+        if url_state_manager:
+            url_min_freq = url_state_manager.load_from_url("min_frequency", config['default_min_frequency'], float)
+            url_max_freq = url_state_manager.load_from_url("max_frequency", config['default_max_frequency'], float)
+        else:
+            url_min_freq = config['default_min_frequency']
+            url_max_freq = config['default_max_frequency']
+        
         col1, col2 = target.columns(2)
         
         with col1:
@@ -197,7 +207,7 @@ def render_mutation_plot_component(
                 "Minimum frequency threshold",
                 min_value=0.0,
                 max_value=1.0,
-                value=config['default_min_frequency'],
+                value=url_min_freq,
                 step=0.001,
                 format="%.3f",
                 help="Only show mutations that reach at least this frequency at some point in the timeframe.",
@@ -209,12 +219,16 @@ def render_mutation_plot_component(
                 "Maximum frequency threshold", 
                 min_value=0.0,
                 max_value=1.0,
-                value=config['default_max_frequency'],
+                value=url_max_freq,
                 step=0.001,
                 format="%.3f",
                 help="Only show mutations that stay below this frequency throughout the timeframe.",
                 key=f"{session_prefix}max_frequency"
             )
+        
+        # Save frequency thresholds to URL if URL state manager is provided
+        if url_state_manager:
+            url_state_manager.save_to_url(min_frequency=min_frequency, max_frequency=max_frequency)
         
         # Validate that min <= max
         if min_frequency > max_frequency:
