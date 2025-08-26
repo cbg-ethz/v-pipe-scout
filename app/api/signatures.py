@@ -210,7 +210,6 @@ class VariantDefinition(BaseModel):
         return mutations
     
 
-# Enhanced models for the multi_variant_signatures.py
 class Variant(BaseModel):
     name: str
     short_name: str
