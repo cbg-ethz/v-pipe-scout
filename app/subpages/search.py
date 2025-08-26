@@ -1,8 +1,10 @@
+import numpy as np
 import streamlit as st
 import pandas as pd
+import asyncio
+import streamlit.components.v1 as components
+import plotly.graph_objects as go 
 import pathlib
-
-from datetime import datetime
 
 from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
@@ -48,7 +50,7 @@ def app():
     st.write("Choose your data to inspect:")
     # Get dynamic date range from API with bounds to enforce limits
     default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("resistance_mutations")
-    date_range_in = st.date_input(
+    date_range = st.date_input(
         "Select a date range:", 
         [default_start, default_end],
         min_value=min_date,
@@ -56,13 +58,12 @@ def app():
     )
 
     # Ensure date_range is a tuple with two elements
-    if len(date_range_in) != 2:
+    if len(date_range) != 2:
         st.error("Please select a valid date range with a start and end date.")
         return
 
-    start_date = datetime.fromisoformat(date_range_in[0].strftime('%Y-%m-%d'))
-    end_date = datetime.fromisoformat(date_range_in[1].strftime('%Y-%m-%d'))
-    date_range = (start_date, end_date)
+    start_date = date_range[0].strftime('%Y-%m-%d')
+    end_date = date_range[1].strftime('%Y-%m-%d')
     
 
     ## Fetch locations from API
@@ -77,6 +78,7 @@ def app():
     sequence_type_value = "amino acid"
 
     formatted_mutations_str = str(formatted_mutations).replace("'", '"')
+
     st.markdown("---")
     st.write("### Resistance Mutations Over Time")
     st.write("Shows the mutations over time in wastewater for the selected date range.")

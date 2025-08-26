@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 from process.mutations import sort_mutations_by_position
 
 
-def mutations_over_time(freq_df, counts_df=None, coverage_freq_df=None, title="Mutations Over Time"):
+def mutations_over_time(freq_df, counts_df=None, coverage_freq_df=None, title="Mutations Over Time", progress_callback=None):
     """Plot mutations over time as a heatmap using Plotly.
     
     This function creates an interactive heatmap showing mutation frequencies
@@ -26,11 +26,16 @@ def mutations_over_time(freq_df, counts_df=None, coverage_freq_df=None, title="M
         coverage_freq_df (pd.DataFrame, optional): MultiIndex DataFrame with detailed 
                                                   coverage and frequency data
         title (str, optional): Title for the heatmap. Defaults to "Mutations Over Time"
+        progress_callback (callable, optional): Function to call with progress updates.
+                                              Should accept (current, total, message) parameters.
     
     Returns:
         plotly.graph_objects.Figure: Interactive heatmap figure
     """
     # Sort mutations by genomic position before processing
+    if progress_callback:
+        progress_callback(0.1, 1.0, "Sorting mutations by genomic position...")
+    
     mutations_list = freq_df.index.tolist()
     sorted_mutations = sort_mutations_by_position(mutations_list)
     
@@ -39,13 +44,26 @@ def mutations_over_time(freq_df, counts_df=None, coverage_freq_df=None, title="M
     if counts_df is not None and not counts_df.empty:
         counts_df = counts_df.reindex(sorted_mutations)
     
+    if progress_callback:
+        progress_callback(0.3, 1.0, "Processing frequency data...")
+    
     # Replace None with np.nan and remove commas from numbers
     df_processed = freq_df.replace({None: np.nan, ',': ''}, regex=True)
     df_processed = df_processed.apply(pd.to_numeric, errors='coerce')
 
+    if progress_callback:
+        progress_callback(0.5, 1.0, "Creating enhanced hover text...")
+    
     # Create enhanced hover text
     hover_text = []
-    for mutation in df_processed.index:
+    total_mutations = len(df_processed.index)
+    
+    for idx, mutation in enumerate(df_processed.index):
+        # Update progress during hover text creation (this is the slowest part)
+        if progress_callback and total_mutations > 0:
+            hover_progress = 0.5 + (idx / total_mutations) * 0.3  # Progress from 0.5 to 0.8
+            progress_callback(hover_progress, 1.0, f"Creating hover text for mutation {idx + 1}/{total_mutations}...")
+        
         row_hover_text = []
         for date in df_processed.columns:
             frequency = df_processed.loc[mutation, date]
@@ -89,6 +107,9 @@ def mutations_over_time(freq_df, counts_df=None, coverage_freq_df=None, title="M
             row_hover_text.append(text)
         hover_text.append(row_hover_text)
 
+    if progress_callback:
+        progress_callback(0.9, 1.0, "Finalizing plot layout...")
+    
     # Determine dynamic height
     height = max(400, len(df_processed.index) * 20 + 100)  # Base height + per mutation + padding for title/axes
 

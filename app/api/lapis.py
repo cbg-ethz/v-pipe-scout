@@ -36,8 +36,9 @@ class Lapis:
 
     def fetch_locations(self, default_locations=None):
         """Fetches locations from the API endpoint."""
-        if default_locations is None:
-            default_locations = ["Zürich (ZH)"]
+        if "locations" in st.session_state:
+            locations = st.session_state.locations
+            return locations
         # Use the full server_ip URL directly instead of parsing it
         location_url = f'{self.server_ip.rstrip("/")}/sample/aggregated?fields=location_name&limit=100&orderBy=location_name&dataFormat=JSON&downloadAsFile=false'
         try:
@@ -49,6 +50,7 @@ class Lapis:
             fetched_locations = [item['location_name'] for item in location_data.get('data', []) if 'location_name' in item]
             if fetched_locations:
                 logging.info(f"Successfully fetched locations: {fetched_locations}")
+                st.session_state.locations = fetched_locations
                 st.toast("Successfully fetched locations from API.", icon="✅") # Temporary toast
                 return fetched_locations
             else:

@@ -98,15 +98,11 @@ class ApiHealthChecker:
         
         try:
             # Use a simple endpoint that should always be available
-            health_endpoint = f"{server_url.rstrip('/')}/sample/aggregated"
+            health_endpoint = f"{server_url.rstrip('/')}/sample/info"
             
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout)) as session:
                 # Simple health check with minimal payload
                 payload = {
-                    "fields": ["location_name"],
-                    "limit": 1,
-                    "orderBy": ["location_name"],
-                    "dataFormat": "JSON"
                 }
                 
                 async with session.get(health_endpoint, params=payload) as response:
@@ -116,7 +112,7 @@ class ApiHealthChecker:
                         # Check if we get valid JSON response
                         try:
                             data = await response.json()
-                            if isinstance(data, dict) and 'data' in data:
+                            if isinstance(data, dict) and 'lapisVersion' in data:
                                 status = HealthStatus.HEALTHY if response_time < self.warning_threshold_ms else HealthStatus.WARNING
                                 result = ApiHealthResult(
                                     status=status,

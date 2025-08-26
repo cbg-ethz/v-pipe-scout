@@ -66,16 +66,14 @@ def app():
     
 
     ## Fetch locations from API
-    default_locations = [
-        "Zürich (ZH)",
-    ]  # Define default locations
+    default_locations = []  
     # Fetch locations using the fetch_locations function
     locations = wiseLoculus.fetch_locations(default_locations)
 
     location = st.selectbox("Select Location:", locations)
 
     # Add button to trigger data fetching
-    if st.button("Fetch Untracked Mutations"):
+    if date_range and len(date_range) == 2 and location:
         with st.spinner("Fetching mutation data..."):
             try:
                 mutations_in_timeframe_df = asyncio.run(wiseLoculus.sample_mutations(
@@ -120,6 +118,10 @@ def app():
             default=cached_get_variant_names(),
             help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team"
         )
+   
+    # Add performance warning
+    st.warning("⚠️ **Performance Notice**: Loading this plot may take up to a minute due to the high number of datapoints to fetch.")
+
     
     # Only process if mutations_in_timeframe is defined and has data
     if 'mutations_in_timeframe' in locals() and mutations_in_timeframe:

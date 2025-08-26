@@ -12,6 +12,7 @@ from typing import List, Dict, Optional, Tuple, Any
 
 from interface import MutationType
 from visualize.mutations import mutations_over_time
+from api.exceptions import APIError
 
 
 def render_mutation_plot_component(
@@ -88,12 +89,69 @@ def render_mutation_plot_component(
             if mutation_type ==  MutationType.AMINO_ACID:
                 st.warning("⚠️ Amino acid mutations are not yet supported in this component. Please use nucleotide mutations instead.")
                 return None
-            counts_df, freq_df, coverage_freq_df = wiseLoculus.mutations_over_time_dfs(
-                mutations,
-                mutation_type,
+            
+            # Get data using the mutations_over_time function
+            mutations_over_time_df = asyncio.run(wiseLoculus.mutations_over_time(
+                mutations=mutations,
+                mutation_type=mutation_type,
                 date_range=(start_date, end_date),
                 location_name=location
-            )
+            ))
+
+            # Check if fallback was used and notify user
+            if hasattr(mutations_over_time_df, 'attrs') and mutations_over_time_df.attrs.get('fallback_used', False):
+                if mutations_over_time_df.attrs.get('fallback_failed', False):
+                    target.error("🚨 **Both primary and fallback methods failed**")
+                    target.error("Unable to retrieve mutation data at this time.")
+                    if mutations_over_time_df.attrs.get('fallback_reason'):
+                        with target.expander("🔍 Error Details", expanded=False):
+                            target.code(mutations_over_time_df.attrs['fallback_reason'])
+                    return None
+                else:
+                    target.warning("⚠️ **Primary API endpoint failed - switched to slower fallback method**")
+                    target.info("✅ Data retrieved successfully using legacy endpoint. This may be slower but should provide complete results.")
+                    if mutations_over_time_df.attrs.get('fallback_reason'):
+                        with target.expander("🔍 Fallback Reason", expanded=False):
+                            target.text(mutations_over_time_df.attrs['fallback_reason'])
+
+            # Transform the data to match mutations_over_time_dfs signature:
+            # 1. counts_df and freq_df: mutations as rows, dates as columns
+            # 2. coverage_freq_df: keep the MultiIndex structure for compatibility
+            
+            # Reset index to access mutation and sampling_date as columns
+            df_reset = mutations_over_time_df.reset_index()
+            
+            # Create the expected format: mutations as index, dates as columns
+            counts_df = df_reset.pivot(index='mutation', columns='sampling_date', values='count')
+            freq_df = df_reset.pivot(index='mutation', columns='sampling_date', values='frequency')
+            
+            # Keep the original MultiIndex structure for coverage_freq_df for compatibility with visualization
+            coverage_freq_df = mutations_over_time_df
+
+        except APIError as api_err:
+            # Handle API-specific errors with clear messaging
+            if api_err.status_code == 500:
+                target.error("🚨 **Internal Server Error (500)**")
+                target.error("The backend API server is experiencing technical difficulties. This is **not** an issue with this web application.")
+                
+                with target.expander("🔍 Debug Information", expanded=False):
+                    target.write("**Error Details:**")
+                    target.code(str(api_err.details) if api_err.details else "No additional details available")
+                    if api_err.payload:
+                        target.write("**Request Payload:**")
+                        target.json(api_err.payload)
+                
+                target.info("💡 **What you can try:**")
+                target.write("• Try again – we are aware that the backend may have transient failures.")
+                target.write("• Reduce the number of mutations or date range")
+            else:
+                target.error(f"🚨 **API Error ({api_err.status_code})**")
+                target.error("The API request failed. This may be a temporary issue.")
+                target.write(f"**Error:** {str(api_err)}")
+                if api_err.details:
+                    with target.expander("🔍 Debug Information", expanded=False):
+                        target.code(str(api_err.details))
+            return None
         except Exception as e:
             target.error(f"⚠️ Error fetching mutation analysis data: {str(e)}")
             target.info("This could be due to API connectivity issues. Please try again later.")
@@ -216,13 +274,58 @@ def render_mutation_plot_component(
             target.error("The fetched data contains only NaN values. Please try a different date range or adjust frequency filters.")
             return None
         else:
-            fig = mutations_over_time(
-                plot_freq_df, 
-                plot_counts_df, 
-                coverage_freq_df_filtered,
-                title=config['plot_title']
-            )
-            target.plotly_chart(fig, use_container_width=True)
+            # Show data size information
+            num_mutations = len(plot_freq_df.index)
+            num_dates = len(plot_freq_df.columns)
+            data_points = num_mutations * num_dates
+            
+            # Create placeholders for info message and progress indicators
+            info_placeholder = target.empty()
+            info_placeholder.info(f"📊 Generating heatmap for {num_mutations:,} mutations × {num_dates:,} dates ({data_points:,} data points)")
+            
+            progress_bar = target.progress(0)
+            status_text = target.empty()
+            
+            try:
+                status_text.text("🔄 Sorting mutations by genomic position...")
+                progress_bar.progress(0.2)
+                
+                # Define progress callback to update UI
+                def update_progress(current, total, message):
+                    progress = 0.2 + (current * 0.6)  # Map 0-1 progress to 0.2-0.8 range
+                    progress_bar.progress(progress)
+                    status_text.text(f"🔄 {message}")
+                
+                fig = mutations_over_time(
+                    plot_freq_df, 
+                    plot_counts_df, 
+                    coverage_freq_df_filtered,
+                    title=config['plot_title'],
+                    progress_callback=update_progress
+                )
+                
+                status_text.text("🔄 Rendering plot...")
+                progress_bar.progress(0.8)
+                
+                target.plotly_chart(fig, use_container_width=True)
+                
+                progress_bar.progress(1.0)
+                status_text.text("✅ Plot ready!")
+                
+                # Clean up progress indicators and info message after a brief delay
+                import time
+                time.sleep(0.5)
+                progress_bar.empty()
+                status_text.empty()
+                info_placeholder.empty()  # Clear the info message
+                
+            except Exception as e:
+                # Clean up progress indicators and info message on error
+                progress_bar.empty()
+                status_text.empty()
+                info_placeholder.empty()  # Clear the info message on error too
+                target.error(f"Error creating plot: {str(e)}")
+                return None
     else:
         target.error("No data available for plotting.")
         return None
