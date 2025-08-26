@@ -22,7 +22,7 @@ def test_navigation_links():
     
     # Check that all expected page titles are present in the navigation
     expected_pages = ["Home", "Resistance Mutations", "Search by Proportion", "Untracked Mutations", 
-                     "Variant Signature Explorer", "Variant Abundances"]
+                     "Variant Signature Explorer", "Variant Abundances", "Region Explorer"]
     
     page_titles = [link.label for link in page_links] # type: ignore
     for expected_page in expected_pages:
