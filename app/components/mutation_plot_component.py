@@ -7,7 +7,6 @@ that can be embedded in different pages with custom configurations.
 import streamlit as st
 import pandas as pd
 import numpy as np
-import asyncio
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple, Any
 
@@ -18,7 +17,7 @@ from visualize.mutations import mutations_over_time
 def render_mutation_plot_component(
     wiseLoculus: Any,
     mutations: List[str],
-    sequence_type: str,
+    sequence_type: MutationType,
     date_range: Tuple[datetime, datetime],
     location: str,
     config: Optional[Dict] = None,
@@ -30,8 +29,8 @@ def render_mutation_plot_component(
     
     Args:
         wiseLoculus: WiseLoculusLapis instance for API calls
-        mutations: List of mutations to plot
-        sequence_type: "nucleotide" or "amino acid"
+        mutations: List of mutations to plot 
+        sequence_type: MutationType.AMINO_ACID or MutationType.NUCLEOTIDE"
         date_range: Tuple of (start_date, end_date)
         location: Location name for filtering
         config: Configuration dictionary with plotting options
@@ -84,7 +83,7 @@ def render_mutation_plot_component(
     with target.spinner("Fetching mutation data..."):
         try:
             # Convert sequence_type string to MutationType enum
-            mutation_type = MutationType.NUCLEOTIDE if sequence_type == "nucleotide" else MutationType.AMINO_ACID
+            mutation_type = sequence_type
 
             if mutation_type ==  MutationType.AMINO_ACID:
                 st.warning("⚠️ Amino acid mutations are not yet supported in this component. Please use nucleotide mutations instead.")

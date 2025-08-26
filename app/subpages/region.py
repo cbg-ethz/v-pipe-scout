@@ -5,7 +5,7 @@ from datetime import datetime
 
 from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
-from visualize.mutations import mutations_over_time
+from components.mutation_plot_component import render_mutation_plot_component
 from utils.config import get_wiseloculus_url
 from process.mutations import get_symbols_for_mutation_type, possible_mutations_at_position, extract_position, validate_mutation
 
@@ -203,36 +203,30 @@ def app():
             st.success(f"Processing {len(mutations)} mutations for visualization ({total_genomic_sites} unique genomic positions).")
 
         with st.spinner("Fetching genomic regions data..."):
-            try:
-                counts_df, freq_df, coverage_freq_df = wiseLoculus.mutations_over_time_dfs(mutations, mutation_type_value, date_range, location)
-            except Exception as e:
-                st.error(f"⚠️ Error fetching resistance mutation data: {str(e)}")
-                st.info("This could be due to API connectivity issues. Please try again later.")
-                # Create empty DataFrames for consistency
-                counts_df = pd.DataFrame()
-                freq_df = pd.DataFrame()
-                coverage_freq_df = pd.DataFrame()
 
-
-        # Only skip NA dates if the option is selected
-        if show_empty_dates == "Skip dates with no coverage":
-            plot_counts_df = counts_df.dropna(axis=1, how='all')
-            plot_freq_df = freq_df.dropna(axis=1, how='all')
-        else:
-            plot_counts_df = counts_df
-            plot_freq_df = freq_df
-
-        if not freq_df.empty:
-            if freq_df.isnull().all().all():
-                st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
-            else:
-                fig = mutations_over_time(
-                    plot_freq_df, 
-                    plot_counts_df, 
-                    coverage_freq_df,
-                    title=f"Proportion of {mode} Over Time"
-                )
-                st.plotly_chart(fig, use_container_width=True)
+            # Configure the component for dynamic mutations
+            plot_config = {
+                'show_frequency_filtering': True,
+                'show_date_options': True,
+                'show_download': True,
+                'show_summary_stats': True,
+                'default_min_frequency': 0.1,
+                'default_max_frequency': 1.0,
+                'plot_title': f"Mutations by Proportion Over Time",
+                'enable_empty_date_toggle': True,
+                'show_mutation_count': True
+            }
+            
+            # Use the mutation plot component
+            result = render_mutation_plot_component(
+                wiseLoculus=wiseLoculus,
+                mutations=mutations,
+                sequence_type=mutation_type_value,
+                date_range=(start_date, end_date),
+                location=location,
+                config=plot_config,
+                session_prefix="dynamic_"
+            )
 
 
     

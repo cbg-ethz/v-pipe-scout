@@ -120,7 +120,7 @@ def app():
                 result = render_mutation_plot_component(
                     wiseLoculus=wiseLoculus,
                     mutations=mutations_list,
-                    sequence_type=sequence_type_value,
+                    sequence_type=mutation_type,
                     date_range=(start_date, end_date),
                     location=location,
                     config=plot_config,
