@@ -5,9 +5,9 @@ that can be embedded in different pages with custom configurations.
 """
 
 import streamlit as st
+import asyncio
 import pandas as pd
 import numpy as np
-import asyncio
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple, Any
 
@@ -19,7 +19,7 @@ from api.exceptions import APIError
 def render_mutation_plot_component(
     wiseLoculus: Any,
     mutations: List[str],
-    sequence_type: str,
+    sequence_type: MutationType,
     date_range: Tuple[datetime, datetime],
     location: str,
     config: Optional[Dict] = None,
@@ -31,8 +31,8 @@ def render_mutation_plot_component(
     
     Args:
         wiseLoculus: WiseLoculusLapis instance for API calls
-        mutations: List of mutations to plot
-        sequence_type: "nucleotide" or "amino acid"
+        mutations: List of mutations to plot 
+        sequence_type: MutationType.AMINO_ACID or MutationType.NUCLEOTIDE"
         date_range: Tuple of (start_date, end_date)
         location: Location name for filtering
         config: Configuration dictionary with plotting options
@@ -85,10 +85,10 @@ def render_mutation_plot_component(
     with target.spinner("Fetching mutation data..."):
         try:
             # Convert sequence_type string to MutationType enum
-            mutation_type = MutationType.NUCLEOTIDE if sequence_type == "nucleotide" else MutationType.AMINO_ACID
+            mutation_type = sequence_type
 
-            if mutation_type ==  MutationType.AMINO_ACID:
-                st.warning("⚠️ Amino acid mutations are not yet supported in this component. Please use nucleotide mutations instead.")
+            if mutation_type not in [MutationType.NUCLEOTIDE, MutationType.AMINO_ACID]:
+                target.error("⚠️ Invalid sequence type. Must be 'nucleotide' or 'amino acid'.")
                 return None
             
             # Get data using the mutations_over_time function
@@ -122,7 +122,24 @@ def render_mutation_plot_component(
             # Reset index to access mutation and sampling_date as columns
             df_reset = mutations_over_time_df.reset_index()
             
-            # Create the expected format: mutations as index, dates as columns
+            # Check for duplicate entries and throw error if found
+            duplicates = df_reset.duplicated(subset=['mutation', 'sampling_date'], keep=False)
+            if duplicates.any():
+                duplicate_rows = df_reset[duplicates]
+                error_msg = f"Duplicate mutation-date combinations detected: {len(duplicate_rows)} entries"
+                target.error(f"🚨 **Data Integrity Error**: {error_msg}")
+                
+                with target.expander("🔍 Duplicate entries details", expanded=True):
+                    target.write("**Duplicate entries found:**")
+                    target.dataframe(duplicate_rows[['mutation', 'sampling_date', 'count', 'frequency']])
+                    target.write("**This indicates a problem with data processing that needs to be fixed.**")
+                
+                # Throw a detailed error for debugging
+                duplicate_details = duplicate_rows[['mutation', 'sampling_date', 'count', 'frequency']].to_string()
+                raise ValueError(f"Index contains duplicate entries, cannot reshape. "
+                               f"Found {len(duplicate_rows)} duplicate mutation-date combinations:\n{duplicate_details}")
+            
+            # No duplicates, use regular pivot
             counts_df = df_reset.pivot(index='mutation', columns='sampling_date', values='count')
             freq_df = df_reset.pivot(index='mutation', columns='sampling_date', values='frequency')
             

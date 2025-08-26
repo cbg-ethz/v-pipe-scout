@@ -1,12 +1,14 @@
 import streamlit as st
 import pandas as pd
-import asyncio
 import pathlib
+
+from datetime import datetime
 
 from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
 from visualize.mutations import mutations_over_time
 from utils.config import get_wiseloculus_url
+from components.mutation_plot_component import render_mutation_plot_component
 
 pd.set_option('future.no_silent_downcasting', True)
 
@@ -47,7 +49,7 @@ def app():
     st.write("Choose your data to inspect:")
     # Get dynamic date range from API with bounds to enforce limits
     default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("resistance_mutations")
-    date_range = st.date_input(
+    date_range_in = st.date_input(
         "Select a date range:", 
         [default_start, default_end],
         min_value=min_date,
@@ -55,89 +57,52 @@ def app():
     )
 
     # Ensure date_range is a tuple with two elements
-    if len(date_range) != 2:
+    if len(date_range_in) != 2:
         st.error("Please select a valid date range with a start and end date.")
         return
 
-    start_date = date_range[0].strftime('%Y-%m-%d')
-    end_date = date_range[1].strftime('%Y-%m-%d')
-
-    start_date = pd.to_datetime(start_date)
-    end_date = pd.to_datetime(end_date)
+    start_date = datetime.fromisoformat(date_range_in[0].strftime('%Y-%m-%d'))
+    end_date = datetime.fromisoformat(date_range_in[1].strftime('%Y-%m-%d'))
+    date_range = (start_date, end_date)
     
-
-    ## Fetch locations from API
-    default_locations = [
-        "Zürich (ZH)",
-    ]  # Define default locations
-    # Fetch locations using the fetch_locations function
-    locations = wiseLoculus.fetch_locations(default_locations)
-
+    locations = wiseLoculus.fetch_locations()
     location = st.selectbox("Select Location:", locations)
     
-    st.markdown("---")
-    st.write("### Resistance Mutations Over Time")
-    st.write("Shows the mutations over time in wastewater for the selected date range.")
-
-    # Add radio button for showing/hiding dates with no data
-    show_empty_dates = st.radio(
-        "Date display options:",
-        options=["Show all dates", "Skip dates with no coverage"],
-        index=0  # Default to showing all dates (off)
-    )
-
     with st.spinner("Fetching resistance mutation data..."):
         try:
-            # Get data using the mutations_over_time function
-            mutations_over_time_df = asyncio.run(wiseLoculus.mutations_over_time(
+            mutation_type = MutationType.AMINO_ACID
+            
+            # Configure the component for dynamic mutations
+            plot_config = {
+                'show_frequency_filtering': True,
+                'show_date_options': True,
+                'show_download': True,
+                'show_summary_stats': True,
+                'default_min_frequency': 0.01,
+                'default_max_frequency': 1.0,
+                'plot_title': f"Resistance Mutations Over Time",
+                'enable_empty_date_toggle': True,
+                'show_mutation_count': True
+            }
+            
+            # Use the mutation plot component
+            result = render_mutation_plot_component(
+                wiseLoculus=wiseLoculus,
                 mutations=formatted_mutations,
-                mutation_type=MutationType.AMINO_ACID,
-                date_range=(start_date, end_date),
-                location_name=location
-            ))
-
-            # Transform the data to match mutations_over_time_dfs signature:
-            # 1. counts_df and freq_df: mutations as rows, dates as columns
-            # 2. coverage_freq_df: keep the MultiIndex structure for compatibility
-            
-            # Reset index to access mutation and sampling_date as columns
-            df_reset = mutations_over_time_df.reset_index()
-            
-            # Create the expected format: mutations as index, dates as columns
-            counts_df = df_reset.pivot(index='mutation', columns='sampling_date', values='count')
-            freq_df = df_reset.pivot(index='mutation', columns='sampling_date', values='frequency')
-            
-            # Keep the original MultiIndex structure for coverage_freq_df for compatibility with visualization
-            coverage_freq_df = mutations_over_time_df
-
-        except Exception as e:
-            st.error(f"⚠️ Error fetching resistance mutation data: {str(e)}")
-            st.info("This could be due to API connectivity issues. Please try again later.")
-            # Create empty DataFrames for consistency
-            counts_df = pd.DataFrame()
-            freq_df = pd.DataFrame()
-            coverage_freq_df = pd.DataFrame()
-
-
-    # Only skip NA dates if the option is selected
-    if show_empty_dates == "Skip dates with no coverage":
-        plot_counts_df = counts_df.dropna(axis=1, how='all')
-        plot_freq_df = freq_df.dropna(axis=1, how='all')
-    else:
-        plot_counts_df = counts_df
-        plot_freq_df = freq_df
-
-    if not freq_df.empty:
-        if freq_df.isnull().all().all():
-            st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
-        else:
-            fig = mutations_over_time(
-                plot_freq_df, 
-                plot_counts_df, 
-                coverage_freq_df,  # Now using the original MultiIndex structure
-                title="Proportion of Resistance Mutations Over Time"
+                sequence_type=mutation_type,
+                date_range=date_range,
+                location=location,
+                config=plot_config,
+                session_prefix="proportion_"
             )
-            st.plotly_chart(fig, use_container_width=True)
+            
+            if result is None:
+                st.info("💡 Try adjusting the date range, location, or minimum proportion.")
+            else:
+                st.success(f"Successfully analyzed {len(result['filtered_mutations'])} mutations.")
+        except Exception as e:
+            st.error(f"⚠️ Error fetching mutation data: {str(e)}")
+            st.info("This could be due to API connectivity issues. Please try again later.")
 
 if __name__ == "__main__":
     app()

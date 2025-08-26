@@ -8,6 +8,7 @@ extracting genomic positions, and validating mutation formats.
 import re
 from typing import List
 from interface import MutationType
+from typing import Optional
 
 
 def get_symbols_for_mutation_type(mutation_type: MutationType) -> List[str]:
@@ -116,3 +117,101 @@ def sort_mutations_by_position(mutations: List[str]) -> List[str]:
         ["A100G", "T300C", "C500T"]
     """
     return sorted(mutations, key=extract_position)
+
+
+def validate_mutation(mutation_str: str, mutation_type: MutationType) -> bool:
+    """Validate if a mutation string conforms to the expected format for the given mutation type.
+    
+    Args:
+        mutation_str (str): The mutation string to validate
+        mutation_type (MutationType): The type of mutation (AMINO_ACID or NUCLEOTIDE)
+        
+    Returns:
+        bool: True if the mutation string is valid, False otherwise
+        
+    Examples:
+        >>> validate_mutation("C345T", MutationType.NUCLEOTIDE)
+        True
+        >>> validate_mutation("ORF1a:T103L", MutationType.AMINO_ACID)
+        True
+        >>> validate_mutation("X123Y", MutationType.AMINO_ACID)
+        False
+    """
+    mutation_str = mutation_str.strip()
+    
+    if mutation_type == MutationType.AMINO_ACID:
+        # Amino acid mutation format: "ORF1a:T103L", "S:N126K"
+        if ':' not in mutation_str:
+            return False
+        try:
+            gene_part, mutation_part = mutation_str.split(':', 1)
+            amino_acids = get_symbols_for_mutation_type(MutationType.AMINO_ACID)
+            amino_acid_pattern = '|'.join(amino_acids)
+            match = re.match(rf"^({amino_acid_pattern})?(\d+)({amino_acid_pattern}|-)?$", mutation_part.upper())
+            return match is not None
+        except (ValueError, IndexError):
+            return False
+            
+    elif mutation_type == MutationType.NUCLEOTIDE:
+        # Nucleotide mutation format: "C345T", "456-", "748G"
+        try:
+            nucleotides = get_symbols_for_mutation_type(MutationType.NUCLEOTIDE)
+            nucleotide_pattern = '|'.join(nucleotides)
+            match = re.match(rf"^({nucleotide_pattern})?(\d+)({nucleotide_pattern}|-)?$", mutation_str.upper())
+            return match is not None
+        except ValueError:
+            return False
+            
+    return False  # Unknown mutation type
+
+
+def possible_mutations_at_position(position: int, mutation_type: MutationType, gene: Optional[str] = None, include_reference: bool = True) -> List[str]:
+    """Generate all possible mutations at a given genomic position for the specified mutation type.
+    
+    Args:
+        position (int): The genomic position number
+        mutation_type (MutationType): The type of mutation (AMINO_ACID or NUCLEOTIDE)
+        gene (str, optional): The gene name for amino acid mutations (e.g., "ORF1ab", "S")
+        include_reference (bool): Whether to include reference base in mutation strings.
+                                If False, generates simpler mutations like "100T" instead of "A100T"
+        
+    Returns:
+        List[str]: List of possible mutation strings at the given position
+        
+    Examples:
+        >>> possible_mutations_at_position(100, MutationType.NUCLEOTIDE, include_reference=True)
+        ["A100T", "A100C", "A100G", "T100A", "T100C", "T100G", ...]
+        
+        >>> possible_mutations_at_position(100, MutationType.NUCLEOTIDE, include_reference=False)
+        ["100A", "100T", "100C", "100G", "100-"]
+        
+        >>> possible_mutations_at_position(50, MutationType.AMINO_ACID, "ORF1ab", include_reference=False)
+        ["ORF1ab:50A", "ORF1ab:50C", "ORF1ab:50D", ..., "ORF1ab:50Y"]
+    """
+    symbols = get_symbols_for_mutation_type(mutation_type)
+    mutations = []
+    
+    if include_reference:
+        # Original behavior: generate all ref->alt combinations
+        for ref in symbols:
+            for alt in symbols:
+                if ref != alt:
+                    if mutation_type == MutationType.AMINO_ACID and gene:
+                        mutations.append(f"{gene}:{ref}{position}{alt}")
+                    else:
+                        mutations.append(f"{ref}{position}{alt}")
+    else:
+        # Simplified behavior: generate position->alt mutations (no reference base)
+        for alt in symbols:
+            if mutation_type == MutationType.AMINO_ACID and gene:
+                mutations.append(f"{gene}:{position}{alt}")
+            else:
+                mutations.append(f"{position}{alt}")
+        
+        # Add deletion mutation
+        if mutation_type == MutationType.AMINO_ACID and gene:
+            mutations.append(f"{gene}:{position}-")
+        else:
+            mutations.append(f"{position}-")
+    
+    return mutations

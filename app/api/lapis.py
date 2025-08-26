@@ -34,7 +34,7 @@ class Lapis:
             logging.error(f"Error parsing URL {url_string}: {e}", exc_info=True)
             return url_string # Fallback in case of any parsing error
 
-    def fetch_locations(self, default_locations=None):
+    def fetch_locations(self, default_locations=None) -> list[str]:
         """Fetches locations from the API endpoint."""
         if "locations" in st.session_state:
             locations = st.session_state.locations
