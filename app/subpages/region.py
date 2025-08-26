@@ -205,8 +205,8 @@ def app():
             st.info("• For nucleotide mutations: limit ranges to ~25 positions each")
             st.info("• For amino acid mutations: limit ranges to ~5 positions each")
             
-            # Offer to show first 100 mutations
-            if st.button("Show first 100 mutations anyway"):
+            # Offer to show first {MAX_MUTATIONS_LIMIT} mutations
+            if st.button("Show first {MAX_MUTATIONS_LIMIT} mutations anyway"):
                 mutations = mutations[:MAX_MUTATIONS_LIMIT]
                 st.info(f"Showing first {MAX_MUTATIONS_LIMIT} mutations out of {original_mutation_count} total.")
             else:
