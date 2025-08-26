@@ -774,8 +774,16 @@ class WiseLoculusLapis(Lapis):
             # Create DataFrame from records
             df = pd.DataFrame(records)
 
-            # Set MultiIndex if we have data
+            # Check for and handle duplicates before setting MultiIndex
             if not df.empty and "mutation" in df.columns and "sampling_date" in df.columns:
+                # Check for duplicates
+                duplicates = df.duplicated(subset=['mutation', 'sampling_date'], keep=False)
+                if duplicates.any():
+                    logging.warning(f"Found {duplicates.sum()} duplicate mutation-date combinations, removing duplicates")
+                    # Keep first occurrence of each duplicate, preferring non-zero values
+                    df = df.drop_duplicates(subset=['mutation', 'sampling_date'], keep='first')
+                    logging.debug(f"After deduplication: {len(df)} records remain")
+                
                 df.set_index(["mutation", "sampling_date"], inplace=True)
             else:
                 # Create empty DataFrame with proper MultiIndex structure

@@ -18,11 +18,11 @@ def test_navigation_links():
     page_links = at.sidebar.get("page_link")
     
     # Check that we have the expected number of navigation links (6 pages)
-    assert len(page_links) == 6
+    assert len(page_links) == 7
     
     # Check that all expected page titles are present in the navigation
     expected_pages = ["Home", "Resistance Mutations", "Search by Proportion", "Untracked Mutations", 
-                     "Variant Signature Explorer", "Variant Abundances"]
+                     "Variant Signature Explorer", "Variant Abundances", "Region Explorer"]
     
     page_titles = [link.label for link in page_links] # type: ignore
     for expected_page in expected_pages:

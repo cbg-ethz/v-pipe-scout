@@ -73,6 +73,7 @@ def app():
     - *Explore variant signatures*: Plot variant-specific mutations over time.
     - *Explore untracked mutations*: See the mutations not currently accounted for in the variant signatures we track.
     - *Rapid variant abundance*: Estimate variant abundance over time for an interactively defined set of variants.
+    - *Region-specific mutations*: Explore mutations in specific genes or regions of the genome, userful for primer design.
     """)
     
 

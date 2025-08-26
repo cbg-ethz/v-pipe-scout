@@ -3,6 +3,7 @@ from datetime import datetime, date
 
 from api.wiseloculus import WiseLoculusLapis
 from api.covspectrum import CovSpectrumLapis
+from interface import MutationType
 from components.variant_signature_component import render_signature_composer
 from components.mutation_plot_component import render_mutation_plot_component
 from utils.config import get_wiseloculus_url, get_covspectrum_url
@@ -21,7 +22,7 @@ def app():
     url_state = create_url_state_manager("signature")
 
     st.title("Variant Signature Explorer")
-    st.subheader("Explore the variant signatures in the wastewater data.")
+    st.subheader("Explore variant signatures in the wastewater data.")
     st.write("First make a variant definition based on live queries to CovSpectrum.")
     st.write("Then explore the variant signature in the wastewater data, on read level.")
 
@@ -35,7 +36,9 @@ def app():
         'show_plot': True,
         'title': "Variant Signature Explorer",
         'show_title': True,
-        'show_description': True
+        'show_description': True,
+        'default_min_abundance': 0.8,
+        'default_min_coverage': 9,  # Lowered to 9 to for better UX
     }
 
     # Render the variant signature component
@@ -122,7 +125,7 @@ def app():
         result = render_mutation_plot_component(
             wiseLoculus=wiseLoculus,
             mutations=selected_mutations,
-            sequence_type=sequence_type_value,
+            sequence_type=MutationType.NUCLEOTIDE, # Signature mutations are always nucleotide
             date_range=(start_date, end_date),
             location=location,
             config=plot_config,

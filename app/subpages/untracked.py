@@ -201,7 +201,7 @@ def app():
             result = render_mutation_plot_component(
                 wiseLoculus=wiseLoculus,
                 mutations=background_mutations,
-                sequence_type="nucleotide",  # Background mutations are always nucleotide
+                sequence_type=MutationType.NUCLEOTIDE,
                 date_range=(start_date, end_date),
                 location=location,
                 config=plot_config,
