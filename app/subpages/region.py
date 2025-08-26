@@ -12,6 +12,9 @@ from process.mutations import possible_mutations_at_position, extract_position, 
 
 pd.set_option('future.no_silent_downcasting', True)
 
+# Constants
+MAX_MUTATIONS_LIMIT = 300
+MAX_GENOMIC_POSITIONS_LIMIT = 100
 
 # Get server configuration from centralized config
 server_ip = get_wiseloculus_url()
@@ -85,7 +88,7 @@ def app():
         
         # Add guidance about mutation counts
         if mutation_type_value == MutationType.AMINO_ACID:
-            st.info("💡 **Amino acid ranges**: Each position generates ~21 mutations (20 amino acids + deletion). You can use larger ranges (~14 positions max) to stay under the 300 mutation limit.")
+            st.info(f"💡 **Amino acid ranges**: Each position generates ~21 mutations (20 amino acids + deletion). You can use larger ranges (~14 positions max) to stay under the {MAX_MUTATIONS_LIMIT} mutation limit.")
         else:
             st.info("💡 **Nucleotide ranges**: Each position generates ~5 mutations (4 nucleotides + deletion). You can use larger ranges (~60 positions max).")
         
@@ -194,8 +197,8 @@ def app():
         
         # Check if we need to limit the number of mutations/positions
         original_mutation_count = len(mutations)
-        if original_mutation_count > 300:
-            st.warning(f"⚠️ You have requested {original_mutation_count} mutations. For performance reasons, we limit plots to 300 mutations maximum.")
+        if original_mutation_count > MAX_MUTATIONS_LIMIT:
+            st.warning(f"⚠️ You have requested {original_mutation_count} mutations. For performance reasons, we limit plots to {MAX_MUTATIONS_LIMIT} mutations maximum.")
             st.info("Suggestions:")
             st.info("• Reduce the size of your genomic ranges")
             st.info("• Use fewer ranges")
@@ -204,21 +207,21 @@ def app():
             
             # Offer to show first 100 mutations
             if st.button("Show first 100 mutations anyway"):
-                mutations = mutations[:300]
-                st.info(f"Showing first 300 mutations out of {original_mutation_count} total.")
+                mutations = mutations[:MAX_MUTATIONS_LIMIT]
+                st.info(f"Showing first {MAX_MUTATIONS_LIMIT} mutations out of {original_mutation_count} total.")
             else:
                 return
         
-        if total_genomic_sites > 100:
-            st.warning(f"⚠️ You have requested {total_genomic_sites} genomic positions. For performance reasons, we limit plots to 100 positions maximum.")
+        if total_genomic_sites > MAX_GENOMIC_POSITIONS_LIMIT:
+            st.warning(f"⚠️ You have requested {total_genomic_sites} genomic positions. For performance reasons, we limit plots to {MAX_GENOMIC_POSITIONS_LIMIT} positions maximum.")
             st.info("Please reduce your genomic range to proceed with visualization.")
             return
         
         if mode == "Genomic Ranges":
-            st.success(f"Processing {total_genomic_sites} genomic loci for visualization ({len(mutations)} total mutations). Note: Mutations are generated without reference bases (e.g., '100A' instead of 'C100A') since reference doesn't affect the analysis.")
+            st.info(f"Processing {total_genomic_sites} genomic loci for visualization ({len(mutations)} total mutations). Note: Mutations are generated without reference bases (e.g., '100A' instead of 'C100A') since reference doesn't affect the analysis.")
 
         if mode == "Custom Mutation Set":
-            st.success(f"Processing {len(mutations)} mutations for visualization ({total_genomic_sites} unique genomic positions).")
+            st.info(f"Processing {len(mutations)} mutations for visualization ({total_genomic_sites} unique genomic positions).")
 
         with st.spinner("Fetching genomic regions data..."):
 
