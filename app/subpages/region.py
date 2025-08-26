@@ -7,6 +7,7 @@ from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
 from visualize.mutations import mutations_over_time
 from utils.config import get_wiseloculus_url
+from process.mutations import get_symbols_for_mutation_type, possible_mutations_at_position
 
 
 pd.set_option('future.no_silent_downcasting', True)
@@ -18,6 +19,7 @@ wiseLoculus = WiseLoculusLapis(server_ip)
 
 
 def app():
+    mutations = []
     st.title("Region Explorer")
     st.write("This page allows you to visualize a custom set or genomic range of mutations over time.")
     st.write("This feature may be useful for positions of interest or primer design and redesign.")
@@ -38,6 +40,10 @@ def app():
         index=0  # Default to "Custom Mutation Set"
     )
 
+    # Initialize variables
+    mutations = []
+    genomic_sites = 0
+
     # allow input by comma-separated list of mutations as free text that is then validated
     if mode == "Custom Mutation Set":
         st.write("### Input Mutations")
@@ -49,10 +55,39 @@ def app():
         # Validate mutations --> let's implemen a simple regex validation of nucleotide mutations and amino acids in process/mutations.py
         # if not valid show warning, but proceed with valid ones
 
+    elif mode == "Genomic Ranges":
+        st.write("### Input Genomic Ranges")
+        st.write("Enter genomic ranges in the format 'start-end' (e.g., 100-200). You can enter multiple ranges separated by commas.")
+        st.write("For amino acid mutations, please also specify the gene (e.g., ORF1a:100-200).")
+        range_input = st.text_area("Genomic Ranges:", value="100-130, 200-209", height=100)
+        # Split input into a list and strip whitespace
+        ranges = [r.strip() for r in range_input.split(",") if r.strip()]
+        # Generate possible mutations for each range
+        for r in ranges:
+            try:
+                if '-' not in r:
+                    st.warning(f"Invalid range format: {r}. Expected format is 'start-end'.")
+                    continue
+                start_str, end_str = r.split('-')
+                start = int(start_str)
+                end = int(end_str)
+                if start >= end:
+                    st.warning(f"Invalid range: {r}. Start should be less than end.")
+                    continue
+                gene = None
+                if mutation_type_value == MutationType.AMINO_ACID and ':' in start_str:
+                    gene, start_str = start_str.split(':')
+                    start = int(start_str)
+                for pos in range(start, end + 1):
+                    possible_muts = possible_mutations_at_position(pos, mutation_type_value, gene)
+                    mutations.extend(possible_muts)
+            except ValueError:
+                st.warning(f"Invalid range format: {r}. Please ensure you enter valid integers for start and end.")
+        # Remove duplicates
+        mutations = list(set(mutations))
+        if not mutations:
+            st.warning("No valid mutations generated from the provided ranges.")
 
-
-    # Apply the lambda function to each element in the mutations list
-    formatted_mutations = mutations
 
     st.markdown("---")
     # Allow the user to choose a date range
@@ -98,38 +133,50 @@ def app():
         options=["Show all dates", "Skip dates with no coverage"],
         index=0  # Default to showing all dates (off)
     )
+    if mutations not in (None, []):
+        if mode == "Genomic Ranges" and
+            st.success(f"Processing {total_genomic_sites} genomic loci for visualization. Note the number of mutations we query is times 4 by nucleotides and times 20 by amino acids.")
 
-    with st.spinner("Fetching resistance mutation data..."):
-        try:
-            counts_df, freq_df, coverage_freq_df = wiseLoculus.mutations_over_time_dfs(formatted_mutations, mutation_type_value, date_range, location)
-        except Exception as e:
-            st.error(f"⚠️ Error fetching resistance mutation data: {str(e)}")
-            st.info("This could be due to API connectivity issues. Please try again later.")
-            # Create empty DataFrames for consistency
-            counts_df = pd.DataFrame()
-            freq_df = pd.DataFrame()
-            coverage_freq_df = pd.DataFrame()
+        if mode == "Custom Mutation Set":
+            st.success(f"Processing {len(mutations)} mutations for visualization.")
+
+        with st.spinner("Fetching resistance mutation data..."):
+            try:
+                counts_df, freq_df, coverage_freq_df = wiseLoculus.mutations_over_time_dfs(mutations, mutation_type_value, date_range, location)
+            except Exception as e:
+                st.error(f"⚠️ Error fetching resistance mutation data: {str(e)}")
+                st.info("This could be due to API connectivity issues. Please try again later.")
+                # Create empty DataFrames for consistency
+                counts_df = pd.DataFrame()
+                freq_df = pd.DataFrame()
+                coverage_freq_df = pd.DataFrame()
 
 
-    # Only skip NA dates if the option is selected
-    if show_empty_dates == "Skip dates with no coverage":
-        plot_counts_df = counts_df.dropna(axis=1, how='all')
-        plot_freq_df = freq_df.dropna(axis=1, how='all')
-    else:
-        plot_counts_df = counts_df
-        plot_freq_df = freq_df
-
-    if not freq_df.empty:
-        if freq_df.isnull().all().all():
-            st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
+        # Only skip NA dates if the option is selected
+        if show_empty_dates == "Skip dates with no coverage":
+            plot_counts_df = counts_df.dropna(axis=1, how='all')
+            plot_freq_df = freq_df.dropna(axis=1, how='all')
         else:
-            fig = mutations_over_time(
-                plot_freq_df, 
-                plot_counts_df, 
-                coverage_freq_df,
-                title="Proportion of Resistance Mutations Over Time"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            plot_counts_df = counts_df
+            plot_freq_df = freq_df
 
+        if not freq_df.empty:
+            if freq_df.isnull().all().all():
+                st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
+            else:
+                fig = mutations_over_time(
+                    plot_freq_df, 
+                    plot_counts_df, 
+                    coverage_freq_df,
+                    title="Proportion of Resistance Mutations Over Time"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+
+    
+    else:
+        st.error("No valid mutations provided. Please input mutations or ranges to proceed.")
+        return
+    
 if __name__ == "__main__":
     app()
