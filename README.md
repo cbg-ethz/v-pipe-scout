@@ -33,6 +33,10 @@ Specifically, V-Pipe Scout enables:
 - **Composition of variant signatures for abundance estimates**  
     - Leveraging clinical sequence databases (e.g., [CovSpectrum](https://cov-spectrum.org/))  
     - Using curated variant signatures
+- **URL-based session sharing**  
+    - Share analysis configurations via URLs
+    - Collaborate by sharing specific page setups
+    - Bookmark and resume analysis sessions
 
 Further, we will implement:
 - On-demand variant abundance estimates by [Lollipop](https://github.com/cbg-ethz/LolliPop)

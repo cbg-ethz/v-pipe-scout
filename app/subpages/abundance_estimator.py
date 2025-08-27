@@ -39,6 +39,7 @@ from api.signatures import Variant as SignatureVariant
 from api.signatures import VariantList as SignatureVariantList
 from process.mutations import extract_position, sort_mutations_by_position
 from utils.config import get_wiseloculus_url, get_covspectrum_url
+from utils.url_state import create_url_state_manager
 
 
 # Initialize Celery
@@ -104,6 +105,9 @@ def cached_get_variant_names() -> List[str]:
     return get_variant_names()
 
 def app():
+    # Initialize URL state manager for this page
+    url_state = create_url_state_manager("abundance")
+    
     # ============== INITIALIZATION ==============
     # Initialize all session state variables
     AbundanceEstimatorState.initialize()
@@ -163,13 +167,19 @@ def app():
     # Get the available variant names from the signatures API (cached)
     available_variants = cached_get_variant_names()
     
+    # Load variant selection from URL or use current session state
+    url_selected_variants = url_state.load_from_url("selected_variants", AbundanceEstimatorState.get_selected_curated_names(), list)
+    
     # Create a multi-select box for variants
     selected_curated_variants = st.multiselect(
         "Select known variants of interest – curated by the V-Pipe team",
         options=available_variants,
-        default=AbundanceEstimatorState.get_selected_curated_names(),
+        default=url_selected_variants,
         help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team"
     )
+    
+    # Save variant selection to URL
+    url_state.save_to_url(selected_variants=selected_curated_variants)
     
     # Update the session state if the selection has changed
     if selected_curated_variants != AbundanceEstimatorState.get_selected_curated_names():
@@ -393,6 +403,9 @@ def app():
     
     # ============== SELECTED VARIANTS MANAGEMENT ==============
     st.subheader("Selected Variants")
+    
+    # URL sharing limitation info
+    st.info("💡 **URL Sharing Note:** Only curated variants are included in shareable URLs. Custom variants (created via CovSpectrum or manual input) are not saved to URLs due to potential length limitations. To share complete analysis including custom variants, use the export functionality below.")
     
     # Get the current variants for display
     current_variant_names = [variant.name for variant in combined_variants.variants]
