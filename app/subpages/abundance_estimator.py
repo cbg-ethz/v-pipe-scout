@@ -404,6 +404,9 @@ def app():
     # ============== SELECTED VARIANTS MANAGEMENT ==============
     st.subheader("Selected Variants")
     
+    # URL sharing limitation info
+    st.info("💡 **URL Sharing Note:** Only curated variants are included in shareable URLs. Custom variants (created via CovSpectrum or manual input) are not saved to URLs due to potential length limitations. To share complete analysis including custom variants, use the export functionality below.")
+    
     # Get the current variants for display
     current_variant_names = [variant.name for variant in combined_variants.variants]
     
