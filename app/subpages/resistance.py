@@ -86,17 +86,19 @@ def app():
     url_state.save_to_url(start_date=date_range[0], end_date=date_range[1])
 
     
-    locations = wiseLoculus.fetch_locations()
+    # Fetch locations from API with default fallback
+    default_locations = ["Zürich (ZH)"]
+    locations = wiseLoculus.fetch_locations(default_locations)
     
     # Load location from URL or use default
     default_location = locations[0] if locations else ""
     url_location = url_state.load_from_url("location", default_location, str)
     
     # Make sure the URL location is still valid
-    if url_location not in locations:
+    if locations and url_location not in locations:
         url_location = default_location
     
-    location_index = locations.index(url_location) if url_location in locations else 0
+    location_index = locations.index(url_location) if locations and url_location in locations else 0
     location = st.selectbox("Select Location:", locations, index=location_index)
     
     # Save location to URL
