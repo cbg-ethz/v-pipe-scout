@@ -282,7 +282,7 @@ def app():
                 'show_summary_stats': True,
                 'default_min_frequency': 0.0,
                 'default_max_frequency': 1.0,
-                'plot_title': f"Mutations by Proportion Over Time",
+                'plot_title': "",  # Remove plot title to avoid duplicate with section heading
                 'enable_empty_date_toggle': True,
                 'show_mutation_count': True
             }
