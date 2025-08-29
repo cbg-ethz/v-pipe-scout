@@ -299,7 +299,6 @@ def render_mutation_plot_component(
     
     # Display the visualization
     target.markdown("---")
-    target.write(f"### {config['plot_title']}")
     
     if not freq_df_filtered.empty and len(filtered_mutations) > 0:
         if freq_df_filtered.isnull().all().all():
