@@ -221,7 +221,7 @@ def app():
     url_state.save_to_url(location=location)
 
     st.markdown("---")
-    st.write("### Resistance Mutations Over Time")
+    st.write(f"### Mutations in {mode} Over Time")
     st.write("Shows the mutations over time in wastewater for the selected date range.")
 
     # Add radio button for showing/hiding dates with no data
@@ -282,7 +282,7 @@ def app():
                 'show_summary_stats': True,
                 'default_min_frequency': 0.0,
                 'default_max_frequency': 1.0,
-                'plot_title': "",  # Remove plot title to avoid duplicate with section heading
+                'plot_title': "Mutations Over Time",
                 'enable_empty_date_toggle': True,
                 'show_mutation_count': True
             }
