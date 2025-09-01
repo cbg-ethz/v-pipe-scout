@@ -25,7 +25,7 @@ jobs:
             git pull origin main
             docker compose down
             docker compose up -d --build
-            sleep 10
+            sleep 9
             if curl -f -s -o /dev/null "${{ secrets.PRODUCTION_URL }}"; then
               echo "Deployment successful!"
             else
