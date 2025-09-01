@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import logging
 
 from datetime import datetime, date
 
@@ -9,6 +10,10 @@ from components.mutation_plot_component import render_mutation_plot_component
 from utils.config import get_wiseloculus_url
 from utils.url_state import create_url_state_manager
 from process.mutations import possible_mutations_at_position, extract_position, validate_mutation
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 pd.set_option('future.no_silent_downcasting', True)
@@ -35,12 +40,24 @@ def app():
     url_mutation_type = url_state.load_from_url("mutation_type", "Nucleotide", str)
     mutation_type_options = ["Nucleotide", "Amino Acid"]
     mutation_type_index = mutation_type_options.index(url_mutation_type) if url_mutation_type in mutation_type_options else 0
+    
+    # Track previous mutation type to detect changes (use session state, not URL)
+    previous_mutation_type = st.session_state.get("region_previous_mutation_type", None)
+    
+    logger.info(f"🔍 MUTATION TYPE - URL: {url_mutation_type}, Previous: {previous_mutation_type}")
+    
     mutation_type = st.radio(
         "Select mutation type:",
         options=mutation_type_options,
         index=mutation_type_index
     )
     mutation_type_value = MutationType.NUCLEOTIDE if mutation_type == "Nucleotide" else MutationType.AMINO_ACID
+    
+    # Detect if user actively changed mutation type
+    mutation_type_changed = previous_mutation_type is not None and mutation_type != previous_mutation_type
+    st.session_state["region_previous_mutation_type"] = mutation_type
+    
+    logger.info(f"🔄 MUTATION TYPE CHANGE - Current: {mutation_type}, Changed: {mutation_type_changed}")
     
     # Save mutation type to URL
     url_state.save_to_url(mutation_type=mutation_type)
@@ -55,6 +72,8 @@ def app():
         index=mode_index
     )
     
+    logger.info(f"📋 MODE SELECTION - Selected: {mode}, URL: {url_mode}")
+    
     # Save mode to URL
     url_state.save_to_url(mode=mode)
 
@@ -63,46 +82,98 @@ def app():
 
     # allow input by comma-separated list of mutations as free text that is then validated
     if mode == "Custom Mutation Set":
+        logger.info(f"🧬 CUSTOM MUTATION SET - Starting logic for {mutation_type_value}")
         st.write("### Input Mutations")
+        
+        # Handle mutation input with smart defaults based on user interaction
+        existing_mutation_input = url_state.load_from_url("mutation_input", None, str)
+        logger.info(f"📄 EXISTING URL INPUT - mutation_input: '{existing_mutation_input}'")
+        
         if mutation_type_value == MutationType.NUCLEOTIDE:
             st.write("Enter a comma-separated list of nucleotide mutations (e.g., C43T, G96A, T456C).")
             st.write("Mutations should be in nucleotide format (e.g., A123T), you may also skip the reference base (e.g., 123T, 456-).")
-            url_mutation_input = url_state.load_from_url("mutation_input", "C43T, G96A, T456C", str)
-            mutation_input = st.text_area("Mutations:", value=url_mutation_input, height=100)
+            appropriate_default_mutations = "C43T, G96A, T456C"
         else:
             st.write("Enter a comma-separated list of amino acid mutations (e.g., ORF1a:T103L, S:N126K).")
             st.write("Mutations should include the gene name (e.g., ORF1a:T103L, S:N126K).")
-            url_mutation_input = url_state.load_from_url("mutation_input", "ORF1a:T103L, S:N126K", str)
-            mutation_input = st.text_area("Mutations:", value=url_mutation_input, height=100)
+            appropriate_default_mutations = "ORF1a:T103L, S:N126K"
+        
+        logger.info(f"🎯 APPROPRIATE DEFAULTS - {appropriate_default_mutations}")
+        
+        mutations_initialized = st.session_state.get("region_mutations_initialized", False)
+        logger.info(f"🚀 INITIALIZATION STATE - mutations_initialized: {mutations_initialized}")
+        
+        # Check if existing input is compatible with current mutation type
+        existing_is_compatible = True
+        if existing_mutation_input is not None:
+            # Quick check: if we have amino acid mutations but are in nucleotide mode (or vice versa)
+            sample_mutations = [mut.strip() for mut in existing_mutation_input.split(",") if mut.strip()][:2]  # Check first 2
+            compatible_count = sum(1 for mut in sample_mutations if validate_mutation(mut, mutation_type_value))
+            existing_is_compatible = len(sample_mutations) == 0 or compatible_count > 0
+            logger.info(f"🔍 COMPATIBILITY CHECK - {compatible_count}/{len(sample_mutations)} existing mutations compatible with {mutation_type_value}")
+        
+        # Logic for determining what to show in the text area:
+        if mutation_type_changed and mutations_initialized:
+            # User actively changed mutation type - always use new appropriate defaults
+            url_mutation_input = appropriate_default_mutations
+            logger.info(f"🔄 BRANCH: User changed mutation type - using defaults: '{url_mutation_input}'")
+        elif existing_mutation_input is not None and not existing_is_compatible:
+            # Existing input is incompatible with current mutation type - use appropriate defaults
+            url_mutation_input = appropriate_default_mutations
+            logger.info(f"� BRANCH: Existing input incompatible with {mutation_type_value} - using defaults: '{url_mutation_input}'")
+        elif existing_mutation_input is not None and existing_is_compatible:
+            # Loading from URL or preserving existing input - use what's there (if compatible)
+            url_mutation_input = existing_mutation_input
+            logger.info(f"🔗 BRANCH: Using existing URL input: '{url_mutation_input}'")
+        else:
+            # No existing input or initialization - use appropriate defaults
+            url_mutation_input = appropriate_default_mutations
+            logger.info(f"✨ BRANCH: Using fresh defaults: '{url_mutation_input}'")
+        
+        # Mark that mutations have been initialized (for detecting future changes)
+        st.session_state["region_mutations_initialized"] = True
+        logger.info(f"✅ MARKED AS INITIALIZED")
+        
+        mutation_input = st.text_area("Mutations:", value=url_mutation_input, height=100)
+        logger.info(f"📝 TEXT AREA VALUE - Final input: '{mutation_input}'")
         
         # Save mutation input to URL
         url_state.save_to_url(mutation_input=mutation_input)
+        logger.info(f"💾 SAVED TO URL - mutation_input: '{mutation_input}'")
         
         # Split input into a list and strip whitespace
         input_mutations = [mut.strip() for mut in mutation_input.split(",") if mut.strip()]
+        logger.info(f"✂️ SPLIT MUTATIONS - {len(input_mutations)} mutations: {input_mutations}")
         
         # Validate mutations
         valid_mutations = []
         invalid_mutations = []
         
-        for mut in input_mutations:
-            if validate_mutation(mut, mutation_type_value):
+        for i, mut in enumerate(input_mutations):
+            is_valid = validate_mutation(mut, mutation_type_value)
+            logger.info(f"🔍 VALIDATING [{i+1}] '{mut}' for {mutation_type_value}: {'✅ VALID' if is_valid else '❌ INVALID'}")
+            if is_valid:
                 valid_mutations.append(mut)
             else:
                 invalid_mutations.append(mut)
         
         mutations = valid_mutations
+        logger.info(f"📊 VALIDATION RESULTS - Valid: {len(valid_mutations)}, Invalid: {len(invalid_mutations)}")
         
         # Show validation results
         if invalid_mutations:
             st.warning(f"Invalid mutations found and excluded: {', '.join(invalid_mutations)}")
+            logger.warning(f"⚠️ INVALID MUTATIONS FOUND: {invalid_mutations}")
         
         if mutations:
             st.info(f"Valid mutations: {len(mutations)} / {len(input_mutations)}")
+            logger.info(f"✅ SUCCESS - {len(mutations)} valid mutations ready for processing")
         else:
             st.error("No valid mutations found. Please check your input format.")
+            logger.error(f"❌ ERROR - No valid mutations found from input: '{mutation_input}'")
 
     elif mode == "Genomic Ranges":
+        logger.info(f"🧬 GENOMIC RANGES - Starting logic for {mutation_type_value}")
         st.write("### Input Genomic Ranges")
         st.write("Enter genomic ranges in the format 'start-end' (e.g., 100-200). You can enter multiple ranges separated by commas.")
         st.write("For amino acid mutations, please also specify the gene (e.g., ORF1a:100-200).")
@@ -113,14 +184,60 @@ def app():
         else:
             st.info("💡 **Nucleotide ranges**: Each position generates ~5 mutations (4 nucleotides + deletion). You can use larger ranges (~60 positions max).")
         
-        # Set dynamic default based on mutation type
-        if mutation_type_value == MutationType.AMINO_ACID:
-            default_ranges = "ORF1a:20-25, S:34-40"
-        else:
-            default_ranges = "100-120, 200-220"
+        # Handle genomic ranges with smart defaults based on user interaction
+        existing_range_input = url_state.load_from_url("range_input", None, str)
+        logger.info(f"📄 EXISTING URL INPUT - range_input: '{existing_range_input}'")
         
-        url_range_input = url_state.load_from_url("range_input", default_ranges, str)
+        # Determine appropriate default ranges for current mutation type
+        if mutation_type_value == MutationType.AMINO_ACID:
+            appropriate_default = "ORF1a:20-25, S:34-40"
+        elif mutation_type_value == MutationType.NUCLEOTIDE:
+            appropriate_default = "100-120, 200-220"
+        else:
+            appropriate_default = ""
+        
+        logger.info(f"🎯 APPROPRIATE DEFAULTS - {appropriate_default}")
+        
+        ranges_initialized = st.session_state.get("region_ranges_initialized", False)
+        logger.info(f"🚀 INITIALIZATION STATE - ranges_initialized: {ranges_initialized}")
+        
+        # Check if existing input is compatible with current mutation type
+        existing_is_compatible = True
+        if existing_range_input is not None:
+            # Quick check: amino acid ranges should have colons, nucleotide shouldn't need them
+            if mutation_type_value == MutationType.AMINO_ACID:
+                # For amino acid, we expect format like "ORF1a:20-25"
+                ranges = [r.strip() for r in existing_range_input.split(",") if r.strip()]
+                existing_is_compatible = all(':' in r for r in ranges)
+            else:
+                # For nucleotide, we expect format like "100-120" (no gene specification needed)
+                ranges = [r.strip() for r in existing_range_input.split(",") if r.strip()]
+                existing_is_compatible = True  # Nucleotide ranges are more flexible
+            logger.info(f"🔍 COMPATIBILITY CHECK - existing ranges compatible with {mutation_type_value}: {existing_is_compatible}")
+        
+        # Logic for determining what to show in the text area:
+        if mutation_type_changed and ranges_initialized:
+            # User actively changed mutation type - use new appropriate defaults
+            url_range_input = appropriate_default
+            logger.info(f"🔄 BRANCH: User changed mutation type - using defaults: '{url_range_input}'")
+        elif existing_range_input is not None and existing_is_compatible:
+            # Loading from URL or preserving existing input - use what's there (if compatible)
+            url_range_input = existing_range_input
+            logger.info(f"🔗 BRANCH: Using existing URL input: '{url_range_input}'")
+        else:
+            # No existing input, incompatible input, or no mutation type change - use appropriate defaults
+            url_range_input = appropriate_default
+            if existing_range_input is not None and not existing_is_compatible:
+                logger.info(f"🔄 BRANCH: Existing input incompatible with {mutation_type_value} - using defaults: '{url_range_input}'")
+            else:
+                logger.info(f"✨ BRANCH: Using fresh defaults: '{url_range_input}'")
+        
+        # Mark that ranges have been initialized (for detecting future changes)
+        st.session_state["region_ranges_initialized"] = True
+        logger.info(f"✅ MARKED AS INITIALIZED")
+        
         range_input = st.text_area("Genomic Ranges:", value=url_range_input, height=100)
+        logger.info(f"📝 TEXT AREA VALUE - Final input: '{range_input}'")
         
         # Save range input to URL
         url_state.save_to_url(range_input=range_input)
