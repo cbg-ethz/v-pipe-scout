@@ -1,0 +1,32 @@
+name: Deploy to Production
+
+on:
+  release: 
+    types: [published]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to production server
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          port: ${{ secrets.PRODUCTION_SSH_PORT || '22' }}
+          script: |
+            cd /opt/v-pipe-scout
+            git pull origin main
+            docker compose down
+            docker compose up -d --build
+            sleep 9
+            if curl -f -s -o /dev/null "${{ secrets.PRODUCTION_URL }}"; then
+              echo "Deployment successful!"
+            else
+              echo "Deployment failed - health check failed"
+              exit 1
+            fi
