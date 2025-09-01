@@ -177,6 +177,11 @@ def app():
         else:
             appropriate_default = ""
         
+        logger.info(f"🎯 GENOMIC RANGES DEFAULTS - Type: {mutation_type_value}, Default: '{appropriate_default}'")
+        
+        ranges_initialized = st.session_state.get("region_ranges_initialized", False)
+        logger.info(f"🚀 RANGES INITIALIZATION STATE - ranges_initialized: {ranges_initialized}")
+        
         # Check if existing input is compatible with current mutation type
         existing_is_compatible = True
         if existing_range_input is not None:
@@ -189,22 +194,29 @@ def app():
                 # For nucleotide, we expect format like "100-120" (no gene specification needed)
                 ranges = [r.strip() for r in existing_range_input.split(",") if r.strip()]
                 existing_is_compatible = True  # Nucleotide ranges are more flexible
+            
+            logger.info(f"🔄 COMPATIBILITY CHECK - Existing: '{existing_range_input}', Compatible: {existing_is_compatible}")
                
         # Logic for determining what to show in the text area:
         if mutation_type_changed and ranges_initialized:
             # User actively changed mutation type - use new appropriate defaults
             url_range_input = appropriate_default
+            logger.info(f"🔄 RANGES BRANCH: User changed mutation type - using defaults: '{url_range_input}'")
         elif existing_range_input is not None and existing_is_compatible:
             # Loading from URL or preserving existing input - use what's there (if compatible)
             url_range_input = existing_range_input
+            logger.info(f"🔗 RANGES BRANCH: Using existing compatible input: '{url_range_input}'")
         else:
             # No existing input, incompatible input, or no mutation type change - use appropriate defaults
             url_range_input = appropriate_default
+            logger.info(f"✨ RANGES BRANCH: Using fresh defaults: '{url_range_input}'")
         
         # Mark that ranges have been initialized (for detecting future changes)
         st.session_state["region_ranges_initialized"] = True
+        logger.info(f"✅ RANGES MARKED AS INITIALIZED")
         
         range_input = st.text_area("Genomic Ranges:", value=url_range_input, height=100)
+        logger.info(f"📝 RANGES TEXT AREA VALUE - Final input: '{range_input}'")
 
         
         # Save range input to URL
