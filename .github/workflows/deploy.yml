@@ -17,7 +17,7 @@ jobs:
           host: ${{ secrets.PRODUCTION_HOST }}
           username: ${{ secrets.PRODUCTION_USER }}
           key: ${{ secrets.PRODUCTION_SSH_KEY }}
-          port: ${{ secrets.PRODUCTION_SSH_PORT || 22 }}
+          port: ${{ secrets.PRODUCTION_SSH_PORT || '22' }}
           script: |
             cd /opt/v-pipe-scout
             git pull origin main
