@@ -44,7 +44,7 @@ def app():
     # Track previous mutation type to detect changes (use session state, not URL)
     previous_mutation_type = st.session_state.get("region_previous_mutation_type", None)
     
-    logger.info(f"🔍 MUTATION TYPE - URL: {url_mutation_type}, Previous: {previous_mutation_type}")
+    logger.debug(f"🔍 MUTATION TYPE - URL: {url_mutation_type}, Previous: {previous_mutation_type}")
     
     mutation_type = st.radio(
         "Select mutation type:",
@@ -57,7 +57,7 @@ def app():
     mutation_type_changed = previous_mutation_type is not None and mutation_type != previous_mutation_type
     st.session_state["region_previous_mutation_type"] = mutation_type
     
-    logger.info(f"🔄 MUTATION TYPE CHANGE - Current: {mutation_type}, Changed: {mutation_type_changed}")
+    logger.debug(f"🔄 MUTATION TYPE CHANGE - Current: {mutation_type}, Changed: {mutation_type_changed}")
     
     # Save mutation type to URL
     url_state.save_to_url(mutation_type=mutation_type)
@@ -72,7 +72,7 @@ def app():
         index=mode_index
     )
     
-    logger.info(f"📋 MODE SELECTION - Selected: {mode}, URL: {url_mode}")
+    logger.debug(f"📋 MODE SELECTION - Selected: {mode}, URL: {url_mode}")
     
     # Save mode to URL
     url_state.save_to_url(mode=mode)
@@ -82,7 +82,7 @@ def app():
 
     # allow input by comma-separated list of mutations as free text that is then validated
     if mode == "Custom Mutation Set":
-        logger.info(f"🧬 CUSTOM MUTATION SET - Starting logic for {mutation_type_value}")
+        logger.debug(f"🧬 CUSTOM MUTATION SET - Starting logic for {mutation_type_value}")
         st.write("### Input Mutations")
         
         # Handle mutation input with smart defaults based on user interaction
@@ -103,9 +103,9 @@ def app():
         existing_is_compatible = True
         if existing_mutation_input is not None:
             # Quick check: if we have amino acid mutations but are in nucleotide mode (or vice versa)
-            sample_mutations = [mut.strip() for mut in existing_mutation_input.split(",") if mut.strip()][:2]  # Check first 2
+            sample_mutations = [mut.strip() for mut in existing_mutation_input.split(",") if mut.strip()]  # Check all mutations
             compatible_count = sum(1 for mut in sample_mutations if validate_mutation(mut, mutation_type_value))
-            existing_is_compatible = len(sample_mutations) == 0 or compatible_count > 0
+            existing_is_compatible = len(sample_mutations) == 0 or compatible_count == len(sample_mutations)
         
         # Logic for determining what to show in the text area:
         if mutation_type_changed and mutations_initialized:
@@ -155,7 +155,7 @@ def app():
             st.error("No valid mutations found. Please check your input format.")
 
     elif mode == "Genomic Ranges":
-        logger.info(f"🧬 GENOMIC RANGES - Starting logic for {mutation_type_value}")
+        logger.debug(f"🧬 GENOMIC RANGES - Starting logic for {mutation_type_value}")
         st.write("### Input Genomic Ranges")
         st.write("Enter genomic ranges in the format 'start-end' (e.g., 100-200). You can enter multiple ranges separated by commas.")
         st.write("For amino acid mutations, please also specify the gene (e.g., ORF1a:100-200).")
@@ -177,9 +177,6 @@ def app():
         else:
             appropriate_default = ""
         
-        
-        ranges_initialized = st.session_state.get("region_ranges_initialized", False)
-             
         # Check if existing input is compatible with current mutation type
         existing_is_compatible = True
         if existing_range_input is not None:
