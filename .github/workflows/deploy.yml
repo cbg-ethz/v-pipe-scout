@@ -4,7 +4,7 @@ on:
   release: 
     types: [published]
   push:
-    branches: [feat/cd]  # test on pushes to this branch
+    branches: [feat/cd]  # test on pushes to
 
 jobs:
   deploy:
