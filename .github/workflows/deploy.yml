@@ -26,7 +26,7 @@ jobs:
             docker compose down
             docker compose up -d --build
             sleep 10
-            if curl -f ${{ secrets.PRODUCTION_URL }}; then
+            if curl -f -s -o /dev/null "${{ secrets.PRODUCTION_URL }}"; then
               echo "Deployment successful!"
             else
               echo "Deployment failed - health check failed"
