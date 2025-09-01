@@ -208,6 +208,7 @@ def app():
         st.session_state["region_ranges_initialized"] = True
         
         range_input = st.text_area("Genomic Ranges:", value=url_range_input, height=100)
+
         
         # Save range input to URL
         url_state.save_to_url(range_input=range_input)
