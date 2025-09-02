@@ -100,6 +100,14 @@ For production deployments on VMs or servers, you can set up automatic deploymen
 
 This project was initiated as part of a hackathon project at the [BioHackathon Europe 2024](https://biohackathon-europe.org/).
 
+## CI/CD
+
+**Testing**: Automated tests for frontend, worker, and full Docker Compose stack run on every push/PR.
+
+**Deployment**:
+- **Development**: [`auto-deploy.sh`](scripts/auto-deploy.sh) runs every 5 minutes via cron → [dev.vpipe.ethz.ch](http://dev.vpipe.ethz.ch) (ETH network only)
+- **Production**: [`deploy.yml`](.github/workflows/deploy.yml) triggers on GitHub releases for production deployment
+
 
 ## Contributing
 
