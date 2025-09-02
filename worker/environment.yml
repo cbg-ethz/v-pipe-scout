@@ -5,7 +5,7 @@ channels:
   - defaults
 dependencies:
   # Python and lollipop dependencies
-  - python=3.12
+  - python=3.13
   - numpy>=1.23
   - scipy>=1.9
   - pandas>=1.5
@@ -30,7 +30,7 @@ dependencies:
   - pytest-mock # Added pytest-mock for the mocker fixture
 
   # Celery worker dependencies
-  - celery=5.3.6
+  - celery=5.5.3
   
   - pip
   - pip:
