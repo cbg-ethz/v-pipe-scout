@@ -1,7 +1,7 @@
 # V-Pipe Scout: Rapid Interactive Viral Variant Detection 
 
 ![POC](https://img.shields.io/badge/status-POC-yellow)
-![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![Python](https://img.shields.io/badge/python-3.13-blue)
 ![Streamlit](https://img.shields.io/badge/streamlit-1.49.0-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
