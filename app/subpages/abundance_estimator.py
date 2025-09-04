@@ -511,7 +511,7 @@ def app():
         columns = ["Mutation"] + [variant.name for variant in combined_variants.variants]
 
         # Sort mutations by position number using the utility function
-        matrix_data.sort(key=lambda x: extract_position(x[0]))  # Sort by position in ascending order
+        matrix_data.sort(key=lambda x: extract_position(x[0]), reverse=True)  # Sort by position in descending order
         
         # Sort columns alphabetically by variant name, but keep "Mutation" as the first column
         variant_columns = columns[1:]  # Skip the "Mutation" column
