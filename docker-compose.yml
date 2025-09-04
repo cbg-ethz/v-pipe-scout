@@ -23,7 +23,7 @@ services:
       context: ./app
       dockerfile: Dockerfile
     ports:
-      - "9001:8000"
+      - "${STREAMLIT_PORT:-9001}:8000"
     volumes:
       - ./app:/app
     extra_hosts:
