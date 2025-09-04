@@ -17,7 +17,9 @@ jobs:
           port: ${{ secrets.PRODUCTION_SSH_PORT || '22' }}
           script: |
             cd /opt/v-pipe-scout
-            git pull origin main
+            git config --global --add safe.directory /opt/v-pipe-scout
+            git pull origin main || exit 1
+            echo "Pulled latest commit: $(git rev-parse HEAD)"
             docker compose down
             docker compose up -d --build
             sleep 9
