@@ -37,7 +37,7 @@ from components.variant_signature_component import render_signature_composer
 from state import AbundanceEstimatorState
 from api.signatures import Variant as SignatureVariant
 from api.signatures import VariantList as SignatureVariantList
-from process.mutations import extract_position, sort_mutations_by_position
+from process.variants import create_mutation_variant_matrix
 from utils.config import get_wiseloculus_url, get_covspectrum_url
 from utils.url_state import create_url_state_manager
 
@@ -490,36 +490,8 @@ def app():
     # Build the mutation-variant matrix
     elif combined_variants.variants:
         
-        # Collect all unique mutations across selected variants
-        all_mutations = set()
-        for variant in combined_variants.variants:
-            all_mutations.update(variant.signature_mutations)
-        
-        # Sort mutations for consistent display
-        all_mutations = sorted(list(all_mutations))
-        
-        # Create a DataFrame with mutations as rows and variants as columns
-        matrix_data = []
-        for mutation in all_mutations:
-            row = [mutation]
-            for variant in combined_variants.variants:
-                # 1 if mutation is in variant's signature mutations, 0 otherwise
-                row.append(1 if mutation in variant.signature_mutations else 0)
-            matrix_data.append(row)
-        
-        # Create column names (variant names)
-        columns = ["Mutation"] + [variant.name for variant in combined_variants.variants]
-
-        # Sort mutations by position number using the utility function
-        matrix_data.sort(key=lambda x: extract_position(x[0]), reverse=True)  # Sort by position in descending order
-        
-        # Sort columns alphabetically by variant name, but keep "Mutation" as the first column
-        variant_columns = columns[1:]  # Skip the "Mutation" column
-        variant_columns.sort()  # Sort alphabetically
-        columns = ["Mutation"] + variant_columns
-        
-        # Create DataFrame
-        matrix_df = pd.DataFrame(matrix_data, columns=columns)
+        # Create the mutation-variant matrix using the utility function
+        matrix_df = create_mutation_variant_matrix(combined_variants)
         
         # Create a section with two visualizations side by side
         
