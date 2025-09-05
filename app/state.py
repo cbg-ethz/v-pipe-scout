@@ -38,15 +38,7 @@ class AbundanceEstimatorState:
             
         # Selected curated variants (for backward compatibility and UI state)
         if 'ui_selected_curated_names' not in st.session_state:
-            from subpages.abundance_estimator import cached_get_variant_names
-            available_curated_names_init = cached_get_variant_names()
-            # Set a default variant if available - LP.8 is preferred but any will do
-            if "LP.8" in available_curated_names_init:
-                default_variants = ["LP.8"]
-            elif available_curated_names_init:
-                default_variants = [available_curated_names_init[0]]  # Select first available
-            else:
-                default_variants = []
+            default_variants = []
             st.session_state.ui_selected_curated_names = default_variants
         
         # Selected custom variants (for UI state)
