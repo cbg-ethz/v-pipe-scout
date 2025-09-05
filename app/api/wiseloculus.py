@@ -320,67 +320,6 @@ class WiseLoculusLapis(Lapis):
             return pd.DataFrame()
     
 
-    async def mutations_over_time_fallback(
-        self, 
-        formatted_mutations: List[str], 
-        mutation_type: MutationType, 
-        date_range: Tuple[datetime, datetime], 
-        location_name: str
-    ) -> pd.DataFrame:
-        """
-        Fetch mutation data using the fallback fetch_counts_coverage_freq method.
-        Returns a MultiIndex DataFrame compatible with mutations_over_time.
-        
-        Args:
-            formatted_mutations: List of mutation strings (e.g., ['A123T', 'C456G'] for nucleotides 
-                               or ['ORF1a:V3449I'] for amino acids)
-            mutation_type: Type of mutations (MutationType.NUCLEOTIDE or MutationType.AMINO_ACID)
-            date_range: Tuple of (start_date, end_date) as datetime objects
-            location_name: Name of the location to filter by
-            
-        Returns:
-            pd.DataFrame: MultiIndex DataFrame with (mutation, sampling_date) as index 
-                         and count, coverage, frequency as columns
-            
-        Raises:
-            TypeError: If formatted_mutations is not a list of strings
-            ValueError: If formatted_mutations is empty or contains invalid mutation formats
-        """
-        # Type validation
-        if not isinstance(formatted_mutations, list):
-            raise TypeError(f"formatted_mutations must be a list of strings, got {type(formatted_mutations).__name__}: {formatted_mutations}")
-        
-        if not formatted_mutations:
-            # Return empty DataFrame with proper MultiIndex structure when no mutations provided
-            logging.warning("No mutations provided to mutations_over_time_fallback, returning empty DataFrame")
-            empty_coverage_df = pd.DataFrame(columns=["count", "coverage", "frequency"])
-            empty_coverage_df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
-            return empty_coverage_df
-            
-        if not all(isinstance(m, str) for m in formatted_mutations):
-            raise TypeError(f"All elements in formatted_mutations must be strings, got: {[type(m).__name__ for m in formatted_mutations]}")
-        
-        # Basic format validation for mutations
-        for mutation in formatted_mutations:
-            if not mutation.strip():  # Check for empty or whitespace-only strings
-                raise ValueError(f"Invalid mutation format: empty or whitespace-only string")
-            
-            if mutation_type == MutationType.NUCLEOTIDE:
-                # Nucleotide mutations should be like "A123T" - at least 3 characters
-                if len(mutation) < 3:
-                    raise ValueError(f"Invalid nucleotide mutation format: '{mutation}'. Expected format like 'A123T'")
-            elif mutation_type == MutationType.AMINO_ACID:
-                # Amino acid mutations should contain ":" for gene:mutation format
-                if ":" not in mutation:
-                    raise ValueError(f"Invalid amino acid mutation format: '{mutation}'. Expected format like 'ORF1a:V3449I'")
-
-        # Fetch comprehensive data using the existing async method
-        coverage_freq_df = await self.fetch_counts_coverage_freq(
-            formatted_mutations, mutation_type, date_range, location_name
-        )
-        
-        return coverage_freq_df
-
     async def get_date_range(self) -> Tuple[Optional[datetime], Optional[datetime]]:
         """
         Fetches all available sampling dates and returns the earliest and latest dates.
@@ -792,40 +731,14 @@ class WiseLoculusLapis(Lapis):
             return df
 
         except APIError as api_error:
-            # Handle API failures by falling back to the slower legacy method
-            logging.warning(f"APIError encountered in mutations_over_time: {api_error}")
-            logging.info("Switching to fallback method (mutations_over_time_fallback) - this may be slower")
-            
-            try:
-                df = await self.mutations_over_time_fallback(
-                    formatted_mutations=mutations,
-                    mutation_type=mutation_type,
-                    date_range=date_range,
-                    location_name=location_name
-                )
-                
-                # Add a marker to indicate fallback was used - components can detect this
-                if hasattr(df, 'attrs'):
-                    df.attrs['fallback_used'] = True
-                    df.attrs['fallback_reason'] = f"Primary API failed: {str(api_error)}"
-                
-                logging.info("Successfully retrieved data using fallback method")
-                return df
-                
-            except Exception as fallback_error:
-                logging.error(f"Fallback method also failed: {fallback_error}")
-                # If fallback also fails, return empty DataFrame
-                df = pd.DataFrame(columns=["count", "coverage", "frequency"])
-                df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
-                if hasattr(df, 'attrs'):
-                    df.attrs['fallback_used'] = True
-                    df.attrs['fallback_failed'] = True
-                    df.attrs['fallback_reason'] = f"Primary API failed: {str(api_error)}, Fallback failed: {str(fallback_error)}"
-                return df
+            # Log the API error and return empty DataFrame
+            logging.error(f"APIError encountered in mutations_over_time: {api_error}")
+            df = pd.DataFrame(columns=["count", "coverage", "frequency"])
+            df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
+            return df
         except Exception as e:
             logging.error(f"Error in mutations_over_time: {e}")
             # Return empty DataFrame with proper MultiIndex structure
             df = pd.DataFrame(columns=["count", "coverage", "frequency"])
             df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
             return df
-
