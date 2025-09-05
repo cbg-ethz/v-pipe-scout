@@ -513,8 +513,8 @@ class WiseLoculusLapis(Lapis):
                         mutation_data = data_matrix[i][j]
                         
                         # Extract count and coverage from the API response
-                        count = mutation_data.get("count", pd.NA)
-                        coverage = mutation_data.get("coverage", pd.NA)
+                        count = mutation_data.get("count", 0)
+                        coverage = mutation_data.get("coverage", 0)
                         
                         # Calculate frequency from count and coverage
                         frequency = count / coverage if coverage > 0 else pd.NA
