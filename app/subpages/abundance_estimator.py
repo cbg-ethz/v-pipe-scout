@@ -838,6 +838,11 @@ def app():
 
             # Add a button to trigger fetching
             if st.button("Fetch Data"):
+                # Validate that location is available
+                if location is None:
+                    st.error("Please ensure a location is selected. Unable to fetch data without a valid location.")
+                    st.stop()
+                
                 # Get the latest mutation list
                 mutations = matrix_df["Mutation"].tolist()
                 
@@ -852,11 +857,13 @@ def app():
                 
                 with st.spinner('Fetching mutation counts and coverage data...'):
                     # Store the result in session state
-                    st.session_state.counts_df3d = asyncio.run(wiseLoculus.fetch_counts_coverage_freq(
+                    # Using the improved mutations_over_time endpoint with daily interval
+                    st.session_state.counts_df3d = asyncio.run(wiseLoculus.mutations_over_time(
                     mutations,
                     MutationType.NUCLEOTIDE,  
                     datetime_range,
-                    location
+                    location,
+                    interval="daily"
                     ))
                 st.success("Data fetched successfully!")
                 
