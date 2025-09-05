@@ -149,7 +149,8 @@ def render_signature_composer(
         key=f'{session_prefix}variantQuery',
         help="Variant queries may use pango lineage queries (either called by pangolin or by Nextclade) "
              "and filter by Nextstrain clades e.g.: BA.5* | nextcladePangoLineage:BA.5* | nextstrainClade:22B, "
-             "see https://lapis-docs.readthedocs.io/en/latest/concepts/variant_query.html#variantquery for details."
+             "see https://lapis-docs.readthedocs.io/en/latest/concepts/variant_query.html#variantquery for details.",
+        placeholder="e.g.: BA.5* | nextcladePangoLineage:BA.5* | nextstrainClade:22B,"
     )
 
     if config['show_nucleotides_only']:
