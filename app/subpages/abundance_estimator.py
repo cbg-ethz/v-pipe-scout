@@ -170,11 +170,24 @@ def app():
     # Load variant selection from URL or use current session state
     url_selected_variants = url_state.load_from_url("selected_variants", AbundanceEstimatorState.get_selected_curated_names(), list)
     
+    # Filter URL variants to only include those that are still available
+    current_selected_curated = AbundanceEstimatorState.get_selected_curated_names()
+    available_variant_names = set(available_variants)
+    filtered_url_variants = [v for v in url_selected_variants if v in available_variant_names] if url_selected_variants else []
+    
+    # Use current session state as default, but respect filtered URL state if it exists and differs
+    if filtered_url_variants != current_selected_curated and filtered_url_variants:
+        # URL has different variants, use filtered URL state
+        default_variants = filtered_url_variants
+    else:
+        # Use current session state, but only include variants that are still available
+        default_variants = [v for v in current_selected_curated if v in available_variant_names]
+    
     # Create a multi-select box for variants
     selected_curated_variants = st.multiselect(
         "Select known variants of interest – curated by the V-Pipe team",
         options=available_variants,
-        default=url_selected_variants,
+        default=default_variants,
         help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team"
     )
     
@@ -458,6 +471,9 @@ def app():
         
         # If variants were removed, rerun to update the UI
         if variants_removed or all_removed:
+            # Update URL to reflect the current curated variants selection
+            current_curated = AbundanceEstimatorState.get_selected_curated_names()
+            url_state.save_to_url(selected_variants=current_curated)
             st.rerun()
     else:
         st.info("No variants are currently selected. Select variants from the Curated Variant List or create Custom Variants above.")
