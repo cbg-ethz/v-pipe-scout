@@ -837,9 +837,25 @@ def app():
             locations = wiseLoculus.fetch_locations()
             if locations is None:
                 st.error("Unable to fetch locations. Please check your connection to the Loculus server.")
-                location = None
+                selected_locations = []
             else:
-                location = st.selectbox("Location", locations, help="Select the sampling location for data analysis.")
+                selected_locations = st.multiselect(
+                    "Locations", 
+                    options=locations,
+                    default=locations,  # Default to all locations selected
+                    help="Select one or more sampling locations for data analysis. Multiple locations will be processed together."
+                )
+                
+                # Show warning if more than one location is selected
+                if len(selected_locations) > 1:
+                    st.warning(f"⚠️ Multiple locations selected ({len(selected_locations)} locations). Multi-location analysis is currently experimental and may take longer to process.")
+                elif len(selected_locations) == 0:
+                    st.error("Please select at least one location for analysis.")
+                else:
+                    st.success(f"✅ Single location selected: {selected_locations[0]}")
+            
+            # For backward compatibility, set location to the first selected location or None
+            location = selected_locations[0] if selected_locations else None
         
         with col2:
             st.markdown("#### ⚙️ Deconvolution Parameters")
@@ -895,13 +911,19 @@ def app():
             # Only show Run Analysis button if we don't have results yet
             if st.button("🚀 Run Complete Analysis", help="Fetch data and estimate variant abundances", type="primary"):
                 # Validate inputs
-                if location is None:
-                    st.error("Please ensure a location is selected. Unable to fetch data without a valid location.")
+                if not selected_locations:
+                    st.error("Please select at least one location. Unable to fetch data without selecting a location.")
                     st.stop()
                 
                 if len(date_range) != 2:
                     st.error("Please select a valid date range with both start and end dates.")
                     st.stop()
+                
+                # Show information about the analysis scope
+                if len(selected_locations) > 1:
+                    st.info(f"🌍 Running analysis for {len(selected_locations)} locations: {', '.join(selected_locations)}")
+                else:
+                    st.info(f"📍 Running analysis for location: {selected_locations[0]}")
                 
                 # Get the latest mutation list
                 mutations = matrix_df["Mutation"].tolist()
@@ -914,15 +936,23 @@ def app():
                 # Step 1: Fetch data
                 with st.spinner('Step 1/2: Fetching mutation counts and coverage data from Loculus...'):
                     try:
+                        # For now, process the first location (multi-location support to be implemented)
+                        primary_location = selected_locations[0]
+                        st.caption(f"Fetching data for: {primary_location}")
+                        
                         # Using the improved mutations_over_time endpoint with daily interval
                         st.session_state.counts_df3d = asyncio.run(wiseLoculus.mutations_over_time(
                             mutations,
                             MutationType.NUCLEOTIDE,  
                             datetime_range,
-                            location,
+                            primary_location,
                             interval="daily"
                         ))
                         st.success("✅ Data fetched successfully!")
+                        
+                        if len(selected_locations) > 1:
+                            st.info(f"ℹ️ Note: Currently processing data for {primary_location} only. Full multi-location support coming soon.")
+                            
                     except Exception as e:
                         st.error(f"❌ Error fetching data: {str(e)}")
                         st.stop()
