@@ -101,7 +101,8 @@ def app():
             st.info(f"**Current LAPIS Server:** {lapis_url}")
             
             # Swagger UI link - hardcoded to correct URL
-            st.markdown("📋 **[Interactive API Documentation (Swagger UI)](https://lapis.wasap.genspectrum.org/swagger-ui/index.html)**")
+            swagger_url = f"{lapis_url}/swagger-ui/index.html"
+            st.markdown(f"📋 **[Interactive API Documentation (Swagger UI)]({swagger_url})**")
             
             st.markdown("### Recommended Endpoints")
             st.markdown("""
