@@ -115,15 +115,6 @@ def app():
             - **`/sample/aggregated?groupByFields=date`** - Mutations over time data
             - **`/sample/aggregated?groupByFields=date,location`** - Location-specific time series
             """)
-            
-            # Add disclaimers
-            st.warning("""
-            **⚠️ Important Notes:**
-            - This API provides access to the same data visualized in V-Pipe Scout
-            - API availability depends on server status (check Debug Information below)
-            - Rate limiting may apply for excessive requests
-            - Data is updated regularly but may have some delay from real-time sequencing
-            """)
                 
         except Exception as e:
             st.error(f"⚠️ Could not load LAPIS configuration: {str(e)}")
