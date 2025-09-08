@@ -89,6 +89,38 @@ def app():
     st.markdown("**27 Mio Reads × 2.5 GB/Mio Reads = 67.5 GB of RAM**")
     st.markdown("**4 weeks x 67.5 GB/week =  270 GB of RAM**")
 
+    # LAPIS API Documentation Section (Collapsible)
+    st.markdown("---")
+    with st.expander("🔗 Try LAPIS API Yourself", expanded=False):
+        st.markdown("### Direct Access to LAPIS API")
+        
+        # Get current LAPIS configuration
+        try:
+            lapis_url = get_wiseloculus_url()
+            
+            st.info(f"**Current LAPIS Server:** {lapis_url}")
+            
+            # Swagger UI link - hardcoded to correct URL
+            swagger_url = f"{lapis_url}/swagger-ui/index.html"
+            st.markdown(f"📋 **[Interactive API Documentation (Swagger UI)]({swagger_url})**")
+            
+            st.markdown("### Recommended Endpoints")
+            st.markdown("""
+            **Core Query Endpoints:**
+            - **`/sample/aggregated`** - Aggregate samples by various fields (date, location, mutations)
+            - **`/sample/details`** - Get detailed sample information with filtering
+            - **`/sample/aminoAcidMutations`** - Query amino acid mutations across samples
+            - **`/sample/nucleotideMutations`** - Query nucleotide mutations across samples
+            
+            **Time Series Endpoints:**
+            - **`/sample/aggregated?groupByFields=date`** - Mutations over time data
+            - **`/sample/aggregated?groupByFields=date,location`** - Location-specific time series
+            """)
+                
+        except Exception as e:
+            st.error(f"⚠️ Could not load LAPIS configuration: {str(e)}")
+            st.info("Please check the configuration in `app/config.yaml` or contact administrators.")
+
     # Debug Information Section (Collapsible)
     st.markdown("---")
     with st.expander("🛠️ Debug Information", expanded=False):
