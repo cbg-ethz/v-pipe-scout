@@ -89,6 +89,85 @@ def app():
     st.markdown("**27 Mio Reads × 2.5 GB/Mio Reads = 67.5 GB of RAM**")
     st.markdown("**4 weeks x 67.5 GB/week =  270 GB of RAM**")
 
+    # LAPIS API Documentation Section (Collapsible)
+    st.markdown("---")
+    with st.expander("🔗 Try LAPIS API Yourself", expanded=False):
+        st.markdown("### Direct Access to LAPIS API")
+        
+        # Get current LAPIS configuration
+        try:
+            lapis_url = get_wiseloculus_url()
+            
+            st.info(f"**Current LAPIS Server:** {lapis_url}")
+            
+            # Swagger UI link
+            swagger_url = f"{lapis_url.rstrip('/')}/docs"
+            st.markdown(f"📋 **[Interactive API Documentation (Swagger UI)]({swagger_url})**")
+            
+            st.markdown("### Recommended Endpoints")
+            st.markdown("""
+            **Core Query Endpoints:**
+            - **`/sample/aggregated`** - Aggregate samples by various fields (date, location, mutations)
+            - **`/sample/details`** - Get detailed sample information with filtering
+            - **`/sample/aminoAcidMutations`** - Query amino acid mutations across samples
+            - **`/sample/nucleotideMutations`** - Query nucleotide mutations across samples
+            
+            **Time Series Endpoints:**
+            - **`/sample/aggregated?groupByFields=date`** - Mutations over time data
+            - **`/sample/aggregated?groupByFields=date,location`** - Location-specific time series
+            
+            **Mutation Analysis:**
+            - **`/sample/aminoAcidMutations?minProportion=0.05`** - Find AA mutations above threshold
+            - **`/sample/nucleotideMutations?minProportion=0.1`** - Find nucleotide mutations above threshold
+            """)
+            
+            st.markdown("### Quick Start Examples")
+            st.markdown(f"""
+            **Get all samples from last 7 days:**
+            ```
+            GET {lapis_url}sample/aggregated?groupByFields=date&orderBy=date&order=descending&limit=7
+            ```
+            
+            **Find samples with specific mutation:**
+            ```
+            GET {lapis_url}sample/details?aminoAcidMutations=S:501Y
+            ```
+            
+            **Get mutation frequencies over time:**
+            ```
+            GET {lapis_url}sample/aggregated?groupByFields=date&aminoAcidMutations=S:501Y&nucleotideMutations=A23403G
+            ```
+            """)
+            
+            # Add disclaimers
+            st.warning("""
+            **⚠️ Important Notes:**
+            - This API provides access to the same data visualized in V-Pipe Scout
+            - API availability depends on server status (check Debug Information below)
+            - Rate limiting may apply for excessive requests
+            - Data is updated regularly but may have some delay from real-time sequencing
+            """)
+            
+            # Add API health status specifically for this section
+            try:
+                health_results = get_system_health_status()
+                lapis_health = health_results.get('lapis', None)
+                if lapis_health:
+                    if lapis_health.is_healthy:
+                        st.success("✅ LAPIS API is currently available and healthy")
+                    elif lapis_health.is_available:
+                        st.warning(f"⚠️ LAPIS API is available but may have issues: {lapis_health.status.value}")
+                    else:
+                        st.error(f"❌ LAPIS API is currently unavailable: {lapis_health.error_message or lapis_health.status.value}")
+                else:
+                    st.info("ℹ️ API health status not available")
+            except Exception as e:
+                st.warning(f"Could not check API health: {str(e)}")
+                
+        except Exception as e:
+            st.error(f"⚠️ Could not load LAPIS configuration: {str(e)}")
+            st.info("Please check the configuration in `app/config.yaml` or contact administrators.")
+
     # Debug Information Section (Collapsible)
     st.markdown("---")
     with st.expander("🛠️ Debug Information", expanded=False):
