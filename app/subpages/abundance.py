@@ -951,7 +951,7 @@ def app():
                         st.success("✅ Data fetched successfully!")
                         
                         if len(selected_locations) > 1:
-                            st.info(f"ℹ️ Note: Currently processing data for {primary_location} only. Full multi-location support coming soon.")
+                            st.warning(f"ℹ️ Note: Currently processing data one location only: {primary_location}. Full multi-location support coming soon.")
                             
                     except Exception as e:
                         st.error(f"❌ Error fetching data: {str(e)}")
