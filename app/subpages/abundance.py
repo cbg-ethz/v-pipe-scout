@@ -806,9 +806,9 @@ def app():
         st.markdown("---")
 
         # ============== DATA FETCHING ==============
-        st.subheader("Download Mutation Counts and Coverage")
+        st.subheader("Gather Mutation Counts & Coverage")
 
-        with st.expander("Fetch and download mutation counts and coverage data", expanded=False):
+        with st.expander("Fetch and download mutation counts and coverage data", expanded=True):
             st.write("You can download the mutation counts and coverage data for the selected mutations over a specified date range and location.")
             st.write("This data is fetched from the the Loculus Wastewater Instance and can be used for further analysis, such as tracking variant prevalence over time.")
             st.write("Please specify the date range for the data.")
@@ -819,7 +819,7 @@ def app():
             
             # Date range input
             # Get dynamic date range from API with bounds to enforce limits
-            default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("abundance_estimator")
+            default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("abundance")
             
             date_range = st.date_input(
                 "Select Date Range",
