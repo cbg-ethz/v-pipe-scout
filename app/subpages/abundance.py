@@ -805,70 +805,187 @@ def app():
         
         st.markdown("---")
 
-        # ============== DATA FETCHING ==============
-        st.subheader("Download Mutation Counts and Coverage")
-
-        with st.expander("Fetch and download mutation counts and coverage data", expanded=False):
-            st.write("You can download the mutation counts and coverage data for the selected mutations over a specified date range and location.")
-            st.write("This data is fetched from the the Loculus Wastewater Instance and can be used for further analysis, such as tracking variant prevalence over time.")
-            st.write("Please specify the date range for the data.")
-            
-            # Initialize the API client first
-            server_ip = get_wiseloculus_url()
-            wiseLoculus = WiseLoculusLapis(server_ip)
+        # ============== ANALYSIS CONFIGURATION ==============
+        st.subheader("Analysis Configuration & Execution")
+        st.write("Configure the parameters for data fetching and variant abundance estimation, then run the complete analysis.")
+        
+        # Add information about the process
+        st.info("💡 This analysis will: 1) Fetch mutation counts and coverage data from Loculus, 2) Estimate variant abundances using LolliPop deconvolution")
+        
+        # Initialize the API client first
+        server_ip = get_wiseloculus_url()
+        wiseLoculus = WiseLoculusLapis(server_ip)
+        
+        # Configuration sections in columns
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            st.markdown("#### 📊 Data Parameters")
             
             # Date range input
             # Get dynamic date range from API with bounds to enforce limits
-            default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("abundance_estimator")
+            default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("abundance")
             
             date_range = st.date_input(
-                "Select Date Range",
+                "Date Range",
                 value=[default_start, default_end],
                 min_value=min_date,
                 max_value=max_date,
-                help="Select the date range for which you want to fetch mutation counts and coverage data."
+                help="Select the date range for fetching mutation counts and coverage data from Loculus."
             )
 
             locations = wiseLoculus.fetch_locations()
             if locations is None:
                 st.error("Unable to fetch locations. Please check your connection to the Loculus server.")
-                location = None
+                selected_locations = []
             else:
-                location = st.selectbox("Select Location:", locations)
+                selected_locations = st.multiselect(
+                    "Locations", 
+                    options=locations,
+                    default=locations,  # Default to all locations selected
+                    help="Select one or more sampling locations for data analysis. Multiple locations will be processed together."
+                )
+                
+                # Show warning if more than one location is selected
+                if len(selected_locations) > 1:
+                    st.warning(f"⚠️ Multiple locations selected ({len(selected_locations)} locations). Multi-location analysis is currently experimental and may take longer to process.")
+                elif len(selected_locations) == 0:
+                    st.error("Please select at least one location for analysis.")
+                else:
+                    st.success(f"✅ Single location selected: {selected_locations[0]}")
+            
+            # For backward compatibility, set location to the first selected location or None
+            location = selected_locations[0] if selected_locations else None
+        
+        with col2:
+            st.markdown("#### ⚙️ Deconvolution Parameters")
+            
+            # Bootstrap iterations with preset options
+            bootstrap_options = {
+                "Rapid (Fast)": 50,
+                "Standard": 100, 
+                "Reliable (Slower)": 300
+            }
+            
+            selected_option = st.radio(
+                "Bootstrap Iterations",
+                options=list(bootstrap_options.keys()),
+                index=1,  # Default to "Standard" (100 bootstraps)
+                help="Choose the number of bootstrap iterations for confidence intervals. More iterations provide better estimates but take longer to compute."
+            )
+            
+            bootstraps = bootstrap_options[selected_option]
+            
+            # Show the actual number selected
+            st.caption(f"Selected: {bootstraps} bootstrap iterations")
+            
+            st.markdown("**Method:** LolliPop Deconvolution")
+            st.caption("Kernel-based deconvolution that leverages time series data to generate high-confidence abundance estimates despite noise in wastewater samples.")
+        
+        # Initialize task ID and result in session state if not present
+        if 'analysis_task_id' not in st.session_state:
+            st.session_state.analysis_task_id = None
+        
+        if 'analysis_result' not in st.session_state:
+            st.session_state.analysis_result = None
+        
+        if 'counts_df3d' not in st.session_state:
+            st.session_state.counts_df3d = None
 
-            # Add a button to trigger fetching
-            if st.button("Fetch Data"):
-                # Validate that location is available
-                if location is None:
-                    st.error("Please ensure a location is selected. Unable to fetch data without a valid location.")
+        # Single action button
+        st.markdown("---")
+        
+        # Button logic depends on whether we already have results
+        if st.session_state.analysis_result is not None:
+            # If we have results, show a "Start New Analysis" button instead
+            if st.button("🔄 Start New Analysis", help="Clear current results and start a new complete analysis", type="primary"):
+                # Clear all analysis state to reset the workflow
+                st.session_state.analysis_task_id = None
+                st.session_state.analysis_result = None
+                st.session_state.counts_df3d = None
+                # Also clear any data hash to force recomputation
+                if 'last_data_hash' in st.session_state:
+                    del st.session_state.last_data_hash
+                st.rerun()  # Rerun to show the parameters and Run Analysis button
+        else:
+            # Only show Run Analysis button if we don't have results yet
+            if st.button("🚀 Run Complete Analysis", help="Fetch data and estimate variant abundances", type="primary"):
+                # Validate inputs
+                if not selected_locations:
+                    st.error("Please select at least one location. Unable to fetch data without selecting a location.")
                     st.stop()
+                
+                if len(date_range) != 2:
+                    st.error("Please select a valid date range with both start and end dates.")
+                    st.stop()
+                
+                # Show information about the analysis scope
+                if len(selected_locations) > 1:
+                    st.info(f"🌍 Running analysis for {len(selected_locations)} locations: {', '.join(selected_locations)}")
+                else:
+                    st.info(f"📍 Running analysis for location: {selected_locations[0]}")
                 
                 # Get the latest mutation list
                 mutations = matrix_df["Mutation"].tolist()
                 
                 # Convert date range to datetime tuples
-                if len(date_range) == 2:
-                    start_date = datetime.combine(date_range[0], datetime.min.time())
-                    end_date = datetime.combine(date_range[1], datetime.min.time())
-                    datetime_range = (start_date, end_date)
-                else:
-                    st.error("Please select a valid date range with both start and end dates.")
-                    st.stop()
+                start_date = datetime.combine(date_range[0], datetime.min.time())
+                end_date = datetime.combine(date_range[1], datetime.min.time())
+                datetime_range = (start_date, end_date)
                 
-                with st.spinner('Fetching mutation counts and coverage data...'):
-                    # Store the result in session state
-                    # Using the improved mutations_over_time endpoint with daily interval
-                    st.session_state.counts_df3d = asyncio.run(wiseLoculus.mutations_over_time(
-                    mutations,
-                    MutationType.NUCLEOTIDE,  
-                    datetime_range,
-                    location,
-                    interval="daily"
-                    ))
-                st.success("Data fetched successfully!")
+                # Step 1: Fetch data
+                with st.spinner('Step 1/2: Fetching mutation counts and coverage data from Loculus...'):
+                    try:
+                        # For now, process the first location (multi-location support to be implemented)
+                        primary_location = selected_locations[0]
+                        st.caption(f"Fetching data for: {primary_location}")
+                        
+                        # Using the improved mutations_over_time endpoint with daily interval
+                        st.session_state.counts_df3d = asyncio.run(wiseLoculus.mutations_over_time(
+                            mutations,
+                            MutationType.NUCLEOTIDE,  
+                            datetime_range,
+                            primary_location,
+                            interval="daily"
+                        ))
+                        st.success("✅ Data fetched successfully!")
+                        
+                        if len(selected_locations) > 1:
+                            st.warning(f"ℹ️ Note: Currently processing data one location only: {primary_location}. Full multi-location support coming soon.")
+                            
+                    except Exception as e:
+                        st.error(f"❌ Error fetching data: {str(e)}")
+                        st.stop()
                 
-            # Only show download buttons if data exists
-            if 'counts_df3d' in st.session_state and st.session_state.counts_df3d is not None:
+                # Step 2: Run deconvolution
+                if st.session_state.counts_df3d is not None:
+                    with st.spinner('Step 2/2: Starting variant abundance estimation...'):
+                        try:
+                            # Convert DataFrames to base64-encoded pickle strings for serialization
+                            counts_pickle = base64.b64encode(pickle.dumps(st.session_state.counts_df3d)).decode('utf-8')
+                            matrix_pickle = base64.b64encode(pickle.dumps(matrix_df)).decode('utf-8')
+                            
+                            # Submit the task to Celery worker
+                            task = celery_app.send_task(
+                                'tasks.run_deconvolve',
+                                kwargs={
+                                    'mutation_counts_df': counts_pickle,
+                                    'mutation_variant_matrix_df': matrix_pickle,
+                                    'bootstraps': bootstraps
+                                }
+                            )
+                            # Store task ID in session state
+                            st.session_state.analysis_task_id = task.id
+                            st.success(f"✅ Analysis started! Task ID: {task.id}")
+                        except Exception as e:
+                            st.error(f"❌ Error starting deconvolution: {str(e)}")
+                            st.stop()
+        
+        # Show download options for fetched data (if available)
+        if st.session_state.counts_df3d is not None:
+            with st.expander("📥 Download Raw Data", expanded=False):
+                st.write("Download the fetched mutation counts and coverage data:")
+                
                 # Create columns for download buttons
                 col1, col2 = st.columns(2)
                 
@@ -877,11 +994,11 @@ def app():
                     # Make sure to preserve index for dates and mutations
                     csv = st.session_state.counts_df3d.to_csv(index=True)
                     st.download_button(
-                    label="Download as CSV",
-                    data=csv,
-                    file_name='mutation_counts_coverage.csv',
-                    mime='text/csv',
-                    help="Download all data as a single CSV file with preserved indices."
+                        label="Download as CSV",
+                        data=csv,
+                        file_name='mutation_counts_coverage.csv',
+                        mime='text/csv',
+                        help="Download all data as a single CSV file with preserved indices."
                     )
                 
                 # 2. JSON Download
@@ -890,285 +1007,238 @@ def app():
                     json_data = st.session_state.counts_df3d.to_json(orient='split', date_format='iso', index=True)
                     
                     st.download_button(
-                    label="Download as JSON",
-                    data=json_data,
-                    file_name='mutation_counts_coverage.json',
-                    mime='application/json',
-                    help="Download data as a JSON file that preserves dates and mutation indices."
+                        label="Download as JSON",
+                        data=json_data,
+                        file_name='mutation_counts_coverage.json',
+                        mime='application/json',
+                        help="Download data as a JSON file that preserves dates and mutation indices."
                     )
-
-        # Create a separate section for Variant Abundance Estimation
+        
         st.markdown("---")
-
-        # ============== VARIANT ABUNDANCE ESTIMATION ==============
-        st.subheader("Estimate Variant Abundances")
         
-        # Add information about LolliPop
-        st.markdown("Processing is done with **LolliPop - a tool for Deconvolution for Wastewater Genomics**", 
-            help="LolliPop has been developed to improve wastewater-based genomic surveillance as the number of variants of concern increased and to account for shared mutations among variants. It relies on a kernel-based deconvolution, and leverages the time series nature of the samples. This approach enables to generate higher confidence relative abundance curves despite the very high noise and overdispersion present in wastewater samples.")
-        
-        # Check if data has been fetched
-        if 'counts_df3d' not in st.session_state or st.session_state.counts_df3d is None:
-            st.warning("Please fetch mutation counts and coverage data first in the section above before estimating variant abundances.")
-        else:
-            bootstraps = st.slider("Number of Bootstrap Iterations", 
-                                min_value=0, max_value=300, value=10, step=10)
+        # ============== RESULTS SECTION ==============
+        st.subheader("Analysis Results")
+
+        # Display task status and results
+        if st.session_state.analysis_task_id:
+            task_id = st.session_state.analysis_task_id
             
-            mutation_counts_df = st.session_state.counts_df3d
-            mutation_variant_matrix_df = matrix_df
-
-            # Initialize task ID in session state if not present
-            if 'deconv_task_id' not in st.session_state:
-                st.session_state.deconv_task_id = None
-            
-            if 'deconv_result' not in st.session_state:
-                st.session_state.deconv_result = None
-
-            # Button logic depends on whether we already have results
-            if st.session_state.deconv_result is not None:
-                # If we have results, show a "Start New Deconvolution" button instead
-                if st.button("Start New Deconvolution", help="Clear current results and start a new deconvolution"):
-                    # Clear both the task ID and result to reset the workflow
-                    st.session_state.deconv_task_id = None
-                    st.session_state.deconv_result = None
-                    # Also clear any data hash to force recomputation
-                    if 'last_data_hash' in st.session_state:
-                        del st.session_state.last_data_hash
-                    st.rerun()  # Rerun to show the parameters and Run Deconvolution button
-            else:
-                # Only show Run Deconvolution button if we don't have results yet
-                if st.button("Run Deconvolution"):
-                    with st.spinner('Starting deconvolution task...'):
-                        # Convert DataFrames to base64-encoded pickle strings for serialization
-                        counts_pickle = base64.b64encode(pickle.dumps(mutation_counts_df)).decode('utf-8')
-                        matrix_pickle = base64.b64encode(pickle.dumps(mutation_variant_matrix_df)).decode('utf-8')
-                        
-                        # Submit the task to Celery worker
-                        task = celery_app.send_task(
-                            'tasks.run_deconvolve',
-                            kwargs={
-                                'mutation_counts_df': counts_pickle,
-                                'mutation_variant_matrix_df': matrix_pickle,
-                                'bootstraps': bootstraps
-                            }
-                        )
-                        # Store task ID in session state
-                    st.session_state.deconv_task_id = task.id
-                    st.success(f"Deconvolution started! Task ID: {task.id}")
-
-            # Display task status and results
-            if st.session_state.deconv_task_id:
-    
-                    task_id = st.session_state.deconv_task_id
+            # Check if we already have results
+            if st.session_state.analysis_result is not None:
+                st.success("🎉 Complete analysis finished!")
+                
+                # Parse and visualize the analysis results
+                result_data = st.session_state.analysis_result
+                
+                # Get the location (for now, we just use the first location key)
+                if result_data and len(result_data) > 0:
+                    location = list(result_data.keys())[0]
+                    variants_data = result_data[location]
                     
-                    # Check if we already have results
-                    if st.session_state.deconv_result is not None:
-                        st.success("Deconvolution completed!")
+                    # Create a figure for visualization
+                    fig = go.Figure()
+                    
+                    # Color palette for variants
+                    colors = px.colors.qualitative.Bold if hasattr(px.colors.qualitative, 'Bold') else [
+                        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", 
+                        "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
+                    ]
+                    
+                    # Ensure we have enough colors
+                    if len(variants_data) > len(colors):
+                        # Extend by cycling through the list
+                        colors = colors * (len(variants_data) // len(colors) + 1)
+                    
+                    # Track the max time range for x-axis limits
+                    all_dates = []
+                    
+                    # Plot each variant
+                    for i, (variant_name, variant_data) in enumerate(variants_data.items()):
+                        timeseries = variant_data.get('timeseriesSummary', [])
+                        if not timeseries:
+                            continue
                         
-                        # Parse and visualize the deconvolution results
-                        result_data = st.session_state.deconv_result
+                        # Extract dates and proportions
+                        dates = [pd.to_datetime(point['date']) for point in timeseries]
+                        all_dates.extend(dates)
+                        proportions = [point['proportion'] for point in timeseries]
+                        lower_bounds = [point.get('proportionLower', point['proportion']) for point in timeseries]
+                        upper_bounds = [point.get('proportionUpper', point['proportion']) for point in timeseries]
                         
-                        # Get the location (for now, we just use the first location key)
-                        if result_data and len(result_data) > 0:
-                            location = list(result_data.keys())[0]
-                            variants_data = result_data[location]
-                            
-                            # Create a figure for visualization
-                            fig = go.Figure()
-                            
-                            # Color palette for variants
-                            colors = px.colors.qualitative.Bold if hasattr(px.colors.qualitative, 'Bold') else [
-                                "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", 
-                                "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
-                            ]
-                            
-                            # Ensure we have enough colors
-                            if len(variants_data) > len(colors):
-                                # Extend by cycling through the list
-                                colors = colors * (len(variants_data) // len(colors) + 1)
-                            
-                            # Track the max time range for x-axis limits
-                            all_dates = []
-                            
-                            # Plot each variant
-                            for i, (variant_name, variant_data) in enumerate(variants_data.items()):
-                                timeseries = variant_data.get('timeseriesSummary', [])
-                                if not timeseries:
-                                    continue
-                                
-                                # Extract dates and proportions
-                                dates = [pd.to_datetime(point['date']) for point in timeseries]
-                                all_dates.extend(dates)
-                                proportions = [point['proportion'] for point in timeseries]
-                                lower_bounds = [point.get('proportionLower', point['proportion']) for point in timeseries]
-                                upper_bounds = [point.get('proportionUpper', point['proportion']) for point in timeseries]
-                                
-                                color_idx = i % len(colors)
-                                
-                                # Add line plot for this variant
-                                fig.add_trace(go.Scatter(
-                                    x=dates,
-                                    y=proportions,
-                                    mode='lines+markers',
-                                    line=dict(color=colors[color_idx], width=2),
-                                    name=variant_name
-                                ))
-                                
-                                # Add shaded confidence interval using the exact same color as the line
-                                color = colors[color_idx]
-                                # Convert to rgba with 0.2 opacity - keeping the exact same color
-                                if color.startswith('#'):
-                                    # Convert hex to rgb
-                                    r = int(color[1:3], 16) / 255
-                                    g = int(color[3:5], 16) / 255
-                                    b = int(color[5:7], 16) / 255
+                        color_idx = i % len(colors)
+                        
+                        # Add line plot for this variant
+                        fig.add_trace(go.Scatter(
+                            x=dates,
+                            y=proportions,
+                            mode='lines+markers',
+                            line=dict(color=colors[color_idx], width=2),
+                            name=variant_name
+                        ))
+                        
+                        # Add shaded confidence interval using the exact same color as the line
+                        color = colors[color_idx]
+                        # Convert to rgba with 0.2 opacity - keeping the exact same color
+                        if color.startswith('#'):
+                            # Convert hex to rgb
+                            r = int(color[1:3], 16) / 255
+                            g = int(color[3:5], 16) / 255
+                            b = int(color[5:7], 16) / 255
+                            rgba_color = f'rgba({r:.3f}, {g:.3f}, {b:.3f}, 0.2)'
+                        else:
+                            # Handle other color formats (rgb, rgba, etc.)
+                            # Strip any existing rgba/rgb format and extract the color values
+                            if color.startswith('rgb'):
+                                # Extract the RGB values from the string
+                                rgb_values = color.replace('rgb(', '').replace('rgba(', '').replace(')', '').split(',')
+                                if len(rgb_values) >= 3:
+                                    r = float(rgb_values[0].strip()) / 255 if float(rgb_values[0].strip()) > 1 else float(rgb_values[0].strip())
+                                    g = float(rgb_values[1].strip()) / 255 if float(rgb_values[1].strip()) > 1 else float(rgb_values[1].strip())
+                                    b = float(rgb_values[2].strip()) / 255 if float(rgb_values[2].strip()) > 1 else float(rgb_values[2].strip())
                                     rgba_color = f'rgba({r:.3f}, {g:.3f}, {b:.3f}, 0.2)'
                                 else:
-                                    # Handle other color formats (rgb, rgba, etc.)
-                                    # Strip any existing rgba/rgb format and extract the color values
-                                    if color.startswith('rgb'):
-                                        # Extract the RGB values from the string
-                                        rgb_values = color.replace('rgb(', '').replace('rgba(', '').replace(')', '').split(',')
-                                        if len(rgb_values) >= 3:
-                                            r = float(rgb_values[0].strip()) / 255 if float(rgb_values[0].strip()) > 1 else float(rgb_values[0].strip())
-                                            g = float(rgb_values[1].strip()) / 255 if float(rgb_values[1].strip()) > 1 else float(rgb_values[1].strip())
-                                            b = float(rgb_values[2].strip()) / 255 if float(rgb_values[2].strip()) > 1 else float(rgb_values[2].strip())
-                                            rgba_color = f'rgba({r:.3f}, {g:.3f}, {b:.3f}, 0.2)'
-                                        else:
-                                            rgba_color = f'rgba(0, 0, 0, 0.2)'  # Default as fallback
-                                    else:
-                                        # For any other format, use a default transparency
-                                        rgba_color = f'{color.split(")")[0]}, 0.2)' if ')' in color else f'rgba(0, 0, 0, 0.2)'
-                                
-                                fig.add_trace(go.Scatter(
-                                    x=dates + dates[::-1],  # Forward then backwards
-                                    y=upper_bounds + lower_bounds[::-1],  # Upper then lower bounds
-                                    fill='toself',
-                                    fillcolor=rgba_color,
-                                    line=dict(color='rgba(0,0,0,0)'),
-                                    hoverinfo="skip",
-                                    showlegend=False
-                                ))
-                            
-                            # Update layout
-                            fig.update_layout(
-                                title=f"Variant Proportion Estimates",
-                                xaxis_title="Date",
-                                yaxis_title="Estimated Proportion",
-                                yaxis=dict(
-                                    tickformat='.0%',  # Format as percentage
-                                    range=[0, 1]
-                                ),
-                                legend_title="Variants",
-                                height=500,
-                                template="plotly_white",
-                                hovermode="x unified"
+                                    rgba_color = f'rgba(0, 0, 0, 0.2)'  # Default as fallback
+                            else:
+                                # For any other format, use a default transparency
+                                rgba_color = f'{color.split(")")[0]}, 0.2)' if ')' in color else f'rgba(0, 0, 0, 0.2)'
+                        
+                        fig.add_trace(go.Scatter(
+                            x=dates + dates[::-1],  # Forward then backwards
+                            y=upper_bounds + lower_bounds[::-1],  # Upper then lower bounds
+                            fill='toself',
+                            fillcolor=rgba_color,
+                            line=dict(color='rgba(0,0,0,0)'),
+                            hoverinfo="skip",
+                            showlegend=False
+                        ))
+                    
+                    # Update layout
+                    fig.update_layout(
+                        title=f"Variant Proportion Estimates",
+                        xaxis_title="Date",
+                        yaxis_title="Estimated Proportion",
+                        yaxis=dict(
+                            tickformat='.0%',  # Format as percentage
+                            range=[0, 1]
+                        ),
+                        legend_title="Variants",
+                        height=500,
+                        template="plotly_white",
+                        hovermode="x unified"
+                    )
+                    
+                    # Display the plot
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    
+                    # Optionally add CSV download for the timeseries data
+                    st.write("Download variant timeseries data:")
+                    
+                    # Prepare data for CSV export
+                    all_variant_data = []
+                    for variant_name, variant_data in variants_data.items():
+                        for point in variant_data.get('timeseriesSummary', []):
+                            all_variant_data.append({
+                                'variant': variant_name,
+                                'date': point['date'],
+                                'proportion': point['proportion'],
+                                'proportionLower': point.get('proportionLower', ''),
+                                'proportionUpper': point.get('proportionUpper', '')
+                            })
+                    
+                    if all_variant_data:
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            csv_data = pd.DataFrame(all_variant_data).to_csv(index=False)
+                            st.download_button(
+                                label="Download Results as CSV",
+                                data=csv_data,
+                                file_name='deconvolution_results.csv',
+                                mime='text/csv',
                             )
-                            
-                            # Display the plot
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            
-                            # Optionally add CSV download for the timeseries data
-                            st.write("Download variant timeseries data:")
-                            
-                            # Prepare data for CSV export
-                            all_variant_data = []
-                            for variant_name, variant_data in variants_data.items():
-                                for point in variant_data.get('timeseriesSummary', []):
-                                    all_variant_data.append({
-                                        'variant': variant_name,
-                                        'date': point['date'],
-                                        'proportion': point['proportion'],
-                                        'proportionLower': point.get('proportionLower', ''),
-                                        'proportionUpper': point.get('proportionUpper', '')
-                                    })
-                            
-                            if all_variant_data:
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                        csv_data = pd.DataFrame(all_variant_data).to_csv(index=False)
-                                        st.download_button(
-                                            label="Download Results as CSV",
-                                            data=csv_data,
-                                            file_name='deconvolution_results.csv',
-                                            mime='text/csv',
-                                        )
-                                with col2:
-                                    # Add download button for the JSON data
-                                    json_data = json.dumps(result_data, indent=2)
-                                    st.download_button(
-                                        label="Download Results as JSON",
-                                        data=json_data,
-                                        file_name='deconvolution_results.json',
-                                        mime='application/json',
-                                    )
-                        else:
-                            st.warning("No results data available to visualize.")
-                    else:
-                        # Check task status with spinner
-                        with st.spinner("Checking deconvolution task status..."):
-                            # First check if the task is completed
+                        with col2:
+                            # Add download button for the JSON data
+                            json_data = json.dumps(result_data, indent=2)
+                            st.download_button(
+                                label="Download Results as JSON",
+                                data=json_data,
+                                file_name='deconvolution_results.json',
+                                mime='application/json',
+                            )
+                else:
+                    st.warning("No results data available to visualize.")
+            else:
+                # Check task status with spinner
+                with st.spinner("Checking analysis task status..."):
+                    # First check if the task is completed
+                    task = celery_app.AsyncResult(task_id)
+                    if task.ready():
+                        try:
+                            # Task is complete - get the result and store it
+                            result = task.get()
+                            st.session_state.analysis_result = result
+                            st.success("Analysis completed!")
+                            # Rerun to show the visualization immediately
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error retrieving result: {str(e)}")
+
+                        
+                    
+                    # If task is not ready yet, show progress
+                    progress_key = f"task_progress:{task_id}"
+                    progress_data = redis_client.get(progress_key)
+                    
+                    if progress_data:
+                        # Parse progress data from Redis
+                        progress_info = json.loads(progress_data) # type: ignore
+                        # ignore as redis 5.0.1 typing sucks, see https://github.com/redis/redis-py/issues/2933
+                        current = progress_info.get('current', 0)
+                        total = progress_info.get('total', 1) 
+                        status = progress_info.get('status', 'Processing...')
+                        
+                        # Display progress bar
+                        st.progress(current / total)
+                        st.write(f"Status: {status}")
+            
+                st.write("You can check if the analysis task has completed.")
+                
+                # Add information about auto-refresh
+                st.write("""
+                The page will automatically check for results every 5 seconds.
+                You can also manually check if the results are ready using the button below.
+                """)
+                
+                # Import the streamlit-autorefresh component
+                from streamlit_autorefresh import st_autorefresh
+                
+                # Set up auto-refresh every 5 seconds (5000 ms)
+                # This will automatically rerun the app without showing a countdown
+                st_autorefresh(interval=5000, key="autorefresh")
+                
+                # Check result button
+                check_col1, check_col2 = st.columns([1, 3])
+                with check_col1:
+                    if st.button("Check Result"):
+                        with st.spinner('Checking if results are ready...'):
                             task = celery_app.AsyncResult(task_id)
                             if task.ready():
                                 try:
-                                    # Task is complete - get the result and store it
                                     result = task.get()
-                                    st.session_state.deconv_result = result
-                                    st.success("Deconvolution completed!")
-                                    # Rerun to show the visualization immediately
+                                    st.session_state.analysis_result = result
+                                    st.success("Analysis completed!")
+                                    # The visualization will be shown on the next rerun
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Error retrieving result: {str(e)}")
-                            
-                            # If task is not ready yet, show progress
-                            progress_key = f"task_progress:{task_id}"
-                            progress_data = redis_client.get(progress_key)
-                            
-                            if progress_data:
-                                # Parse progress data from Redis
-                                progress_info = json.loads(progress_data) # type: ignore
-                                # ignore as redis 5.0.1 typing sucks, see https://github.com/redis/redis-py/issues/2933
-                                current = progress_info.get('current', 0)
-                                total = progress_info.get('total', 1) 
-                                status = progress_info.get('status', 'Processing...')
-                                
-                                # Display progress bar
-                                st.progress(current / total)
-                                st.write(f"Status: {status}")
-                        
-                        st.write("You can check if the deconvolution task has completed.")
-                        
-                        # Add information about auto-refresh
-                        st.write("""
-                        The page will automatically check for results every 5 seconds.
-                        You can also manually check if the results are ready using the button below.
-                        """)
-                        
-                        # Import the streamlit-autorefresh component
-                        from streamlit_autorefresh import st_autorefresh
-                        
-                        # Set up auto-refresh every 5 seconds (5000 ms)
-                        # This will automatically rerun the app without showing a countdown
-                        st_autorefresh(interval=5000, key="autorefresh")
-                        
-                        # Check result button
-                        check_col1, check_col2 = st.columns([1, 3])
-                        with check_col1:
-                            if st.button("Check Result"):
-                                with st.spinner('Checking if results are ready...'):
-                                    task = celery_app.AsyncResult(task_id)
-                                    if task.ready():
-                                        try:
-                                            result = task.get()
-                                            st.session_state.deconv_result = result
-                                            st.success("Deconvolution completed!")
-                                            # The visualization will be shown on the next rerun
-                                            st.rerun()
-                                        except Exception as e:
-                                            st.error(f"Error retrieving result: {str(e)}")
-                                    else:
-                                        st.info("Task is still running. Please check again later.")
+                            else:
+                                st.info("Task is still running. Please check again later.")
+        else:
+            # No task has been started yet
+            if st.session_state.counts_df3d is None:
+                st.info("Run the complete analysis above to see results here.")
+            else:
+                st.info("Data has been fetched. Run the complete analysis to estimate variant abundances.")
             
 if __name__ == "__main__":
     app()

@@ -51,7 +51,7 @@ class AbundanceEstimatorState:
             selected_curated = st.session_state.ui_selected_curated_names
             if selected_curated:
                 try:
-                    from subpages.abundance_estimator import cached_get_variant_list
+                    from subpages.abundance import cached_get_variant_list
                     curated_variants = cached_get_variant_list().variants
                     curated_variant_map = {v.name: v for v in curated_variants}
                     
@@ -116,7 +116,7 @@ class AbundanceEstimatorState:
         This method dynamically constructs a VariantList from the variant registry,
         eliminating the need for redundant storage.
         """
-        from subpages.abundance_estimator import Variant, VariantList
+        from subpages.abundance import Variant, VariantList
         
         # Create a new VariantList instance
         combined_variants = VariantList()
