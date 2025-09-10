@@ -921,9 +921,9 @@ def app():
                 
                 # Show information about the analysis scope
                 if len(selected_locations) > 1:
-                    st.info(f"🌍 Running analysis for {len(selected_locations)} locations: {', '.join(selected_locations)}")
+                    st.info(f"Running analysis for {len(selected_locations)} locations: {', '.join(selected_locations)}")
                 else:
-                    st.info(f"📍 Running analysis for location: {selected_locations[0]}")
+                    st.info(f"Running analysis for location: {selected_locations[0]}")
                 
                 # Get the latest mutation list
                 mutations = matrix_df["Mutation"].tolist()
