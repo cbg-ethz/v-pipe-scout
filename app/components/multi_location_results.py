@@ -71,90 +71,7 @@ def render_single_location_result(location: str, result_data: Any) -> None:
         st.warning("No results data available to visualize.")
         return
     
-    # Debug: Show the structure of result_data
-    with st.expander(f"🔍 Debug: Result data structure for {location}", expanded=False):
-        st.write("**Result data type:**", str(type(result_data).__name__))
-        
-        if isinstance(result_data, dict):
-            st.write("**Top-level keys:**", list(result_data.keys()))
-            st.write("**Number of top-level keys:**", len(result_data))
-            
-            # Check if this is location-nested data (has location as key)
-            if location in result_data:
-                st.success(f"✅ Found location-nested structure for '{location}'")
-                location_data = result_data[location]
-            elif "location" in result_data:
-                st.info(f"✅ Found generic 'location' key structure")
-                location_data = result_data["location"]
-                st.write(f"**Data under 'location' key for {location}:**")
-            else:
-                st.info("**Checking for direct variant structure (no location nesting)**")
-                location_data = result_data
-            
-            # Now analyze the location_data
-            if isinstance(location_data, dict):
-                variant_names = list(location_data.keys())
-                st.write(f"**Variant keys found:**", variant_names)
-                st.write(f"**Number of variants:**", len(variant_names))
-                
-                # Check if these look like variant names
-                variant_like_keys = []
-                for key in variant_names:
-                    if isinstance(key, str) and (
-                        '.' in key or  # KP.2, BA.5.1
-                        key.startswith(('XEC', 'XFG', 'BA.', 'BQ.', 'XBB.', 'KP.', 'LP.', 'NB.')) or
-                        key in ['undetermined']
-                    ):
-                        variant_like_keys.append(key)
-                
-                if variant_like_keys:
-                    st.success(f"✅ Found {len(variant_like_keys)} variant-like keys: {variant_like_keys}")
-                    
-                    # Examine sample variant
-                    sample_variant = variant_like_keys[0]
-                    sample_data = location_data[sample_variant]
-                    st.write(f"**Sample variant '{sample_variant}' structure:**")
-                    if isinstance(sample_data, dict):
-                        st.write(f"  - Keys: {list(sample_data.keys())}")
-                        
-                        # Check for timeseries data
-                        timeseries_found = False
-                        for ts_key in ['timeseriesSummary', 'timeseries', 'time_series']:
-                            if ts_key in sample_data:
-                                ts_data = sample_data[ts_key]
-                                if isinstance(ts_data, list):
-                                    st.success(f"  - ✅ Found timeseries under '{ts_key}': {len(ts_data)} time points")
-                                    if ts_data:
-                                        sample_point = ts_data[0]
-                                        if isinstance(sample_point, dict):
-                                            st.write(f"  - Sample time point keys: {list(sample_point.keys())}")
-                                    timeseries_found = True
-                                    break
-                        
-                        if not timeseries_found:
-                            st.warning(f"  - ⚠️ No timeseries data found in sample variant")
-                    else:
-                        st.write(f"  - Type: {type(sample_data)}")
-                else:
-                    st.warning("❌ No obvious variant-like keys found")
-                    st.write("**All keys:**", variant_names)
-                    
-                    # Show sample of first key anyway
-                    if variant_names:
-                        first_key = variant_names[0]
-                        first_data = location_data[first_key]
-                        st.write(f"**Sample key '{first_key}' structure:**")
-                        if isinstance(first_data, dict):
-                            st.write(f"  - Keys: {list(first_data.keys())}")
-                        else:
-                            st.write(f"  - Type: {type(first_data)}")
-                            st.write(f"  - Value: {str(first_data)[:100]}...")
-            else:
-                st.error(f"Location data is not a dictionary: {type(location_data)}")
-        else:
-            st.error(f"Result data is not a dictionary: {type(result_data)}")
-            st.write("**Raw result preview:**", str(result_data)[:200] + "..." if len(str(result_data)) > 200 else str(result_data))
-
+   
 
     # Extract variants data based on the actual structure we see
     variants_data = None
@@ -187,14 +104,14 @@ def render_single_location_result(location: str, result_data: Any) -> None:
                 variants_data = result_data
                 st.info(f"✅ Using direct variants data structure with {len(variants_data)} variants")
             else:
-                # Try looking for nested location data
+                # Try looking for nested location data (prefer actual location name)
                 if location in result_data:
                     variants_data = result_data[location]
                     st.info(f"✅ Found location-nested data for {location}")
                 elif "location" in result_data:
-                    # Handle generic "location" key structure
+                    # Handle generic "location" key structure (legacy)
                     variants_data = result_data["location"]
-                    st.info(f"✅ Found data under generic 'location' key for {location}")
+                    st.warning(f"⚠️ Using generic 'location' key for {location} (legacy structure)")
                 else:
                     # Fall back to treating as variants data anyway
                     variants_data = result_data
@@ -629,11 +546,11 @@ def render_combined_download_options(location_results: Dict[str, Any]) -> None:
     for location, result_data in location_results.items():
         # Handle different result data structures
         if isinstance(result_data, dict):
-            # Check if result_data has location as a key (nested structure)
+            # Check if result_data has location as a key (prefer actual location name)
             if location in result_data:
                 variants_data = result_data[location]
             elif "location" in result_data:
-                # Handle generic "location" key structure
+                # Handle generic "location" key structure (legacy)
                 variants_data = result_data["location"]
             else:
                 # Result data directly contains variants

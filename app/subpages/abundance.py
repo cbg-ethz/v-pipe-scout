@@ -912,7 +912,7 @@ def app():
                 st.rerun()  # Rerun to show the parameters and Run Analysis button
         else:
             # Only show Run Analysis button if we don't have results yet
-            if st.button("🚀 Run Complete Analysis", help="Fetch data and estimate variant abundances", type="primary"):
+            if st.button("Run Complete Analysis", help="Fetch data and estimate variant abundances", type="primary"):
                 # Validate inputs
                 if not selected_locations:
                     st.error("Please select at least one location. Unable to fetch data without selecting a location.")
@@ -986,7 +986,8 @@ def app():
                                     kwargs={
                                         'mutation_counts_df': counts_pickle,
                                         'mutation_variant_matrix_df': matrix_pickle,
-                                        'bootstraps': bootstraps
+                                        'bootstraps': bootstraps,
+                                        'location_name': location  # Add location name
                                     }
                                 )
                                 
