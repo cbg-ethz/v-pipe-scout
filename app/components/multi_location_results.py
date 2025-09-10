@@ -354,8 +354,9 @@ def create_variant_plot(variants_data: Dict[str, Any], location: str) -> Optiona
                 mode='lines+markers',
                 line=dict(color=color, width=2),
                 name=variant_name,
+                customdata=list(zip(lower_bounds, upper_bounds)),  # Pass confidence intervals as custom data
                 hovertemplate=f'<b>{variant_name}</b><br>' +
-                             'Proportion: %{y:.1%}<extra></extra>'
+                             '%{y:.1%} [%{customdata[0]:.1%}, %{customdata[1]:.1%}]<extra></extra>'
             ))
             
             # Add shaded confidence interval if we have different upper/lower bounds
