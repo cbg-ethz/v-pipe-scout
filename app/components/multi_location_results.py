@@ -85,16 +85,7 @@ def render_single_location_result(location: str, result_data: Any) -> None:
         if fig:
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.warning("⚠️ Could not create plot - no valid time series data found")
-            
-            # Additional debugging for plot creation failure
-            st.write("**Debugging plot creation:**")
-            for variant_name, variant_data in list(variants_data.items())[:3]:  # Show first 3
-                if isinstance(variant_data, dict):
-                    st.write(f"- **{variant_name}**: {list(variant_data.keys())}")
-                else:
-                    st.write(f"- **{variant_name}**: {type(variant_data)}")
-                    
+            st.warning("⚠️ Could not create plot - no valid time series data found")           
     except Exception as e:
         st.error(f"❌ Error creating plot: {str(e)}")
         return
@@ -123,15 +114,6 @@ def render_location_progress(location: str, task_id: str, celery_app, redis_clie
         if task.ready():
             try:
                 result = task.get()
-                
-                # DEBUG: Log the raw result structure for understanding
-                logger.info(f"Raw deconvolution result for {location}: type={type(result)}")
-                if isinstance(result, dict):
-                    logger.info(f"Result keys: {list(result.keys())}")
-                    # Log first few characters of each key's value
-                    for key, value in list(result.items())[:3]:
-                        logger.info(f"  {key}: {type(value)} - {str(value)[:100]}...")
-                
                 # Store result in session state
                 st.session_state.location_results[location] = result
                 st.success(f"Analysis completed for {location}!")
@@ -288,9 +270,6 @@ def create_variant_plot(variants_data: Dict[str, Any], location: str) -> Optiona
                     upper_val = point.get('proportionUpper', point.get('upper', point.get('Upper', prop_val)))
                     lower_bounds.append(float(lower_val))
                     upper_bounds.append(float(upper_val))
-                    
-                    if j == 0:  # Log the first successful point for debugging
-                        logger.info(f"Successfully parsed first point for {variant_name}: date='{date_val}' ({date_key_found}), proportion={prop_val} ({prop_key_found})")
                     
                 except (ValueError, TypeError) as e:
                     logger.warning(f"Error parsing data point {j} for {variant_name}: {e} (date='{date_val}', prop='{prop_val}')")
@@ -616,53 +595,5 @@ def render_combined_download_options(location_results: Dict[str, Any]) -> None:
                 key="combined_json_download",
                 help="Complete nested JSON structure with all results"
             )
-        
-        # Show data preview
-        with st.expander("📋 Preview Combined Data Structure"):
-            st.caption(f"First 10 rows of {total_rows} total data points")
-            st.dataframe(df_summary.head(10), use_container_width=True)
     else:
         st.warning("No data available for combined download")
-
-
-def render_combined_results_summary(location_results: Dict[str, Any]) -> None:
-    """
-    Render a summary view of all completed location results.
-    
-    Args:
-        location_results: Dictionary of location -> result data
-    """
-    if not location_results:
-        return
-    
-    st.subheader("Combined Results Summary")
-    
-    # Create summary metrics
-    total_locations = len(location_results)
-    total_variants = set()
-    
-    for location, result_data in location_results.items():
-        if isinstance(result_data, dict):
-            if location in result_data:
-                variants_data = result_data[location]
-            elif "location" in result_data:
-                variants_data = result_data["location"]
-            else:
-                variants_data = result_data
-        else:
-            variants_data = result_data
-        
-        if isinstance(variants_data, dict):
-            total_variants.update(variants_data.keys())
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Locations Analyzed", total_locations)
-    with col2:
-        st.metric("Unique Variants", len(total_variants))
-    with col3:
-        st.metric("Total Results", sum(
-            len(variants_data) if isinstance(variants_data, dict) else 0 
-            for result_data in location_results.values()
-            for variants_data in [result_data.get(list(result_data.keys())[0], result_data) if isinstance(result_data, dict) and len(result_data) == 1 else result_data]
-        ))
