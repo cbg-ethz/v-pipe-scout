@@ -1092,7 +1092,7 @@ def app():
         # Check if we have any location tasks
         if st.session_state.location_tasks:
             # Import and render the multi-location results component
-            from components.multi_location_results import render_location_results_tabs, render_combined_results_summary
+            from components.multi_location_results import render_location_results_tabs
             
             render_location_results_tabs(
                 st.session_state.location_tasks,
@@ -1121,9 +1121,6 @@ def app():
             else:
                 st.success("All locations have completed analysis!")
                 
-                # Show combined results summary
-                if st.session_state.location_results:
-                    render_combined_results_summary(st.session_state.location_results)
                     
         else:
             # No tasks have been started yet

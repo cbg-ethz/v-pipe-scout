@@ -84,7 +84,7 @@ async def fetch_multi_location_data(
             )
             
             if result is not None and not result.empty:
-                location_progress[location].success(f"✅ {location}: {len(result)} records retrieved")
+                location_progress[location].success(f"✅ {location}: records retrieved")
                 return location, result
             else:
                 location_progress[location].warning(f"⚠️ {location}: No data found")
@@ -185,45 +185,3 @@ def validate_location_data(location_data: Dict[str, pd.DataFrame]) -> Dict[str, 
         cleaned_data[location] = df
     
     return cleaned_data
-
-
-def get_location_data_summary(location_data: Dict[str, pd.DataFrame]) -> Dict[str, Dict]:
-    """
-    Generate summary statistics for location data.
-    
-    Args:
-        location_data: Dictionary of location -> DataFrame
-        
-    Returns:
-        Dictionary with summary stats for each location
-    """
-    summary = {}
-    
-    for location, df in location_data.items():
-        if df is None or df.empty:
-            summary[location] = {
-                'record_count': 0,
-                'date_range': None,
-                'mutations_count': 0,
-                'total_coverage': 0
-            }
-            continue
-        
-        # Extract date information from MultiIndex if present
-        if isinstance(df.index, pd.MultiIndex):
-            # Assuming index levels are (mutation, sampling_date)
-            dates = df.index.get_level_values('sampling_date')
-            mutations = df.index.get_level_values(0).unique()  # First level should be mutations
-        else:
-            dates = df.index if df.index.dtype.kind == 'M' else pd.to_datetime(df.index)
-            mutations = df.columns if 'mutation' not in df.columns else df['mutation'].unique()
-        
-        summary[location] = {
-            'record_count': len(df),
-            'date_range': (dates.min(), dates.max()) if len(dates) > 0 else None,
-            'mutations_count': len(mutations),
-            'total_coverage': df['coverage'].sum() if 'coverage' in df.columns else 0,
-            'avg_coverage': df['coverage'].mean() if 'coverage' in df.columns else 0
-        }
-    
-    return summary
