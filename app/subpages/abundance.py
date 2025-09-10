@@ -974,7 +974,7 @@ def app():
                             st.session_state.location_tasks = {}
                             
                             for location, location_counts_df in st.session_state.location_data.items():
-                                st.write(f"🚀 Starting deconvolution for {location}...")
+                                st.write(f"Starting deconvolution for {location}...")
                                 
                                 # Convert DataFrames to base64-encoded pickle strings for serialization
                                 counts_pickle = base64.b64encode(pickle.dumps(location_counts_df)).decode('utf-8')
@@ -1004,19 +1004,6 @@ def app():
         if st.session_state.location_data:
             with st.expander("📥 Download Raw Data", expanded=False):
                 st.write("Download the fetched mutation counts and coverage data:")
-                
-                # Debug information
-                with st.expander("🔍 Debug: Location Data Info", expanded=False):
-                    st.write(f"Total locations in session: {len(st.session_state.location_data)}")
-                    for loc_name, loc_data in st.session_state.location_data.items():
-                        if loc_data is not None:
-                            st.write(f"- {loc_name}: {type(loc_data)} with shape {getattr(loc_data, 'shape', 'Unknown')}")
-                            if hasattr(loc_data, 'empty'):
-                                st.write(f"  Empty: {loc_data.empty}")
-                            if hasattr(loc_data, 'columns'):
-                                st.write(f"  Columns: {list(loc_data.columns)}")
-                        else:
-                            st.write(f"- {loc_name}: None (no data)")
                 
                 if len(st.session_state.location_data) == 1:
                     # Single location - show simple download
@@ -1140,7 +1127,7 @@ def app():
                 from streamlit_autorefresh import st_autorefresh
                 st_autorefresh(interval=5000, key="multi_location_autorefresh")
             else:
-                st.success("🎉 All locations have completed analysis!")
+                st.success("All locations have completed analysis!")
                 
                 # Show combined results summary
                 if st.session_state.location_results:

@@ -65,7 +65,7 @@ def render_single_location_result(location: str, result_data: Any) -> None:
         location: Location name
         result_data: Analysis results for the location
     """
-    st.success(f"🎉 Analysis completed for {location}!")
+    st.success(f"Analysis completed for {location}!")
     
     if not result_data or len(result_data) == 0:
         st.warning("No results data available to visualize.")
@@ -73,29 +73,89 @@ def render_single_location_result(location: str, result_data: Any) -> None:
     
     # Debug: Show the structure of result_data
     with st.expander(f"🔍 Debug: Result data structure for {location}", expanded=False):
-        st.write("**Result data type:**", type(result_data))
-        if isinstance(result_data, dict):
-            st.write("**Keys in result_data:**", list(result_data.keys()))
-            if len(result_data) > 0:
-                first_key = list(result_data.keys())[0]
-                st.write(f"**Sample value type for '{first_key}':**", type(result_data[first_key]))
-                if isinstance(result_data[first_key], dict):
-                    st.write(f"**Sample value keys:**", list(result_data[first_key].keys()))
+        st.write("**Result data type:**", str(type(result_data).__name__))
         
-        # Don't try to display full JSON if it's too large
-        try:
-            json_str = json.dumps(result_data, indent=2)
-            if len(json_str) < 5000:  # Only show if reasonable size
-                st.json(result_data)
+        if isinstance(result_data, dict):
+            st.write("**Top-level keys:**", list(result_data.keys()))
+            st.write("**Number of top-level keys:**", len(result_data))
+            
+            # Check if this is location-nested data (has location as key)
+            if location in result_data:
+                st.success(f"✅ Found location-nested structure for '{location}'")
+                location_data = result_data[location]
+            elif "location" in result_data:
+                st.info(f"✅ Found generic 'location' key structure")
+                location_data = result_data["location"]
+                st.write(f"**Data under 'location' key for {location}:**")
             else:
-                st.write("**Data size:**", f"{len(json_str)} characters (too large to display)")
-                # Show just the structure with first few items
-                if isinstance(result_data, dict):
-                    sample_keys = list(result_data.keys())[:3]
-                    st.write(f"**Sample keys (first 3):**", sample_keys)
-        except Exception as e:
-            st.write("**JSON serialization error:**", str(e))
-    
+                st.info("**Checking for direct variant structure (no location nesting)**")
+                location_data = result_data
+            
+            # Now analyze the location_data
+            if isinstance(location_data, dict):
+                variant_names = list(location_data.keys())
+                st.write(f"**Variant keys found:**", variant_names)
+                st.write(f"**Number of variants:**", len(variant_names))
+                
+                # Check if these look like variant names
+                variant_like_keys = []
+                for key in variant_names:
+                    if isinstance(key, str) and (
+                        '.' in key or  # KP.2, BA.5.1
+                        key.startswith(('XEC', 'XFG', 'BA.', 'BQ.', 'XBB.', 'KP.', 'LP.', 'NB.')) or
+                        key in ['undetermined']
+                    ):
+                        variant_like_keys.append(key)
+                
+                if variant_like_keys:
+                    st.success(f"✅ Found {len(variant_like_keys)} variant-like keys: {variant_like_keys}")
+                    
+                    # Examine sample variant
+                    sample_variant = variant_like_keys[0]
+                    sample_data = location_data[sample_variant]
+                    st.write(f"**Sample variant '{sample_variant}' structure:**")
+                    if isinstance(sample_data, dict):
+                        st.write(f"  - Keys: {list(sample_data.keys())}")
+                        
+                        # Check for timeseries data
+                        timeseries_found = False
+                        for ts_key in ['timeseriesSummary', 'timeseries', 'time_series']:
+                            if ts_key in sample_data:
+                                ts_data = sample_data[ts_key]
+                                if isinstance(ts_data, list):
+                                    st.success(f"  - ✅ Found timeseries under '{ts_key}': {len(ts_data)} time points")
+                                    if ts_data:
+                                        sample_point = ts_data[0]
+                                        if isinstance(sample_point, dict):
+                                            st.write(f"  - Sample time point keys: {list(sample_point.keys())}")
+                                    timeseries_found = True
+                                    break
+                        
+                        if not timeseries_found:
+                            st.warning(f"  - ⚠️ No timeseries data found in sample variant")
+                    else:
+                        st.write(f"  - Type: {type(sample_data)}")
+                else:
+                    st.warning("❌ No obvious variant-like keys found")
+                    st.write("**All keys:**", variant_names)
+                    
+                    # Show sample of first key anyway
+                    if variant_names:
+                        first_key = variant_names[0]
+                        first_data = location_data[first_key]
+                        st.write(f"**Sample key '{first_key}' structure:**")
+                        if isinstance(first_data, dict):
+                            st.write(f"  - Keys: {list(first_data.keys())}")
+                        else:
+                            st.write(f"  - Type: {type(first_data)}")
+                            st.write(f"  - Value: {str(first_data)[:100]}...")
+            else:
+                st.error(f"Location data is not a dictionary: {type(location_data)}")
+        else:
+            st.error(f"Result data is not a dictionary: {type(result_data)}")
+            st.write("**Raw result preview:**", str(result_data)[:200] + "..." if len(str(result_data)) > 200 else str(result_data))
+
+
     # Extract variants data based on the actual structure we see
     variants_data = None
     
@@ -131,6 +191,10 @@ def render_single_location_result(location: str, result_data: Any) -> None:
                 if location in result_data:
                     variants_data = result_data[location]
                     st.info(f"✅ Found location-nested data for {location}")
+                elif "location" in result_data:
+                    # Handle generic "location" key structure
+                    variants_data = result_data["location"]
+                    st.info(f"✅ Found data under generic 'location' key for {location}")
                 else:
                     # Fall back to treating as variants data anyway
                     variants_data = result_data
@@ -185,6 +249,15 @@ def render_location_progress(location: str, task_id: str, celery_app, redis_clie
         if task.ready():
             try:
                 result = task.get()
+                
+                # DEBUG: Log the raw result structure for understanding
+                logger.info(f"Raw deconvolution result for {location}: type={type(result)}")
+                if isinstance(result, dict):
+                    logger.info(f"Result keys: {list(result.keys())}")
+                    # Log first few characters of each key's value
+                    for key, value in list(result.items())[:3]:
+                        logger.info(f"  {key}: {type(value)} - {str(value)[:100]}...")
+                
                 # Store result in session state
                 st.session_state.location_results[location] = result
                 st.success(f"Analysis completed for {location}!")
@@ -559,6 +632,9 @@ def render_combined_download_options(location_results: Dict[str, Any]) -> None:
             # Check if result_data has location as a key (nested structure)
             if location in result_data:
                 variants_data = result_data[location]
+            elif "location" in result_data:
+                # Handle generic "location" key structure
+                variants_data = result_data["location"]
             else:
                 # Result data directly contains variants
                 variants_data = result_data
@@ -692,8 +768,13 @@ def render_combined_results_summary(location_results: Dict[str, Any]) -> None:
     total_variants = set()
     
     for location, result_data in location_results.items():
-        if isinstance(result_data, dict) and location in result_data:
-            variants_data = result_data[location]
+        if isinstance(result_data, dict):
+            if location in result_data:
+                variants_data = result_data[location]
+            elif "location" in result_data:
+                variants_data = result_data["location"]
+            else:
+                variants_data = result_data
         else:
             variants_data = result_data
         
