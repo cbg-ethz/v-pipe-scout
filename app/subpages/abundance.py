@@ -942,12 +942,6 @@ def app():
                         # Import the new multi-location utility
                         from utils.multi_location import fetch_multi_location_data
                         
-                        # Show information about the analysis scope
-                        if len(selected_locations) > 1:
-                            st.info(f"🌍 Running parallel analysis for {len(selected_locations)} locations: {', '.join(selected_locations)}")
-                        else:
-                            st.info(f"📍 Running analysis for location: {selected_locations[0]}")
-                        
                         # Fetch data for all locations (parallel or single)
                         st.session_state.location_data = asyncio.run(fetch_multi_location_data(
                             wiseLoculus,
@@ -993,7 +987,7 @@ def app():
                                 
                                 # Store task ID for this location
                                 st.session_state.location_tasks[location] = task.id
-                                st.success(f"✅ Analysis started for {location}! Task ID: {task.id}")
+                                st.success(f"✅ Analysis started for {location}!")
                             
                             # Task submission completed for all locations
                             

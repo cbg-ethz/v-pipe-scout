@@ -70,53 +70,10 @@ def render_single_location_result(location: str, result_data: Any) -> None:
     if not result_data or len(result_data) == 0:
         st.warning("No results data available to visualize.")
         return
-    
-   
-
     # Extract variants data based on the actual structure we see
     variants_data = None
-    
-    if isinstance(result_data, dict):
-        # The result_data appears to be directly the variants data
-        # where keys are variant names like "KP.2", "KP.3", etc.
-        
-        # Check if this looks like variants data by examining the structure
-        sample_key = list(result_data.keys())[0] if result_data else None
-        if sample_key and isinstance(result_data[sample_key], dict):
-            sample_variant_data = result_data[sample_key]
-            
-            # Look for typical deconvolution result fields
-            has_timeseries = any(key in sample_variant_data for key in [
-                'timeseriesSummary', 'timeseries', 'time_series', 'summary'
-            ])
-            
-            # Check if the keys look like variant names (not nested structure keys)
-            variant_name_pattern = any(
-                key for key in result_data.keys() 
-                if isinstance(key, str) and (
-                    '.' in key or  # KP.2, NB.1.8.1
-                    key.startswith(('XEC', 'XFG', 'BA.', 'BQ.', 'XBB.', 'KP.', 'LP.', 'NB.')) or
-                    key in ['undetermined']
-                )
-            )
-            
-            if has_timeseries or variant_name_pattern:
-                variants_data = result_data
-                st.info(f"✅ Using direct variants data structure with {len(variants_data)} variants")
-            else:
-                # Try looking for nested location data (prefer actual location name)
-                if location in result_data:
-                    variants_data = result_data[location]
-                    st.info(f"✅ Found location-nested data for {location}")
-                elif "location" in result_data:
-                    # Handle generic "location" key structure (legacy)
-                    variants_data = result_data["location"]
-                    st.warning(f"⚠️ Using generic 'location' key for {location} (legacy structure)")
-                else:
-                    # Fall back to treating as variants data anyway
-                    variants_data = result_data
-                    st.warning(f"⚠️ Using result_data as variants data (fallback)")
-    
+    if location in result_data:
+        variants_data = result_data[location]
     if not variants_data:
         st.error(f"❌ Could not extract variants data from result for {location}")
         st.write("**Available keys in result_data:**", list(result_data.keys()) if isinstance(result_data, dict) else "Not a dictionary")
