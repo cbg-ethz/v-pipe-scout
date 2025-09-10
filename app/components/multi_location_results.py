@@ -355,7 +355,6 @@ def create_variant_plot(variants_data: Dict[str, Any], location: str) -> Optiona
                 line=dict(color=color, width=2),
                 name=variant_name,
                 hovertemplate=f'<b>{variant_name}</b><br>' +
-                             'Date: %{x}<br>' +
                              'Proportion: %{y:.1%}<extra></extra>'
             ))
             
