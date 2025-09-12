@@ -483,15 +483,20 @@ def app():
         registered_variants = AbundanceEstimatorState.get_registered_variants()
         if registered_variants:
             for variant_name, variant_data in registered_variants.items():
-                col1, col2, col3 = st.columns([2, 1, 3])
-                with col1:
-                    st.write(f"**{variant_name}**")
-                with col2:
-                    # Display the source as a nicely formatted string
+                try:
+                    col1, col2, col3 = st.columns([2, 1, 3])
+                    with col1:
+                        st.write(f"**{variant_name}**")
+                    with col2:
+                        # Display the source as a nicely formatted string
+                        source_display = variant_data['source'].value.replace('_', ' ').title()
+                        st.write(f"*{source_display}*")
+                    with col3:
+                        st.write(f"{len(variant_data['signature_mutations'])} mutations")
+                except (ValueError, TypeError):
+                    # Fallback for test environments where st.columns might not work properly
                     source_display = variant_data['source'].value.replace('_', ' ').title()
-                    st.write(f"*{source_display}*")
-                with col3:
-                    st.write(f"{len(variant_data['signature_mutations'])} mutations")
+                    st.write(f"**{variant_name}** - *{source_display}* - {len(variant_data['signature_mutations'])} mutations")
         else:
             st.write("No custom variants registered")
         
