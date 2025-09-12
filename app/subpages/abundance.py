@@ -872,6 +872,35 @@ def app():
             )
             
             bootstraps = bootstrap_options[selected_option]
+
+            # Bandwidth parameter for gaussian kernel smoothing
+            bandwidth_options = {
+                "Narrow (1-2 month timeframe)": 10,
+                "Medium (2+ month timeframe)": 20,  
+                "Wide (>3 month timeframe)": 30,
+            }
+            
+            selected_bandwidth_option = st.radio(
+                "Bandwidth (Gaussian Kernel Smoothing)",
+                options=list(bandwidth_options.keys()),
+                index=1,  # Default to "Medium" (20)
+                help="Controls the smoothing applied to time series data. Narrow bandwidth preserves short-term variations (1-2 months), wide bandwidth smooths long-term trends (3+ months). Choose based on your timeframe and number of data points."
+            )
+            
+            bandwidth = bandwidth_options[selected_bandwidth_option]
+            
+            # Show the actual bandwidth value selected
+            st.caption(f"Selected: Bandwidth = {bandwidth}")
+            
+            # Additional guidance based on date range
+            if len(date_range) == 2:
+                days_diff = (date_range[1] - date_range[0]).days
+                if days_diff <= 60 and bandwidth > 10:
+                    st.info("💡 For timeframes ≤2 months, consider using 'Narrow' bandwidth for better short-term variation capture.")
+                elif days_diff > 90 and bandwidth < 20:
+                    st.info("💡 For timeframes >3 months, consider using 'Wide' bandwidth for better trend smoothing.")
+
+
             
             # Show the actual number selected
             st.caption(f"Selected: {bootstraps} bootstrap iterations")
@@ -978,6 +1007,7 @@ def app():
                                         'mutation_counts_df': counts_pickle,
                                         'mutation_variant_matrix_df': matrix_pickle,
                                         'bootstraps': bootstraps,
+                                        'bandwidth': bandwidth,  # Add bandwidth parameter
                                         'location_name': location  # Add location name
                                     }
                                 )
