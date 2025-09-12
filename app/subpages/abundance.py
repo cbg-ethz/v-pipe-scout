@@ -875,16 +875,16 @@ def app():
 
             # Bandwidth parameter for gaussian kernel smoothing
             bandwidth_options = {
-                "Narrow (1-2 month timeframe)": 10,
-                "Medium (2+ month timeframe)": 20,  
-                "Wide (>3 month timeframe)": 30,
+                "Narrow": 10,
+                "Medium": 20,  
+                "Wide": 30,
             }
             
             selected_bandwidth_option = st.radio(
                 "Bandwidth (Gaussian Kernel Smoothing)",
                 options=list(bandwidth_options.keys()),
                 index=0,  # Default to "Narrow" (10)
-                help="Controls the smoothing applied to time series data. Narrow bandwidth preserves short-term variations (1-2 months), wide bandwidth smooths long-term trends (3+ months). Choose based on your timeframe and number of data points."
+                help="Controls the smoothing applied to time series data. The optimal smoothing is highly dependent on the noise in the data. Low noise allows for narrower timeranges, while higher bandwidths help counter noise. Information is shared across time points. Narrow bandwidth preserves short-term variations (1-2 months), wide bandwidth smooths long-term trends (3+ months). Choose based on your timeframe and number of data points."
             )
             
             bandwidth = bandwidth_options[selected_bandwidth_option]
