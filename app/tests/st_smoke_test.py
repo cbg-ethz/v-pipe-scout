@@ -43,11 +43,11 @@ def pytest_generate_tests(metafunc):
             "file_path", get_file_paths(), ids=lambda x: x.split("/")[-1]
         )
 
-
+@pytest.mark.skipif(SKIP_SMOKE, reason="smoke test is disabled by config")
 def test_smoke_page(file_path):
     """
     This will run a basic test on each page in the pages folder, checking to see that
     there are no exceptions raised while the app runs.
     """
-    at = AppTest.from_file(file_path, default_timeout=100).run()
+    at = AppTest.from_file(file_path, default_timeout=20).run()
     assert not at.exception

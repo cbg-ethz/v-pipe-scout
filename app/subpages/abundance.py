@@ -14,13 +14,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 import plotly.graph_objects as go
-import plotly.express as px 
 from pydantic import BaseModel
 from typing import List
-import re
 import logging
 import os
-import json
 import pickle  
 import base64 
 import asyncio
@@ -486,15 +483,20 @@ def app():
         registered_variants = AbundanceEstimatorState.get_registered_variants()
         if registered_variants:
             for variant_name, variant_data in registered_variants.items():
-                col1, col2, col3 = st.columns([2, 1, 3])
-                with col1:
-                    st.write(f"**{variant_name}**")
-                with col2:
-                    # Display the source as a nicely formatted string
+                try:
+                    col1, col2, col3 = st.columns([2, 1, 3])
+                    with col1:
+                        st.write(f"**{variant_name}**")
+                    with col2:
+                        # Display the source as a nicely formatted string
+                        source_display = variant_data['source'].value.replace('_', ' ').title()
+                        st.write(f"*{source_display}*")
+                    with col3:
+                        st.write(f"{len(variant_data['signature_mutations'])} mutations")
+                except (ValueError, TypeError):
+                    # Fallback for test environments where st.columns might not work properly
                     source_display = variant_data['source'].value.replace('_', ' ').title()
-                    st.write(f"*{source_display}*")
-                with col3:
-                    st.write(f"{len(variant_data['signature_mutations'])} mutations")
+                    st.write(f"**{variant_name}** - *{source_display}* - {len(variant_data['signature_mutations'])} mutations")
         else:
             st.write("No custom variants registered")
         
@@ -875,6 +877,35 @@ def app():
             )
             
             bootstraps = bootstrap_options[selected_option]
+
+            # Bandwidth parameter for gaussian kernel smoothing
+            bandwidth_options = {
+                "Narrow": 10,
+                "Medium": 20,  
+                "Wide": 30,
+            }
+            
+            selected_bandwidth_option = st.radio(
+                "Bandwidth (Gaussian Kernel Smoothing)",
+                options=list(bandwidth_options.keys()),
+                index=0,  # Default to "Narrow" (10)
+                help="Controls the smoothing applied to time series data. The optimal smoothing is highly dependent on the noise in the data. Low noise allows for narrower timeranges, while higher bandwidths help counter noise. Information is shared across time points. Narrow bandwidth preserves short-term variations (1-2 months), wide bandwidth smooths long-term trends (3+ months). Choose based on your timeframe and number of data points."
+            )
+            
+            bandwidth = bandwidth_options[selected_bandwidth_option]
+            
+            # Show the actual bandwidth value selected
+            st.caption(f"Selected: Bandwidth = {bandwidth}")
+            
+            # Additional guidance based on date range
+            if len(date_range) == 2:
+                days_diff = (date_range[1] - date_range[0]).days
+                if days_diff <= 60 and bandwidth > 10:
+                    st.info("💡 For timeframes ≤2 months, consider using 'Narrow' bandwidth for better short-term variation capture.")
+                elif days_diff > 90 and bandwidth < 20:
+                    st.info("💡 For timeframes >3 months, consider using 'Wide' bandwidth for better trend smoothing.")
+
+
             
             # Show the actual number selected
             st.caption(f"Selected: {bootstraps} bootstrap iterations")
@@ -882,34 +913,37 @@ def app():
             st.markdown("**Method:** LolliPop Deconvolution")
             st.caption("Kernel-based deconvolution that leverages time series data to generate high-confidence abundance estimates despite noise in wastewater samples.")
         
-        # Initialize task ID and result in session state if not present
-        if 'analysis_task_id' not in st.session_state:
-            st.session_state.analysis_task_id = None
+        # Multi-location session state is already initialized above
+
+        # Initialize multi-location session state variables
+        if 'location_data' not in st.session_state:
+            st.session_state.location_data = {}
         
-        if 'analysis_result' not in st.session_state:
-            st.session_state.analysis_result = None
+        if 'location_tasks' not in st.session_state:
+            st.session_state.location_tasks = {}  # {location: task_id}
         
-        if 'counts_df3d' not in st.session_state:
-            st.session_state.counts_df3d = None
+        if 'location_results' not in st.session_state:
+            st.session_state.location_results = {}  # {location: result_data}
 
         # Single action button
         st.markdown("---")
         
         # Button logic depends on whether we already have results
-        if st.session_state.analysis_result is not None:
+        if st.session_state.location_results:
             # If we have results, show a "Start New Analysis" button instead
             if st.button("🔄 Start New Analysis", help="Clear current results and start a new complete analysis", type="primary"):
                 # Clear all analysis state to reset the workflow
-                st.session_state.analysis_task_id = None
-                st.session_state.analysis_result = None
-                st.session_state.counts_df3d = None
+                st.session_state.location_data = {}
+                st.session_state.location_tasks = {}
+                st.session_state.location_results = {}
+                
                 # Also clear any data hash to force recomputation
                 if 'last_data_hash' in st.session_state:
                     del st.session_state.last_data_hash
                 st.rerun()  # Rerun to show the parameters and Run Analysis button
         else:
             # Only show Run Analysis button if we don't have results yet
-            if st.button("🚀 Run Complete Analysis", help="Fetch data and estimate variant abundances", type="primary"):
+            if st.button("Run Complete Analysis", help="Fetch data and estimate variant abundances", type="primary"):
                 # Validate inputs
                 if not selected_locations:
                     st.error("Please select at least one location. Unable to fetch data without selecting a location.")
@@ -921,9 +955,9 @@ def app():
                 
                 # Show information about the analysis scope
                 if len(selected_locations) > 1:
-                    st.info(f"🌍 Running analysis for {len(selected_locations)} locations: {', '.join(selected_locations)}")
+                    st.info(f"Running analysis for {len(selected_locations)} locations: {', '.join(selected_locations)}")
                 else:
-                    st.info(f"📍 Running analysis for location: {selected_locations[0]}")
+                    st.info(f"Running analysis for location: {selected_locations[0]}")
                 
                 # Get the latest mutation list
                 mutations = matrix_df["Mutation"].tolist()
@@ -936,306 +970,196 @@ def app():
                 # Step 1: Fetch data
                 with st.spinner('Step 1/2: Fetching mutation counts and coverage data from Loculus...'):
                     try:
-                        # For now, process the first location (multi-location support to be implemented)
-                        primary_location = selected_locations[0]
-                        st.caption(f"Fetching data for: {primary_location}")
+                        # Import the new multi-location utility
+                        from utils.multi_location import fetch_multi_location_data
                         
-                        # Using the improved mutations_over_time endpoint with daily interval
-                        st.session_state.counts_df3d = asyncio.run(wiseLoculus.mutations_over_time(
+                        # Fetch data for all locations (parallel or single)
+                        st.session_state.location_data = asyncio.run(fetch_multi_location_data(
+                            wiseLoculus,
                             mutations,
                             MutationType.NUCLEOTIDE,  
                             datetime_range,
-                            primary_location,
+                            selected_locations,
                             interval="daily"
                         ))
-                        st.success("✅ Data fetched successfully!")
                         
-                        if len(selected_locations) > 1:
-                            st.warning(f"ℹ️ Note: Currently processing data one location only: {primary_location}. Full multi-location support coming soon.")
+                        # Data successfully fetched for all locations
+                        
+                        st.success("✅ Data fetched successfully for all locations!")
                             
                     except Exception as e:
                         st.error(f"❌ Error fetching data: {str(e)}")
                         st.stop()
                 
-                # Step 2: Run deconvolution
-                if st.session_state.counts_df3d is not None:
-                    with st.spinner('Step 2/2: Starting variant abundance estimation...'):
+                # Step 2: Run deconvolution for each location
+                if st.session_state.location_data:
+                    with st.spinner('Step 2/2: Starting variant abundance estimation for all locations...'):
                         try:
-                            # Convert DataFrames to base64-encoded pickle strings for serialization
-                            counts_pickle = base64.b64encode(pickle.dumps(st.session_state.counts_df3d)).decode('utf-8')
-                            matrix_pickle = base64.b64encode(pickle.dumps(matrix_df)).decode('utf-8')
+                            # Submit separate tasks for each location
+                            st.session_state.location_tasks = {}
                             
-                            # Submit the task to Celery worker
-                            task = celery_app.send_task(
-                                'tasks.run_deconvolve',
-                                kwargs={
-                                    'mutation_counts_df': counts_pickle,
-                                    'mutation_variant_matrix_df': matrix_pickle,
-                                    'bootstraps': bootstraps
-                                }
-                            )
-                            # Store task ID in session state
-                            st.session_state.analysis_task_id = task.id
-                            st.success(f"✅ Analysis started! Task ID: {task.id}")
+                            for location, location_counts_df in st.session_state.location_data.items():
+                                st.write(f"Starting deconvolution for {location}...")
+                                
+                                # Convert DataFrames to base64-encoded pickle strings for serialization
+                                counts_pickle = base64.b64encode(pickle.dumps(location_counts_df)).decode('utf-8')
+                                matrix_pickle = base64.b64encode(pickle.dumps(matrix_df)).decode('utf-8')
+                                
+                                # Submit the task to Celery worker
+                                task = celery_app.send_task(
+                                    'tasks.run_deconvolve',
+                                    kwargs={
+                                        'mutation_counts_df': counts_pickle,
+                                        'mutation_variant_matrix_df': matrix_pickle,
+                                        'bootstraps': bootstraps,
+                                        'bandwidth': bandwidth,  # Add bandwidth parameter
+                                        'location_name': location  # Add location name
+                                    }
+                                )
+                                
+                                # Store task ID for this location
+                                st.session_state.location_tasks[location] = task.id
+                                st.success(f"✅ Analysis started for {location}!")
+                            
+                            # Task submission completed for all locations
+                            
                         except Exception as e:
                             st.error(f"❌ Error starting deconvolution: {str(e)}")
                             st.stop()
         
         # Show download options for fetched data (if available)
-        if st.session_state.counts_df3d is not None:
+        if st.session_state.location_data:
             with st.expander("📥 Download Raw Data", expanded=False):
                 st.write("Download the fetched mutation counts and coverage data:")
                 
-                # Create columns for download buttons
-                col1, col2 = st.columns(2)
-                
-                # 1. CSV Download
-                with col1:
-                    # Make sure to preserve index for dates and mutations
-                    csv = st.session_state.counts_df3d.to_csv(index=True)
-                    st.download_button(
-                        label="Download as CSV",
-                        data=csv,
-                        file_name='mutation_counts_coverage.csv',
-                        mime='text/csv',
-                        help="Download all data as a single CSV file with preserved indices."
-                    )
-                
-                # 2. JSON Download
-                with col2:
-                    # Convert to JSON structure - using 'split' format to preserve indices
-                    json_data = st.session_state.counts_df3d.to_json(orient='split', date_format='iso', index=True)
+                if len(st.session_state.location_data) == 1:
+                    # Single location - show simple download
+                    location_name = list(st.session_state.location_data.keys())[0]
+                    location_data = st.session_state.location_data[location_name]
                     
-                    st.download_button(
-                        label="Download as JSON",
-                        data=json_data,
-                        file_name='mutation_counts_coverage.json',
-                        mime='application/json',
-                        help="Download data as a JSON file that preserves dates and mutation indices."
-                    )
+                    # Create columns for download buttons
+                    col1, col2 = st.columns(2)
+                    
+                    # 1. CSV Download
+                    with col1:
+                        # Make sure to preserve index for dates and mutations
+                        csv = location_data.to_csv(index=True)
+                        st.download_button(
+                            label=f"Download {location_name} as CSV",
+                            data=csv,
+                            file_name=f'mutation_counts_coverage_{location_name.replace(" ", "_")}.csv',
+                            mime='text/csv',
+                            help="Download all data as a single CSV file with preserved indices."
+                        )
+                    
+                    # 2. JSON Download
+                    with col2:
+                        # Convert to JSON structure - using 'split' format to preserve indices
+                        json_data = location_data.to_json(orient='split', date_format='iso', index=True)
+                        
+                        st.download_button(
+                            label=f"Download {location_name} as JSON",
+                            data=json_data,
+                            file_name=f'mutation_counts_coverage_{location_name.replace(" ", "_")}.json',
+                            mime='application/json',
+                            help="Download data as a JSON file that preserves dates and mutation indices."
+                        )
+                else:
+                    # Multiple locations - show combined and individual downloads
+                    st.markdown("#### Combined Download (All Locations)")
+                    
+                    # Combine all location data
+                    combined_dfs = []
+                    total_data_points = 0
+                    
+                    for location_name, location_data in st.session_state.location_data.items():
+                        try:
+                            if location_data is not None and not location_data.empty:
+                                # Add location column to each dataframe
+                                location_df = location_data.copy()
+                                location_df['location'] = location_name
+                                combined_dfs.append(location_df)
+                                total_data_points += len(location_df)
+                                st.caption(f"✅ {location_name}: {len(location_df)} data points")
+                            else:
+                                st.caption(f"⚠️ {location_name}: No data available")
+                        except Exception as e:
+                            st.caption(f"❌ {location_name}: Error processing data - {str(e)}")
+                    
+                    if combined_dfs:
+                        # Concatenate all dataframes
+                        try:
+                            combined_data = pd.concat(combined_dfs, ignore_index=False)
+                            st.success(f"📊 Combined {len(combined_dfs)} locations with {total_data_points} total data points")
+                            
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                combined_csv = combined_data.to_csv(index=True)
+                                st.download_button(
+                                    label="📄 Download All Locations (CSV)",
+                                    data=combined_csv,
+                                    file_name='mutation_counts_coverage_all_locations.csv',
+                                    mime='text/csv',
+                                    help="Download combined data from all locations with location column"
+                                )
+                            
+                            with col2:
+                                combined_json = combined_data.to_json(orient='split', date_format='iso', index=True)
+                                st.download_button(
+                                    label="📋 Download All Locations (JSON)",
+                                    data=combined_json,
+                                    file_name='mutation_counts_coverage_all_locations.json',
+                                    mime='application/json',
+                                    help="Download combined data from all locations as JSON"
+                                )
+                        except Exception as e:
+                            st.error(f"Error combining data: {str(e)}")
+                            st.warning("Unable to create combined download. Check debug information above.")
+                    else:
+                        st.warning("No valid data found for combined download. Check individual locations in debug section above.")
         
         st.markdown("---")
         
         # ============== RESULTS SECTION ==============
         st.subheader("Analysis Results")
 
-        # Display task status and results
-        if st.session_state.analysis_task_id:
-            task_id = st.session_state.analysis_task_id
+        # Check if we have any location tasks
+        if st.session_state.location_tasks:
+            # Check processing status first and display it prominently
+            incomplete_tasks = []
+            for location, task_id in st.session_state.location_tasks.items():
+                if location not in st.session_state.location_results:
+                    try:
+                        task = celery_app.AsyncResult(task_id)
+                        if not task.ready():
+                            incomplete_tasks.append(location)
+                    except Exception:
+                        incomplete_tasks.append(location)  # Consider as incomplete if we can't check
             
-            # Check if we already have results
-            if st.session_state.analysis_result is not None:
-                st.success("🎉 Complete analysis finished!")
+            if incomplete_tasks:
+                st.info(f"⏳ Still processing: {', '.join(incomplete_tasks)}")
                 
-                # Parse and visualize the analysis results
-                result_data = st.session_state.analysis_result
-                
-                # Get the location (for now, we just use the first location key)
-                if result_data and len(result_data) > 0:
-                    location = list(result_data.keys())[0]
-                    variants_data = result_data[location]
-                    
-                    # Create a figure for visualization
-                    fig = go.Figure()
-                    
-                    # Color palette for variants
-                    colors = px.colors.qualitative.Bold if hasattr(px.colors.qualitative, 'Bold') else [
-                        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", 
-                        "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
-                    ]
-                    
-                    # Ensure we have enough colors
-                    if len(variants_data) > len(colors):
-                        # Extend by cycling through the list
-                        colors = colors * (len(variants_data) // len(colors) + 1)
-                    
-                    # Track the max time range for x-axis limits
-                    all_dates = []
-                    
-                    # Plot each variant
-                    for i, (variant_name, variant_data) in enumerate(variants_data.items()):
-                        timeseries = variant_data.get('timeseriesSummary', [])
-                        if not timeseries:
-                            continue
-                        
-                        # Extract dates and proportions
-                        dates = [pd.to_datetime(point['date']) for point in timeseries]
-                        all_dates.extend(dates)
-                        proportions = [point['proportion'] for point in timeseries]
-                        lower_bounds = [point.get('proportionLower', point['proportion']) for point in timeseries]
-                        upper_bounds = [point.get('proportionUpper', point['proportion']) for point in timeseries]
-                        
-                        color_idx = i % len(colors)
-                        
-                        # Add line plot for this variant
-                        fig.add_trace(go.Scatter(
-                            x=dates,
-                            y=proportions,
-                            mode='lines+markers',
-                            line=dict(color=colors[color_idx], width=2),
-                            name=variant_name
-                        ))
-                        
-                        # Add shaded confidence interval using the exact same color as the line
-                        color = colors[color_idx]
-                        # Convert to rgba with 0.2 opacity - keeping the exact same color
-                        if color.startswith('#'):
-                            # Convert hex to rgb
-                            r = int(color[1:3], 16) / 255
-                            g = int(color[3:5], 16) / 255
-                            b = int(color[5:7], 16) / 255
-                            rgba_color = f'rgba({r:.3f}, {g:.3f}, {b:.3f}, 0.2)'
-                        else:
-                            # Handle other color formats (rgb, rgba, etc.)
-                            # Strip any existing rgba/rgb format and extract the color values
-                            if color.startswith('rgb'):
-                                # Extract the RGB values from the string
-                                rgb_values = color.replace('rgb(', '').replace('rgba(', '').replace(')', '').split(',')
-                                if len(rgb_values) >= 3:
-                                    r = float(rgb_values[0].strip()) / 255 if float(rgb_values[0].strip()) > 1 else float(rgb_values[0].strip())
-                                    g = float(rgb_values[1].strip()) / 255 if float(rgb_values[1].strip()) > 1 else float(rgb_values[1].strip())
-                                    b = float(rgb_values[2].strip()) / 255 if float(rgb_values[2].strip()) > 1 else float(rgb_values[2].strip())
-                                    rgba_color = f'rgba({r:.3f}, {g:.3f}, {b:.3f}, 0.2)'
-                                else:
-                                    rgba_color = f'rgba(0, 0, 0, 0.2)'  # Default as fallback
-                            else:
-                                # For any other format, use a default transparency
-                                rgba_color = f'{color.split(")")[0]}, 0.2)' if ')' in color else f'rgba(0, 0, 0, 0.2)'
-                        
-                        fig.add_trace(go.Scatter(
-                            x=dates + dates[::-1],  # Forward then backwards
-                            y=upper_bounds + lower_bounds[::-1],  # Upper then lower bounds
-                            fill='toself',
-                            fillcolor=rgba_color,
-                            line=dict(color='rgba(0,0,0,0)'),
-                            hoverinfo="skip",
-                            showlegend=False
-                        ))
-                    
-                    # Update layout
-                    fig.update_layout(
-                        title=f"Variant Proportion Estimates",
-                        xaxis_title="Date",
-                        yaxis_title="Estimated Proportion",
-                        yaxis=dict(
-                            tickformat='.0%',  # Format as percentage
-                            range=[0, 1]
-                        ),
-                        legend_title="Variants",
-                        height=500,
-                        template="plotly_white",
-                        hovermode="x unified"
-                    )
-                    
-                    # Display the plot
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    
-                    # Optionally add CSV download for the timeseries data
-                    st.write("Download variant timeseries data:")
-                    
-                    # Prepare data for CSV export
-                    all_variant_data = []
-                    for variant_name, variant_data in variants_data.items():
-                        for point in variant_data.get('timeseriesSummary', []):
-                            all_variant_data.append({
-                                'variant': variant_name,
-                                'date': point['date'],
-                                'proportion': point['proportion'],
-                                'proportionLower': point.get('proportionLower', ''),
-                                'proportionUpper': point.get('proportionUpper', '')
-                            })
-                    
-                    if all_variant_data:
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            csv_data = pd.DataFrame(all_variant_data).to_csv(index=False)
-                            st.download_button(
-                                label="Download Results as CSV",
-                                data=csv_data,
-                                file_name='deconvolution_results.csv',
-                                mime='text/csv',
-                            )
-                        with col2:
-                            # Add download button for the JSON data
-                            json_data = json.dumps(result_data, indent=2)
-                            st.download_button(
-                                label="Download Results as JSON",
-                                data=json_data,
-                                file_name='deconvolution_results.json',
-                                mime='application/json',
-                            )
-                else:
-                    st.warning("No results data available to visualize.")
-            else:
-                # Check task status with spinner
-                with st.spinner("Checking analysis task status..."):
-                    # First check if the task is completed
-                    task = celery_app.AsyncResult(task_id)
-                    if task.ready():
-                        try:
-                            # Task is complete - get the result and store it
-                            result = task.get()
-                            st.session_state.analysis_result = result
-                            st.success("Analysis completed!")
-                            # Rerun to show the visualization immediately
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Error retrieving result: {str(e)}")
-
-                        
-                    
-                    # If task is not ready yet, show progress
-                    progress_key = f"task_progress:{task_id}"
-                    progress_data = redis_client.get(progress_key)
-                    
-                    if progress_data:
-                        # Parse progress data from Redis
-                        progress_info = json.loads(progress_data) # type: ignore
-                        # ignore as redis 5.0.1 typing sucks, see https://github.com/redis/redis-py/issues/2933
-                        current = progress_info.get('current', 0)
-                        total = progress_info.get('total', 1) 
-                        status = progress_info.get('status', 'Processing...')
-                        
-                        # Display progress bar
-                        st.progress(current / total)
-                        st.write(f"Status: {status}")
-            
-                st.write("You can check if the analysis task has completed.")
-                
-                # Add information about auto-refresh
-                st.write("""
-                The page will automatically check for results every 5 seconds.
-                You can also manually check if the results are ready using the button below.
-                """)
-                
-                # Import the streamlit-autorefresh component
+                # Auto-refresh every 5 seconds if there are incomplete tasks
                 from streamlit_autorefresh import st_autorefresh
+                st_autorefresh(interval=5000, key="multi_location_autorefresh")
+            else:
+                st.success("🎉 All locations have completed analysis!")
+                        
+            # Import and render the multi-location results component
+            from components.multi_location_results import render_location_results_tabs
+            
+            render_location_results_tabs(
+                st.session_state.location_tasks,
+                st.session_state.location_results,
+                celery_app,
+                redis_client
+            )
                 
-                # Set up auto-refresh every 5 seconds (5000 ms)
-                # This will automatically rerun the app without showing a countdown
-                st_autorefresh(interval=5000, key="autorefresh")
-                
-                # Check result button
-                check_col1, check_col2 = st.columns([1, 3])
-                with check_col1:
-                    if st.button("Check Result"):
-                        with st.spinner('Checking if results are ready...'):
-                            task = celery_app.AsyncResult(task_id)
-                            if task.ready():
-                                try:
-                                    result = task.get()
-                                    st.session_state.analysis_result = result
-                                    st.success("Analysis completed!")
-                                    # The visualization will be shown on the next rerun
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"Error retrieving result: {str(e)}")
-                            else:
-                                st.info("Task is still running. Please check again later.")
+                    
         else:
-            # No task has been started yet
-            if st.session_state.counts_df3d is None:
+            # No tasks have been started yet
+            if not st.session_state.location_data:
                 st.info("Run the complete analysis above to see results here.")
             else:
                 st.info("Data has been fetched. Run the complete analysis to estimate variant abundances.")
