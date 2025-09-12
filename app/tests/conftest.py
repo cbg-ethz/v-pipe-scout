@@ -6,11 +6,13 @@ from unittest.mock import patch
 
 
 @pytest.fixture(autouse=True)
-def fix_streamlit_logging():
-    """Fix Streamlit logging configuration issues during testing.
+def fix_streamlit_issues():
+    """Fix various Streamlit testing issues.
     
-    This addresses the issue where Streamlit's logging formatter receives
-    MagicMock objects instead of proper string formats during testing.
+    This addresses multiple issues where Streamlit components receive
+    MagicMock objects instead of proper values during testing:
+    - Logging formatter receiving MagicMock objects instead of strings
+    - Theme functions receiving MagicMock objects instead of JSON strings
     """
     # Set environment variables to provide proper logging configuration
     original_log_level = os.environ.get('STREAMLIT_LOG_LEVEL')
@@ -20,10 +22,16 @@ def fix_streamlit_logging():
     os.environ['STREAMLIT_LOG_LEVEL'] = 'WARNING'
     os.environ['STREAMLIT_LOG_FORMAT'] = '%(asctime)s %(levelname)s: %(message)s'
     
-    # Mock the problematic logging configuration parts
-    with patch('streamlit.logger.setup_formatter') as mock_setup:
+    # Mock the problematic components
+    with patch('streamlit.logger.setup_formatter') as mock_setup, \
+         patch('streamlit_theme.st_theme') as mock_theme:
+        
         # Make setup_formatter do nothing to avoid the MagicMock issue
         mock_setup.return_value = None
+        
+        # Make st_theme return a proper theme dictionary instead of MagicMock
+        mock_theme.return_value = {'base': 'light'}
+        
         yield
     
     # Restore original environment
