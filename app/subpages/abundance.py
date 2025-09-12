@@ -883,7 +883,7 @@ def app():
             selected_bandwidth_option = st.radio(
                 "Bandwidth (Gaussian Kernel Smoothing)",
                 options=list(bandwidth_options.keys()),
-                index=1,  # Default to "Medium" (20)
+                index=0,  # Default to "Narrow" (10)
                 help="Controls the smoothing applied to time series data. Narrow bandwidth preserves short-term variations (1-2 months), wide bandwidth smooths long-term trends (3+ months). Choose based on your timeframe and number of data points."
             )
             
