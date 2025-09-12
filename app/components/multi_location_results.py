@@ -36,11 +36,6 @@ def render_location_results_tabs(
         st.info("No analysis tasks have been started yet.")
         return
     
-    # Add combined download section if multiple locations and results are available
-    if len(location_tasks) > 1 and location_results:
-        render_combined_download_options(location_results)
-        st.divider()
-    
     # Create tabs for each location
     location_names = list(location_tasks.keys())
     tabs = st.tabs([f"📍 {loc}" for loc in location_names])
@@ -55,6 +50,20 @@ def render_location_results_tabs(
             else:
                 # Check task status
                 render_location_progress(location, task_id, celery_app, redis_client)
+    
+    # Show combined download section after all individual location tabs
+    st.markdown("---")
+    st.subheader("📥 Download Combined Results")
+    
+    # Check if all locations have results
+    all_complete = len(location_results) == len(location_tasks)
+    
+    if all_complete:
+        render_combined_download_options(location_results)
+    else:
+        completed = len(location_results)
+        total = len(location_tasks)
+        st.info(f"⏳ Combined download will be available when all locations are processed ({completed}/{total} complete)")
 
 
 def render_single_location_result(location: str, result_data: Any) -> None:
@@ -89,12 +98,6 @@ def render_single_location_result(location: str, result_data: Any) -> None:
     except Exception as e:
         st.error(f"❌ Error creating plot: {str(e)}")
         return
-    
-    # Add download options
-    try:
-        render_download_options(location, variants_data)
-    except Exception as e:
-        st.error(f"❌ Error creating download options: {str(e)}")
 
 
 def render_location_progress(location: str, task_id: str, celery_app, redis_client) -> None:
@@ -473,7 +476,6 @@ def render_combined_download_options(location_results: Dict[str, Any]) -> None:
     if not location_results:
         return
     
-    st.subheader("📥 Download Combined Results")
     st.caption("Download all location results in a single long-format table with location column")
     
     # Prepare combined data for download
@@ -557,20 +559,6 @@ def render_combined_download_options(location_results: Dict[str, Any]) -> None:
     
     # Show download options
     if combined_data:
-        # Create summary info
-        df_summary = pd.DataFrame(combined_data)
-        total_rows = len(df_summary)
-        total_locations = df_summary['location'].nunique()
-        total_variants = df_summary['variant'].nunique()
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("📍 Locations", total_locations)
-        with col2:
-            st.metric("🦠 Variants", total_variants)
-        with col3:
-            st.metric("📊 Data Points", total_rows)
-        
         # Download buttons
         col1, col2 = st.columns(2)
         

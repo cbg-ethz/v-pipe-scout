@@ -1091,17 +1091,7 @@ def app():
 
         # Check if we have any location tasks
         if st.session_state.location_tasks:
-            # Import and render the multi-location results component
-            from components.multi_location_results import render_location_results_tabs
-            
-            render_location_results_tabs(
-                st.session_state.location_tasks,
-                st.session_state.location_results,
-                celery_app,
-                redis_client
-            )
-            
-            # Add auto-refresh for ongoing tasks
+            # Check processing status first and display it prominently
             incomplete_tasks = []
             for location, task_id in st.session_state.location_tasks.items():
                 if location not in st.session_state.location_results:
@@ -1113,13 +1103,23 @@ def app():
                         incomplete_tasks.append(location)  # Consider as incomplete if we can't check
             
             if incomplete_tasks:
-                st.write(f"⏳ Still processing: {', '.join(incomplete_tasks)}")
+                st.info(f"⏳ Still processing: {', '.join(incomplete_tasks)}")
                 
                 # Auto-refresh every 5 seconds if there are incomplete tasks
                 from streamlit_autorefresh import st_autorefresh
                 st_autorefresh(interval=5000, key="multi_location_autorefresh")
             else:
-                st.success("All locations have completed analysis!")
+                st.success("🎉 All locations have completed analysis!")
+                        
+            # Import and render the multi-location results component
+            from components.multi_location_results import render_location_results_tabs
+            
+            render_location_results_tabs(
+                st.session_state.location_tasks,
+                st.session_state.location_results,
+                celery_app,
+                redis_client
+            )
                 
                     
         else:
