@@ -17,7 +17,7 @@ import sys
 from unittest.mock import MagicMock
 sys.modules['streamlit'] = MagicMock()
 
-from utils.multi_location import fetch_multi_location_data, validate_location_data, get_location_data_summary
+from utils.multi_location import fetch_multi_location_data, validate_location_data
 from interface import MutationType
 
 
@@ -175,35 +175,6 @@ class TestMultiLocationUtils:
         # Should exclude empty location
         assert 'EmptyLocation' not in cleaned
     
-    def test_get_location_data_summary(self):
-        """Test location data summary generation."""
-        # Create test data with MultiIndex
-        dates = pd.date_range('2024-01-01', periods=3, freq='D')
-        mutations = ['C241T', 'A23403G']
-        
-        data = []
-        for date in dates:
-            for mutation in mutations:
-                data.append({
-                    'count': 10,
-                    'coverage': 100,
-                    'frequency': 0.1
-                })
-        
-        df = pd.DataFrame(data)
-        index_tuples = [(mut, date) for date in dates for mut in mutations]
-        df.index = pd.MultiIndex.from_tuples(index_tuples, names=['mutation', 'sampling_date'])
-        
-        location_data = {'TestLocation': df}
-        
-        summary = get_location_data_summary(location_data)
-        
-        assert 'TestLocation' in summary
-        assert summary['TestLocation']['record_count'] == 6  # 3 dates * 2 mutations
-        assert summary['TestLocation']['mutations_count'] == 2
-        assert summary['TestLocation']['total_coverage'] == 600  # 6 records * 100 coverage
-        assert summary['TestLocation']['date_range'] is not None
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
