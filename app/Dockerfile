@@ -1,20 +1,17 @@
-# Use Miniconda3 as the base image
-FROM continuumio/miniconda3:latest
+# Use Python slim base image
+FROM python:3.13-slim
 
 # Set the working directory
 WORKDIR /app
 
-# Copy environment.yml first to leverage Docker cache
-COPY environment.yml .
+# Install uv
+RUN pip install uv
 
-# Create the conda environment
-RUN conda env create -f environment.yml
+# Copy pyproject.toml and uv.lock first to leverage Docker cache
+COPY pyproject.toml uv.lock ./
 
-# Make sure conda environment is activated by default
-SHELL ["/bin/bash", "-c"]
-
-# Activate the environment and ensure it's used for subsequent commands
-ENV PATH=/opt/conda/envs/v-pipe-scout-app/bin:$PATH
+# Install dependencies using uv
+RUN uv sync --frozen --no-install-project
 
 # Copy the rest of the application code
 COPY . .
@@ -34,4 +31,4 @@ RUN BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") && \
 EXPOSE 8000
 
 # Run the Streamlit application
-CMD ["conda", "run", "-n", "v-pipe-scout-app", "streamlit", "run", "app.py", "--server.port=8000", "--server.address=0.0.0.0"]
+CMD ["uv", "run", "streamlit", "run", "app.py", "--server.port=8000", "--server.address=0.0.0.0"]

@@ -1,0 +1,43 @@
+[project]
+name = "v-pipe-scout-app"
+version = "0.4.4"
+description = "Streamlit-based interactive web application for rapid viral variant detection"
+requires-python = ">=3.13"
+dependencies = [
+    "streamlit==1.49.1",
+    "matplotlib",
+    "numpy",
+    "pandas==2.2.3",
+    "pyyaml",
+    "aiohttp",
+    "requests",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-mock",
+    "streamlit-pydantic",
+    "pydantic>=1.9,<2",
+    "plotly>=6.2.0",
+    "celery==5.5.3",
+    "matplotlib-venn",
+    "redis==5.0.1",
+    "streamlit-autorefresh",
+    "st-theme"
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-mock"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+pythonpath = ["."]
+markers = [
+    "skip_in_ci: marks tests to skip in CI environments (for live API tests)"
+]
