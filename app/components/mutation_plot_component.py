@@ -205,12 +205,12 @@ def render_mutation_plot_component(
         with col1:
             min_frequency = target.slider(
                 "Minimum frequency threshold",
-                min_value=0.0,
+                min_value=0.0032,
                 max_value=1.0,
                 value=url_min_freq,
                 step=0.001,
                 format="%.3f",
-                help="Only show mutations that reach at least this frequency at some point in the timeframe.",
+                help="Only show mutations that reach at least this frequency at some point in the timeframe. Lower bound is set to 0.32%, the average sequence error rate.",
                 key=f"{session_prefix}min_frequency"
             )
         
