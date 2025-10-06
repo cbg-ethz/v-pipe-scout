@@ -6,18 +6,18 @@ from api.wiseloculus import WiseLoculusLapis
 from utils.config import get_wiseloculus_url
 
 def app():
-    st.title("POC: Rapid Interactive Wastewater-based Viral Variant Detection")
+    st.title("Rapid Interactive Wastewater-based Viral Variant Detection")
+    st.markdown("### First ever interactive querying of millions of short reads in the browser")
+    st.markdown("#### Cutting weeks to minutes")
     
     # Get current theme and display appropriate POC image
     theme = st_theme()
     
     # Display theme-appropriate POC image
-    if theme and theme.get('base') == 'dark':
-        # Dark theme - use inverted image
-        st.image("images/index/POC_DeployForInternal_inverted.png", caption="POC Technical Setup")
-    else:
-        # Light theme or unknown theme - use regular image
-        st.image("images/index/POC_DeployForInternal.png", caption="POC Technical Setup")
+
+    # Dark theme - use inverted image
+    st.image("images/index/welcome.png", caption="Illustration rapid browsing of millions of reads", width=600)
+
     
     st.write("## Overview")
     st.write("This is a Proof-Of-Concept for the FAIR-CBG Grant Objective: Fast querying of short reads.")
@@ -82,12 +82,47 @@ def app():
     V-Pipe Scout is the first step toward a holistic Wastewater Analysis and Sharing Platform (W-ASAP) — a joint effort of the Computational Biology Group (CBG) and Computational Evolution Group (cEVO) at ETH Zürich.
     It is built on the [Loculus](https://loculus.org/) software and its high-performance SILO query engine, both developed by the cEVO Group.
     """)
+
+    st.write("#### How are sequencing reads processed?")
+    
+    st.markdown("""
+    **Quality Control & Preprocessing:**
+    
+    All preprocessing is performed using [V-Pipe](https://cbg-ethz.github.io/V-pipe/):
+    - Filter reads shorter than 80% of intended length (250bp for SARS-CoV-2)
+    - Remove reads with more than 4 N bases
+    - Trim reads from both ends when quality score drops below 30
+    - Discard reads when rolling mean quality score drops below 30 (sliding window of 10 bases)
+    - Expected error rate: ~0.32% (Aviti sequencer) — [John et al., 2024](https://www.sciencedirect.com/science/article/pii/S0043135424013642?via%3Dihub)
+    
+    **Nucleotide Alignment:**
+    - Align reads to reference genome (Wuhan-Hu-1, NC_045512.2) using BWA
+    - Performed as part of the V-Pipe workflow
+    
+    **Amino Acid Alignment:**
+    - Translation and alignment performed using [DIAMOND](https://github.com/bbuchfink/diamond)
+    - Integrated as part of [sr2silo](https://github.com/cbg-ethz/sr2silo)
+    
+    **Database Integration:**
+    - Processed reads are wrangled into the [LAPIS](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-023-05364-3) database format
+    - Enables the interactive querying capabilities shown in this application
+    """)
+
     st.write("#### Technical Challenges")
     st.write("The difficulty of this demo lies in the enormous number of reads to make instantaneously available.")
     
     st.write("This requires heavy memory for the database to run:")
     st.markdown("**27 Mio Reads × 2.5 GB/Mio Reads = 67.5 GB of RAM**")
     st.markdown("**4 weeks x 67.5 GB/week =  270 GB of RAM**")
+
+    # Display theme-appropriate POC image
+    if theme and theme.get('base') == 'dark':
+        # Dark theme - use inverted image
+        st.image("images/index/POC_DeployForInternal_inverted.png", caption="POC Technical Setup")
+    else:
+        # Light theme or unknown theme - use regular image
+        st.image("images/index/POC_DeployForInternal.png", caption="POC Technical Setup")
+    
 
     # LAPIS API Documentation Section (Collapsible)
     st.markdown("---")
