@@ -123,9 +123,9 @@ def check_mutation_consistency(mutations, gene):
 def main():
     # Load Data – as downloaded from the Stanford database
     options = {
-        "3C-like proteinase": '../data/3CLpro_inhibitors_datasheet.csv',
-        "RNA-dependent RNA polymerase": '../data/RdRP_inhibitors_datasheet.csv',
-        "spike glycoprotein": '../data/spike_mAbs_datasheet.csv'
+        "3C-like proteinase": '../app/data/3CLpro_inhibitors_datasheet.csv',
+        "RNA-dependent RNA polymerase": '../app/data/RdRP_inhibitors_datasheet.csv',
+        "spike glycoprotein": '../app/data/spike_mAbs_datasheet.csv'
     }
     dfs = {}
     for product, file in options.items():
