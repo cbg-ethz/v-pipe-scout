@@ -292,9 +292,13 @@ def render_mutation_plot_component(
     
     # Apply error rate filtering to individual data points if enabled
     if config['show_frequency_filtering'] and filter_error_rate:
-        # Convert to numeric for comparison
+        # Convert to numeric for comparison (optimize by only converting non-numeric columns)
         freq_df_for_filtering = freq_df_filtered.replace({None: np.nan, ',': ''}, regex=True)
-        freq_df_for_filtering = freq_df_for_filtering.apply(pd.to_numeric, errors='coerce')
+        
+        # Only convert object (string) columns to numeric for efficiency
+        obj_cols = freq_df_for_filtering.select_dtypes(include='object').columns
+        if len(obj_cols) > 0:
+            freq_df_for_filtering[obj_cols] = freq_df_for_filtering[obj_cols].apply(pd.to_numeric, errors='coerce')
         
         # Create masks for values below error rate
         below_error_rate = freq_df_for_filtering < SEQUENCING_ERROR_RATE
