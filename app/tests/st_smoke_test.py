@@ -53,5 +53,23 @@ def test_smoke_page(file_path):
     This will run a basic test on each page in the pages folder, checking to see that
     there are no exceptions raised while the app runs.
     """
-    at = AppTest.from_file(file_path, default_timeout=20).run()
-    assert not at.exception
+    # Ensure app directory is in PYTHONPATH for AppTest subprocess
+    # AppTest.from_file() spawns a new interpreter that needs to find components
+    app_dir = str(Path(__file__).parent.parent.absolute())
+    current_pythonpath = os.environ.get('PYTHONPATH', '')
+    
+    # Prepend app directory to PYTHONPATH
+    if current_pythonpath:
+        os.environ['PYTHONPATH'] = f"{app_dir}{os.pathsep}{current_pythonpath}"
+    else:
+        os.environ['PYTHONPATH'] = app_dir
+    
+    try:
+        at = AppTest.from_file(file_path, default_timeout=20).run()
+        assert not at.exception
+    finally:
+        # Restore original PYTHONPATH
+        if current_pythonpath:
+            os.environ['PYTHONPATH'] = current_pythonpath
+        else:
+            os.environ.pop('PYTHONPATH', None)
