@@ -1,9 +1,13 @@
 import sys
 from pathlib import Path
+
+# Add parent directory (app/) to sys.path for Streamlit AppTest imports
+# This is needed because AppTest.from_file() uses Streamlit's module loader
+# which reads sys.path at import time, not at pytest discovery time
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import os
 import pytest
-from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
