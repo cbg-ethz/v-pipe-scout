@@ -95,6 +95,12 @@ def app():
     - Discard reads when rolling mean quality score drops below 30 (sliding window of 10 bases)
     - Expected error rate: ~0.32% (Aviti sequencer) — [John et al., 2024](https://www.sciencedirect.com/science/article/pii/S0043135424013642?via%3Dihub)
     
+    **Subsampling Strategy:**
+    
+    W-ASAP processes wastewater surveillance samples with highly variable read depths. To ensure consistent performance, we cap amplicon sequences at 4.5 million reads per sample through random subsampling, preserving Variant Allele Frequency and Haplotype Structure for reliable and predictable operations.
+    
+    For the full data for download, visit [db.wasap.genspectrum.org](https://db.wasap.genspectrum.org).
+    
     **Nucleotide Alignment:**
     - Align reads to reference genome (Wuhan-Hu-1, NC_045512.2) using BWA
     - Performed as part of the V-Pipe workflow
