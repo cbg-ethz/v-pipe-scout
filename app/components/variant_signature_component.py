@@ -149,7 +149,8 @@ def render_signature_composer(
         key=f'{session_prefix}variantQuery',
         help="Variant queries may use pango lineage queries (either called by pangolin or by Nextclade) "
              "and filter by Nextstrain clades e.g.: BA.5* | nextcladePangoLineage:BA.5* | nextstrainClade:22B, "
-             "see https://lapis-docs.readthedocs.io/en/latest/concepts/variant_query.html#variantquery for details."
+             "see https://lapis-docs.readthedocs.io/en/latest/concepts/variant_query.html#variantquery for details.",
+        placeholder="e.g.: BA.5* | nextcladePangoLineage:BA.5* | nextstrainClade:22B,"
     )
 
     if config['show_nucleotides_only']:
@@ -172,7 +173,7 @@ def render_signature_composer(
 
     min_coverage = target.slider(
         "Minimal number of known clinical sequences with this mutation for this variant:", 
-        0, 250, config['default_min_coverage'], 
+        0, 50, config['default_min_coverage'], 
         key=f'{session_prefix}min_coverage',
         help="This is the minimal number of clinical sequences for this variant that must have this mutation for it to be included. "
              "This is useful to filter out mutations that are not well supported by the data."

@@ -15,6 +15,9 @@ from interface import MutationType
 from visualize.mutations import mutations_over_time
 from api.exceptions import APIError
 
+# Sequencing error rate threshold (0.32%)
+SEQUENCING_ERROR_RATE = 0.0032
+
 
 def render_mutation_plot_component(
     wiseLoculus: Any,
@@ -187,6 +190,7 @@ def render_mutation_plot_component(
         return None
     
     # Frequency filtering controls
+    filter_error_rate = False  # Default value
     if config['show_frequency_filtering']:
         target.markdown("---")
         target.write("### Frequency Filtering")
@@ -234,6 +238,16 @@ def render_mutation_plot_component(
         if min_frequency > max_frequency:
             target.error("Minimum frequency cannot be greater than maximum frequency.")
             return None
+        
+        # Error rate filtering checkbox
+        target.markdown("")
+        error_rate_percent = SEQUENCING_ERROR_RATE * 100
+        filter_error_rate = target.checkbox(
+            f"Filter out individual frequencies below sequencing error rate ({error_rate_percent:.2f}%)",
+            value=False,
+            help=f"When enabled, individual data points with frequency < {SEQUENCING_ERROR_RATE} will be shown as 'No data'. Mutations are still included if their maximum frequency meets the threshold above.",
+            key=f"{session_prefix}filter_error_rate"
+        )
     else:
         min_frequency = config['default_min_frequency']
         max_frequency = config['default_max_frequency']
@@ -275,6 +289,27 @@ def render_mutation_plot_component(
     else:
         target.warning(f"No mutations found within the frequency range {min_frequency:.3f} - {max_frequency:.3f}. Please adjust the frequency thresholds.")
         return None
+    
+    # Apply error rate filtering to individual data points if enabled
+    if config['show_frequency_filtering'] and filter_error_rate:
+        # Convert to numeric for comparison (optimize by only converting non-numeric columns)
+        freq_df_for_filtering = freq_df_filtered.replace({None: np.nan, ',': ''}, regex=True)
+        
+        # Only convert object (string) columns to numeric for efficiency
+        obj_cols = freq_df_for_filtering.select_dtypes(include='object').columns
+        if len(obj_cols) > 0:
+            freq_df_for_filtering[obj_cols] = freq_df_for_filtering[obj_cols].apply(pd.to_numeric, errors='coerce')
+        
+        # Create masks for values below error rate
+        below_error_rate = freq_df_for_filtering < SEQUENCING_ERROR_RATE
+        
+        # Apply filtering by setting values below threshold to NaN
+        freq_df_filtered = freq_df_filtered.copy()
+        freq_df_filtered[below_error_rate] = np.nan
+        
+        # Also filter counts_df to match
+        counts_df_filtered = counts_df_filtered.copy()
+        counts_df_filtered[below_error_rate] = np.nan
     
     # Date display options
     if config['show_date_options'] and config['enable_empty_date_toggle']:

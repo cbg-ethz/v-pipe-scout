@@ -12,14 +12,13 @@ from .lapis import Lapis
 from .exceptions import APIError
 from interface import MutationType
 
-from process.mutations import get_symbols_for_mutation_type
-
 # Constants for fallback date range
 FALLBACK_START_DATE, FALLBACK_END_DATE = datetime(2025, 1, 1), datetime(2025, 12, 31)
 
 class WiseLoculusLapis(Lapis):
     """Wise-Loculus Instance API"""
 
+    # TODO: phase out
     async def fetch_sample_aggregated(
             self,
             session: aiohttp.ClientSession, 
@@ -71,6 +70,7 @@ class WiseLoculusLapis(Lapis):
             logging.error(f"Connection error fetching data for mutation {mutation}: {e}")
             return {"mutation": mutation, "data": None, "error": str(e)}
 
+    # TODO: phase out
     async def fetch_mutation_counts(
             self, 
             mutations: List[str], 
@@ -88,174 +88,7 @@ class WiseLoculusLapis(Lapis):
         async with aiohttp.ClientSession() as session:
             tasks = [self.fetch_sample_aggregated(session, m, mutation_type, date_range, location_name) for m in mutations]
             return await asyncio.gather(*tasks, return_exceptions=True)  # return_exceptions to avoid failing the entire batch
-        
-    async def _fetch_coverage_for_mutation(
-            self, 
-            session: aiohttp.ClientSession,
-            mutation: str,
-            mutation_type: MutationType,
-            date_range: Tuple[datetime, datetime],
-            location_name: Optional[str]
-        ) -> Tuple[dict[str, int], dict[str, dict]]:
-        """
-        Fetches coverage data for all possible symbols at a mutation position.
-        Returns (coverage_data, stratified_results).
-        """
-        symbols = get_symbols_for_mutation_type(mutation_type)
-        mutation_base = mutation[:-1]  # Everything except the last character
-        
-        # Fetch data for all possible symbols at this position
-        coverage_tasks = [
-            self.fetch_sample_aggregated(session, f"{mutation_base}{symbol}", mutation_type, date_range, location_name)
-            for symbol in symbols
-        ]
-        coverage_results = await asyncio.gather(*coverage_tasks)
-
-        # Parse coverage_results to extract total counts for each symbol
-        coverage_data = {
-            symbol: sum(entry['count'] for entry in item['data']) if item['data'] else 0
-            for symbol, item in zip(symbols, coverage_results)
-        }
-
-        # Stratify results by sampling_date
-        stratified_results = {}
-        for symbol, item in zip(symbols, coverage_results):
-            if item['data']:
-                for entry in item['data']:
-                    date = entry['sampling_date']
-                    count = entry['count']
-                    if date not in stratified_results:
-                        stratified_results[date] = {"counts": {s: 0 for s in symbols}, "coverage": 0}
-                    stratified_results[date]["counts"][symbol] += count
-                    stratified_results[date]["coverage"] += count
-
-        return coverage_data, stratified_results
-
-    def _calculate_mutation_result(
-            self, 
-            mutation: str, 
-            coverage_data: dict[str, int], 
-            stratified_results: dict[str, dict]
-        ) -> dict[str, Any]:
-        """
-        Calculates the final result for a mutation including overall and stratified statistics.
-        """
-        target_symbol = mutation[-1]
-        total_coverage = sum(coverage_data.values())
-        frequency = coverage_data.get(target_symbol, 0) / total_coverage if total_coverage > 0 else 0
-
-        # Calculate frequency for the target symbol on each date
-        for date, data in stratified_results.items():
-            data["frequency"] = data["counts"].get(target_symbol, 0) / data["coverage"] if data["coverage"] > 0 else 0
-
-        # Build stratified data with proper NA handling
-        stratified_data = [
-            {
-                "sampling_date": date,
-                "coverage": data["coverage"],
-                "frequency": data["frequency"] if data["coverage"] > 0 else "NA",
-                "count": data["counts"].get(target_symbol, 0) if data["coverage"] > 0 else "NA"
-            }
-            for date, data in stratified_results.items()
-        ]
-
-        return {
-            "mutation": mutation,
-            "coverage": total_coverage,
-            "frequency": frequency,
-            "counts": coverage_data,
-            "stratified": stratified_data
-        }
-
-    async def fetch_mutation_counts_and_coverage(
-            self, 
-            mutations: List[str], 
-            mutation_type: MutationType, 
-            date_range: Tuple[datetime, datetime], 
-            location_name: Optional[str] = None
-        ) -> List[dict[str, Any]]:
-        """
-        Fetches the mutation counts and coverage for a list of mutations, specifying their type and optional location.
-
-        Note Amino Acid mutations require gene:change name "ORF1a:V3449I" while nucleotide mutations can be in the form "A123T".
-        """
-  
-        try:
-            timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                combined_results = []
-
-                for mutation in mutations:
-                    # Fetch coverage data for all possible symbols at this position
-                    coverage_data, stratified_results = await self._fetch_coverage_for_mutation(
-                        session, mutation, mutation_type, date_range, location_name
-                    )
-                    
-                    # Calculate and append the result for this mutation
-                    mutation_result = self._calculate_mutation_result(mutation, coverage_data, stratified_results)
-                    combined_results.append(mutation_result)
-
-                return combined_results
-        except Exception as e:
-            logging.error(f"Error fetching mutation counts and coverage: {e}")
-            # Return empty results for all mutations
-            return [{"mutation": mutation, "coverage": 0, "frequency": 0, "counts": {}, "stratified": []} for mutation in mutations]
-        
-    
-    async def fetch_counts_coverage_freq(self, mutations: List[str], mutation_type: MutationType, date_range: Tuple[datetime, datetime], location_name: str) -> pd.DataFrame:
-        """Fetches mutation counts, coverage, and frequency for a list of nucleotide mutations over a date range.
-
-        Args:
-            mutations (list): List of nucleotide mutations to fetch data for.
-            date_range (tuple): Tuple containing start and end dates for the data range.
-
-        Returns:
-            pd.DataFrame: A MultiIndex DataFrame with mutation and sampling_date as the index, and count, coverage, and frequency as columns.
-        """
-
-        try:
-            all_data = await self.fetch_mutation_counts_and_coverage(mutations, mutation_type, date_range, location_name)
-
-            # Debug logging
-            logging.debug(f"fetch_counts_coverage_freq: Received {len(all_data)} mutation results")
-
-            # Flatten the data into a list of records
-            records = []
-            for mutation_data in all_data:
-                mutation = mutation_data["mutation"]
-                stratified_data = mutation_data.get("stratified", [])
-                logging.debug(f"Mutation {mutation}: {len(stratified_data)} stratified entries")
-                
-                for stratified in stratified_data:
-                    records.append({
-                        "mutation": mutation,
-                        "sampling_date": stratified["sampling_date"],
-                        "count": stratified["count"],
-                        "coverage": stratified["coverage"],
-                        "frequency": stratified["frequency"]
-                    })
-
-            logging.debug(f"Created {len(records)} records from API data")
-
-            # Create a DataFrame from the records
-            df = pd.DataFrame(records)
-
-            # Only set MultiIndex if we have data and the required columns exist
-            if not df.empty and "mutation" in df.columns and "sampling_date" in df.columns:
-                df.set_index(["mutation", "sampling_date"], inplace=True)
-            else:
-                # Create empty DataFrame with proper MultiIndex structure
-                df = pd.DataFrame(columns=["count", "coverage", "frequency"])
-                df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
-
-            # Return the DataFrame
-            return df
-        except Exception as e:
-            logging.error(f"Error fetching mutation counts and coverage: {e}")
-            # Return empty DataFrame with proper MultiIndex structure
-            df = pd.DataFrame(columns=["count", "coverage", "frequency"])
-            df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
-            return df
+            
 
     async def sample_mutations(
             self, 
@@ -319,67 +152,6 @@ class WiseLoculusLapis(Lapis):
             logging.error(f"Error fetching mutations: {e}")
             return pd.DataFrame()
     
-
-    async def mutations_over_time_fallback(
-        self, 
-        formatted_mutations: List[str], 
-        mutation_type: MutationType, 
-        date_range: Tuple[datetime, datetime], 
-        location_name: str
-    ) -> pd.DataFrame:
-        """
-        Fetch mutation data using the fallback fetch_counts_coverage_freq method.
-        Returns a MultiIndex DataFrame compatible with mutations_over_time.
-        
-        Args:
-            formatted_mutations: List of mutation strings (e.g., ['A123T', 'C456G'] for nucleotides 
-                               or ['ORF1a:V3449I'] for amino acids)
-            mutation_type: Type of mutations (MutationType.NUCLEOTIDE or MutationType.AMINO_ACID)
-            date_range: Tuple of (start_date, end_date) as datetime objects
-            location_name: Name of the location to filter by
-            
-        Returns:
-            pd.DataFrame: MultiIndex DataFrame with (mutation, sampling_date) as index 
-                         and count, coverage, frequency as columns
-            
-        Raises:
-            TypeError: If formatted_mutations is not a list of strings
-            ValueError: If formatted_mutations is empty or contains invalid mutation formats
-        """
-        # Type validation
-        if not isinstance(formatted_mutations, list):
-            raise TypeError(f"formatted_mutations must be a list of strings, got {type(formatted_mutations).__name__}: {formatted_mutations}")
-        
-        if not formatted_mutations:
-            # Return empty DataFrame with proper MultiIndex structure when no mutations provided
-            logging.warning("No mutations provided to mutations_over_time_fallback, returning empty DataFrame")
-            empty_coverage_df = pd.DataFrame(columns=["count", "coverage", "frequency"])
-            empty_coverage_df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
-            return empty_coverage_df
-            
-        if not all(isinstance(m, str) for m in formatted_mutations):
-            raise TypeError(f"All elements in formatted_mutations must be strings, got: {[type(m).__name__ for m in formatted_mutations]}")
-        
-        # Basic format validation for mutations
-        for mutation in formatted_mutations:
-            if not mutation.strip():  # Check for empty or whitespace-only strings
-                raise ValueError(f"Invalid mutation format: empty or whitespace-only string")
-            
-            if mutation_type == MutationType.NUCLEOTIDE:
-                # Nucleotide mutations should be like "A123T" - at least 3 characters
-                if len(mutation) < 3:
-                    raise ValueError(f"Invalid nucleotide mutation format: '{mutation}'. Expected format like 'A123T'")
-            elif mutation_type == MutationType.AMINO_ACID:
-                # Amino acid mutations should contain ":" for gene:mutation format
-                if ":" not in mutation:
-                    raise ValueError(f"Invalid amino acid mutation format: '{mutation}'. Expected format like 'ORF1a:V3449I'")
-
-        # Fetch comprehensive data using the existing async method
-        coverage_freq_df = await self.fetch_counts_coverage_freq(
-            formatted_mutations, mutation_type, date_range, location_name
-        )
-        
-        return coverage_freq_df
 
     async def get_date_range(self) -> Tuple[Optional[datetime], Optional[datetime]]:
         """
@@ -792,40 +564,14 @@ class WiseLoculusLapis(Lapis):
             return df
 
         except APIError as api_error:
-            # Handle API failures by falling back to the slower legacy method
-            logging.warning(f"APIError encountered in mutations_over_time: {api_error}")
-            logging.info("Switching to fallback method (mutations_over_time_fallback) - this may be slower")
-            
-            try:
-                df = await self.mutations_over_time_fallback(
-                    formatted_mutations=mutations,
-                    mutation_type=mutation_type,
-                    date_range=date_range,
-                    location_name=location_name
-                )
-                
-                # Add a marker to indicate fallback was used - components can detect this
-                if hasattr(df, 'attrs'):
-                    df.attrs['fallback_used'] = True
-                    df.attrs['fallback_reason'] = f"Primary API failed: {str(api_error)}"
-                
-                logging.info("Successfully retrieved data using fallback method")
-                return df
-                
-            except Exception as fallback_error:
-                logging.error(f"Fallback method also failed: {fallback_error}")
-                # If fallback also fails, return empty DataFrame
-                df = pd.DataFrame(columns=["count", "coverage", "frequency"])
-                df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
-                if hasattr(df, 'attrs'):
-                    df.attrs['fallback_used'] = True
-                    df.attrs['fallback_failed'] = True
-                    df.attrs['fallback_reason'] = f"Primary API failed: {str(api_error)}, Fallback failed: {str(fallback_error)}"
-                return df
+            # Log the API error and return empty DataFrame
+            logging.error(f"APIError encountered in mutations_over_time: {api_error}")
+            df = pd.DataFrame(columns=["count", "coverage", "frequency"])
+            df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
+            return df
         except Exception as e:
             logging.error(f"Error in mutations_over_time: {e}")
             # Return empty DataFrame with proper MultiIndex structure
             df = pd.DataFrame(columns=["count", "coverage", "frequency"])
             df.index = pd.MultiIndex.from_tuples([], names=["mutation", "sampling_date"])
             return df
-

@@ -76,7 +76,7 @@ V-Pipe Scout is a Streamlit-based interactive web application for rapid viral va
 
 ### Frontend (`app/` directory)
 - **Main app**: `app.py` - Streamlit entry point
-- **Subpages**: `subpages/` - Individual pages (background.py, dynamic_mutations.py, resistance_mut_silo.py, signature_explorer.py, abundance_estimator.py, task_runner.py, index.py)
+- **Subpages**: `subpages/` - Individual pages (background.py, dynamic_mutations.py, resistance_mut_silo.py, signature_explorer.py, abundance.py, task_runner.py, index.py)
 - **Core components**: `components/` - Reusable UI components
 - **Configuration**: `config.yaml` - LAPIS server settings
 - **Environment**: `environment.yml` - Python 3.12, Streamlit 1.47, pandas, matplotlib, plotly
