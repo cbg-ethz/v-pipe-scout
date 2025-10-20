@@ -11,7 +11,7 @@ import pytest
 
 from streamlit.testing.v1 import AppTest
 
-APP_PATH = os.getenv("APP_PATH", default="app.py")
+APP_PATH = Path(os.getenv("APP_PATH", default="app.py"))
 SKIP_SMOKE = os.getenv("SKIP_SMOKE", "False").lower() in ("true", "1", "t")
 
 pytestmark = pytest.mark.skipif(SKIP_SMOKE, reason="smoke test is disabled by config")
@@ -19,12 +19,13 @@ pytestmark = pytest.mark.skipif(SKIP_SMOKE, reason="smoke test is disabled by co
 
 def get_file_paths() -> list[str]:
     """Get a list of file paths for the main page + each page in the pages folder."""
-    page_folder = Path(APP_PATH).parent / "subpages"
+    app_path = APP_PATH.resolve()
+    page_folder = app_path.parent / "subpages"
     if not page_folder.exists():
-        return [APP_PATH]
+        return [str(app_path)]
     page_files = page_folder.glob("*.py")
     file_paths = [str(file.absolute().resolve()) for file in page_files]
-    return [APP_PATH] + file_paths
+    return [str(app_path)] + file_paths
 
 
 def pytest_generate_tests(metafunc):
@@ -55,7 +56,7 @@ def test_smoke_page(file_path):
     """
     # Ensure app directory is in PYTHONPATH for AppTest subprocess
     # AppTest.from_file() spawns a new interpreter that needs to find components
-    app_dir = str(Path(__file__).parent.parent.absolute())
+    app_dir = str(APP_PATH.resolve().parent)
     current_pythonpath = os.environ.get('PYTHONPATH', '')
     
     # Prepend app directory to PYTHONPATH
