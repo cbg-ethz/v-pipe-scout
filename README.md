@@ -69,16 +69,36 @@ _Only accessible within ETH Zürich Networks._
     ./setup.sh  # Creates .env with secure Redis password (single source of truth)
     ```
 
-3. **Configure LAPIS connection** in `app/config.yaml`:
+3. **Install dependencies:**
+    ```sh
+    # Frontend dependencies (using uv for fast installation)
+    cd app
+    pip install uv
+    uv sync  # Installs all dependencies in ~1 second
+    cd ..
+    ```
+
+4. **Configure LAPIS connection** in `app/config.yaml`:
     ```yaml
     server:
       lapis_address: "http://host.docker.internal:8083"  # For local LAPIS
     ```
 
-4. **Run the application:**
+5. **Run the application:**
     ```sh
     docker compose up --build
     ```
+
+**Alternative: Local development without Docker**
+```sh
+# Install uv and dependencies
+cd app
+pip install uv
+uv sync
+
+# Run Streamlit app locally
+uv run streamlit run app.py --server.port=8888
+```
 
 ### Automatic Deployment
 
