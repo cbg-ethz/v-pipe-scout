@@ -1,8 +1,13 @@
 """Test configuration for app tests."""
 
 import os
+import sys
 import pytest
 from unittest.mock import patch
+
+# Add parent directory (app/) to Python path so we can import modules directly
+# This allows tests to use imports like "from components.mutation_plot_component import ..."
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 @pytest.fixture(autouse=True)
