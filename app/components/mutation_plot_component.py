@@ -15,6 +15,9 @@ from interface import MutationType
 from visualize.mutations import mutations_over_time
 from api.exceptions import APIError
 
+# Sequencing error rate threshold (0.32%)
+SEQUENCING_ERROR_RATE = 0.0032
+
 
 def render_mutation_plot_component(
     wiseLoculus: Any,
@@ -238,10 +241,11 @@ def render_mutation_plot_component(
         
         # Error rate filtering checkbox
         target.markdown("")
+        error_rate_percent = SEQUENCING_ERROR_RATE * 100
         filter_error_rate = target.checkbox(
-            "Filter out individual frequencies below sequencing error rate (0.32%)",
+            f"Filter out individual frequencies below sequencing error rate ({error_rate_percent:.2f}%)",
             value=False,
-            help="When enabled, individual data points with frequency < 0.0032 will be shown as 'No data'. Mutations are still included in the plot if their maximum frequency meets the threshold above.",
+            help=f"When enabled, individual data points with frequency < {SEQUENCING_ERROR_RATE} will be shown as 'No data'. Mutations are still included if their maximum frequency meets the threshold above.",
             key=f"{session_prefix}filter_error_rate"
         )
     else:
@@ -293,8 +297,7 @@ def render_mutation_plot_component(
         freq_df_for_filtering = freq_df_for_filtering.apply(pd.to_numeric, errors='coerce')
         
         # Create masks for values below error rate
-        error_rate_threshold = 0.0032
-        below_error_rate = freq_df_for_filtering < error_rate_threshold
+        below_error_rate = freq_df_for_filtering < SEQUENCING_ERROR_RATE
         
         # Apply filtering by setting values below threshold to NaN
         freq_df_filtered = freq_df_filtered.copy()
