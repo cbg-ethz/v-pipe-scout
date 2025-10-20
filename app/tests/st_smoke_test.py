@@ -1,17 +1,13 @@
 import sys
 from pathlib import Path
-
-# Add parent directory (app/) to sys.path for Streamlit AppTest imports
-# This is needed because AppTest.from_file() uses Streamlit's module loader
-# which reads sys.path at import time, not at pytest discovery time
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
 import os
 import pytest
+from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
-APP_PATH = Path(os.getenv("APP_PATH", default="app.py"))
+APP_PATH = os.getenv("APP_PATH", default="app.py")
 SKIP_SMOKE = os.getenv("SKIP_SMOKE", "False").lower() in ("true", "1", "t")
 
 pytestmark = pytest.mark.skipif(SKIP_SMOKE, reason="smoke test is disabled by config")
@@ -19,13 +15,12 @@ pytestmark = pytest.mark.skipif(SKIP_SMOKE, reason="smoke test is disabled by co
 
 def get_file_paths() -> list[str]:
     """Get a list of file paths for the main page + each page in the pages folder."""
-    app_path = APP_PATH.resolve()
-    page_folder = app_path.parent / "subpages"
+    page_folder = Path(APP_PATH).parent / "subpages"
     if not page_folder.exists():
-        return [str(app_path)]
+        return [APP_PATH]
     page_files = page_folder.glob("*.py")
     file_paths = [str(file.absolute().resolve()) for file in page_files]
-    return [str(app_path)] + file_paths
+    return [APP_PATH] + file_paths
 
 
 def pytest_generate_tests(metafunc):
@@ -54,23 +49,5 @@ def test_smoke_page(file_path):
     This will run a basic test on each page in the pages folder, checking to see that
     there are no exceptions raised while the app runs.
     """
-    # Ensure app directory is in PYTHONPATH for AppTest subprocess
-    # AppTest.from_file() spawns a new interpreter that needs to find components
-    app_dir = str(APP_PATH.resolve().parent)
-    current_pythonpath = os.environ.get('PYTHONPATH', '')
-    
-    # Prepend app directory to PYTHONPATH
-    if current_pythonpath:
-        os.environ['PYTHONPATH'] = f"{app_dir}{os.pathsep}{current_pythonpath}"
-    else:
-        os.environ['PYTHONPATH'] = app_dir
-    
-    try:
-        at = AppTest.from_file(file_path, default_timeout=20).run()
-        assert not at.exception
-    finally:
-        # Restore original PYTHONPATH
-        if current_pythonpath:
-            os.environ['PYTHONPATH'] = current_pythonpath
-        else:
-            os.environ.pop('PYTHONPATH', None)
+    at = AppTest.from_file(file_path, default_timeout=20).run()
+    assert not at.exception
