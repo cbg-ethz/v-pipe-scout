@@ -187,6 +187,7 @@ def render_mutation_plot_component(
         return None
     
     # Frequency filtering controls
+    filter_error_rate = False  # Default value
     if config['show_frequency_filtering']:
         target.markdown("---")
         target.write("### Frequency Filtering")
@@ -205,12 +206,12 @@ def render_mutation_plot_component(
         with col1:
             min_frequency = target.slider(
                 "Minimum frequency threshold",
-                min_value=0.0032,
+                min_value=0.0,
                 max_value=1.0,
                 value=url_min_freq,
                 step=0.001,
                 format="%.3f",
-                help="Only show mutations that reach at least this frequency at some point in the timeframe. Lower bound is set to 0.32%, the average sequence error rate.",
+                help="Only show mutations that reach at least this frequency at some point in the timeframe.",
                 key=f"{session_prefix}min_frequency"
             )
         
@@ -234,6 +235,15 @@ def render_mutation_plot_component(
         if min_frequency > max_frequency:
             target.error("Minimum frequency cannot be greater than maximum frequency.")
             return None
+        
+        # Error rate filtering checkbox
+        target.markdown("")
+        filter_error_rate = target.checkbox(
+            "Filter out individual frequencies below sequencing error rate (0.32%)",
+            value=False,
+            help="When enabled, individual data points with frequency < 0.0032 will be shown as 'No data'. Mutations are still included in the plot if their maximum frequency meets the threshold above.",
+            key=f"{session_prefix}filter_error_rate"
+        )
     else:
         min_frequency = config['default_min_frequency']
         max_frequency = config['default_max_frequency']
@@ -275,6 +285,24 @@ def render_mutation_plot_component(
     else:
         target.warning(f"No mutations found within the frequency range {min_frequency:.3f} - {max_frequency:.3f}. Please adjust the frequency thresholds.")
         return None
+    
+    # Apply error rate filtering to individual data points if enabled
+    if config['show_frequency_filtering'] and filter_error_rate:
+        # Convert to numeric for comparison
+        freq_df_for_filtering = freq_df_filtered.replace({None: np.nan, ',': ''}, regex=True)
+        freq_df_for_filtering = freq_df_for_filtering.apply(pd.to_numeric, errors='coerce')
+        
+        # Create masks for values below error rate
+        error_rate_threshold = 0.0032
+        below_error_rate = freq_df_for_filtering < error_rate_threshold
+        
+        # Apply filtering by setting values below threshold to NaN
+        freq_df_filtered = freq_df_filtered.copy()
+        freq_df_filtered[below_error_rate] = np.nan
+        
+        # Also filter counts_df to match
+        counts_df_filtered = counts_df_filtered.copy()
+        counts_df_filtered[below_error_rate] = np.nan
     
     # Date display options
     if config['show_date_options'] and config['enable_empty_date_toggle']:
