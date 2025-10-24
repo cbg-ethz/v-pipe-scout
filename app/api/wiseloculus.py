@@ -4,7 +4,7 @@ import logging
 import aiohttp
 import asyncio
 from typing import Optional, List, Tuple, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 
@@ -13,7 +13,17 @@ from .exceptions import APIError
 from interface import MutationType
 
 # Constants for fallback date range
-FALLBACK_START_DATE, FALLBACK_END_DATE = datetime(2025, 1, 1), datetime(2025, 12, 31)
+# When API fails, use the last 3 months instead of an entire year to avoid huge API calls
+def get_fallback_date_range() -> Tuple[datetime, datetime]:
+    """
+    Returns fallback date range of the last 3 months from today.
+    This avoids excessively large API calls when the API date range query fails.
+    """
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=90)  # Approximately 3 months
+    return start_date, end_date
+
+FALLBACK_START_DATE, FALLBACK_END_DATE = get_fallback_date_range()
 
 class WiseLoculusLapis(Lapis):
     """Wise-Loculus Instance API"""
