@@ -182,9 +182,9 @@ class TestWiseLoculusLapis:
 
         # Expected payload structure
         expected_payload = {
-            "sampling_dateFrom": "2024-01-01",
-            "sampling_dateTo": "2024-01-31",
-            "location_name": location_name,
+            "samplingDateFrom": "2024-01-01",
+            "samplingDateTo": "2024-01-31",
+            "locationName": location_name,
             "minProportion": min_proportion,
             "orderBy": "proportion",
             "limit": 10000,

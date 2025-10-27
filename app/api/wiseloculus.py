@@ -31,10 +31,10 @@ class WiseLoculusLapis(Lapis):
         Fetches aggregated sample data for a given mutation, type, date range, and optional location.
         """
         payload: dict[str, Any] = { 
-            "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
-            "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
-            "fields": ["sampling_date"],
-            "orderBy": ["sampling_date"]  # API expects array, not string
+            "samplingDateFrom": date_range[0].strftime('%Y-%m-%d'),
+            "samplingDateTo": date_range[1].strftime('%Y-%m-%d'),
+            "fields": ["samplingDate"],
+            "orderBy": ["samplingDate"]  # API expects array, not string
         }
 
         if mutation_type == MutationType.AMINO_ACID:
@@ -46,7 +46,7 @@ class WiseLoculusLapis(Lapis):
             return {"mutation": mutation, "data": None, "error": "Unknown mutation type"}
 
         if location_name:
-            payload["location_name"] = location_name  
+            payload["locationName"] = location_name  
 
         logging.debug(f"Fetching sample aggregated with payload: {payload}")
         try:
@@ -109,9 +109,9 @@ class WiseLoculusLapis(Lapis):
         """
 
         payload = {
-            "sampling_dateFrom": date_range[0].strftime('%Y-%m-%d'),
-            "sampling_dateTo": date_range[1].strftime('%Y-%m-%d'),
-            "location_name": location_name,
+            "samplingDateFrom": date_range[0].strftime('%Y-%m-%d'),
+            "samplingDateTo": date_range[1].strftime('%Y-%m-%d'),
+            "locationName": location_name,
             "minProportion": min_proportion, 
             "orderBy": "proportion",
             "limit": 10000,  # Adjust limit as needed
@@ -165,7 +165,7 @@ class WiseLoculusLapis(Lapis):
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
                     f'{self.server_ip}/sample/aggregated',
-                    params={'fields': 'sampling_date'},
+                    params={'fields': 'samplingDate'},
                     headers={'accept': 'application/json'}
                 ) as response:
                     if response.status == 200:
@@ -179,12 +179,12 @@ class WiseLoculusLapis(Lapis):
                         # Extract all dates and convert to datetime objects
                         dates = []
                         for entry in sample_data:
-                            if 'sampling_date' in entry:
+                            if 'samplingDate' in entry:
                                 try:
-                                    date_obj = datetime.strptime(entry['sampling_date'], '%Y-%m-%d')
+                                    date_obj = datetime.strptime(entry['samplingDate'], '%Y-%m-%d')
                                     dates.append(date_obj)
                                 except ValueError as e:
-                                    logging.warning(f"Invalid date format: {entry['sampling_date']}: {e}")
+                                    logging.warning(f"Invalid date format: {entry['samplingDate']}: {e}")
                         
                         if not dates:
                             logging.warning("No valid sampling dates found")
@@ -296,7 +296,7 @@ class WiseLoculusLapis(Lapis):
         """
         payload = {
             "filters": {
-                "location_name": location_name
+                "locationName": location_name
             },
             "includeMutations": mutations,
             "dateRanges": [
@@ -306,7 +306,7 @@ class WiseLoculusLapis(Lapis):
                 }
                 for date_range in date_ranges
             ],
-            "dateField": "sampling_date"
+            "dateField": "samplingDate"
         }
 
         logging.debug(f"Fetching {mutation_type_name} mutations over time with payload: {payload}")
