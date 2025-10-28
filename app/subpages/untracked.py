@@ -105,7 +105,7 @@ def app():
                         start_date,
                         end_date
                     ),
-                    location_name=location
+                    locationName=location
                 ))
 
                 # Handle case where no mutations were found or API call failed

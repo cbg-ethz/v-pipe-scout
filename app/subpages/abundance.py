@@ -1013,7 +1013,7 @@ def app():
                                         'mutation_variant_matrix_df': matrix_pickle,
                                         'bootstraps': bootstraps,
                                         'bandwidth': bandwidth,  # Add bandwidth parameter
-                                        'location_name': location  # Add location name
+                                        'locationName': location  # Add location name
                                     }
                                 )
                                 
@@ -1034,8 +1034,8 @@ def app():
                 
                 if len(st.session_state.location_data) == 1:
                     # Single location - show simple download
-                    location_name = list(st.session_state.location_data.keys())[0]
-                    location_data = st.session_state.location_data[location_name]
+                    locationName = list(st.session_state.location_data.keys())[0]
+                    location_data = st.session_state.location_data[locationName]
                     
                     # Create columns for download buttons
                     col1, col2 = st.columns(2)
@@ -1045,9 +1045,9 @@ def app():
                         # Make sure to preserve index for dates and mutations
                         csv = location_data.to_csv(index=True)
                         st.download_button(
-                            label=f"Download {location_name} as CSV",
+                            label=f"Download {locationName} as CSV",
                             data=csv,
-                            file_name=f'mutation_counts_coverage_{location_name.replace(" ", "_")}.csv',
+                            file_name=f'mutation_counts_coverage_{locationName.replace(" ", "_")}.csv',
                             mime='text/csv',
                             help="Download all data as a single CSV file with preserved indices."
                         )
@@ -1058,9 +1058,9 @@ def app():
                         json_data = location_data.to_json(orient='split', date_format='iso', index=True)
                         
                         st.download_button(
-                            label=f"Download {location_name} as JSON",
+                            label=f"Download {locationName} as JSON",
                             data=json_data,
-                            file_name=f'mutation_counts_coverage_{location_name.replace(" ", "_")}.json',
+                            file_name=f'mutation_counts_coverage_{locationName.replace(" ", "_")}.json',
                             mime='application/json',
                             help="Download data as a JSON file that preserves dates and mutation indices."
                         )
@@ -1072,19 +1072,19 @@ def app():
                     combined_dfs = []
                     total_data_points = 0
                     
-                    for location_name, location_data in st.session_state.location_data.items():
+                    for locationName, location_data in st.session_state.location_data.items():
                         try:
                             if location_data is not None and not location_data.empty:
                                 # Add location column to each dataframe
                                 location_df = location_data.copy()
-                                location_df['location'] = location_name
+                                location_df['location'] = locationName
                                 combined_dfs.append(location_df)
                                 total_data_points += len(location_df)
-                                st.caption(f"✅ {location_name}: {len(location_df)} data points")
+                                st.caption(f"✅ {locationName}: {len(location_df)} data points")
                             else:
-                                st.caption(f"⚠️ {location_name}: No data available")
+                                st.caption(f"⚠️ {locationName}: No data available")
                         except Exception as e:
-                            st.caption(f"❌ {location_name}: Error processing data - {str(e)}")
+                            st.caption(f"❌ {locationName}: Error processing data - {str(e)}")
                     
                     if combined_dfs:
                         # Concatenate all dataframes

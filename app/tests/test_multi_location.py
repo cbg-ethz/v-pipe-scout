@@ -43,9 +43,9 @@ class TestMultiLocationUtils:
                     })
             
             df = pd.DataFrame(data)
-            # Create MultiIndex with mutation and sampling_date
+            # Create MultiIndex with mutation and samplingDate
             index_tuples = [(mut, date) for date in dates for mut in mutations]
-            df.index = pd.MultiIndex.from_tuples(index_tuples, names=['mutation', 'sampling_date'])
+            df.index = pd.MultiIndex.from_tuples(index_tuples, names=['mutation', 'samplingDate'])
             
             return df
         
