@@ -1,4 +1,4 @@
-mutation,sampling_date,count,coverage,frequency
+mutation,samplingDate,count,coverage,frequency
 29734-,2025-02-18,0,1,0.0
 29734-,2025-03-06,0,2,0.0
 A29510C,2025-03-06,725872,725908,0.9999504069386204

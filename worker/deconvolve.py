@@ -152,8 +152,8 @@ def devconvolve(
 
         # # add the  above-update matrix to the mutation counts+coverage table
         # xsv join --left mutation  /tmp/mutation_counts_coverage.csv  Mutation /tmp/mutation_variant_matrix2.csv |
-        #  xsv select sampling_date,count,coverage,frequency,mutation,pos,base,9-  |
-        #  xsv fmt --out-delimiter '\t'  | sed '1s/sampling_date/date/;1s/coverage/cov/;1s/frequency/frac/' >  /tmp/tallymut.tsv
+        #  xsv select samplingDate,count,coverage,frequency,mutation,pos,base,9-  |
+        #  xsv fmt --out-delimiter '\t'  | sed '1s/samplingDate/date/;1s/coverage/cov/;1s/frequency/frac/' >  /tmp/tallymut.tsv
 
         # Create output filename with descriptive suffix
         tallymut_file = output_dir / (mutation_counts.stem + "_tallymut.tsv")
@@ -247,7 +247,7 @@ def devconvolve(
             select_command = [
                 "xsv",
                 "select",
-                "sampling_date,count,coverage,frequency,mutation,pos,base,9-",
+                "samplingDate,count,coverage,frequency,mutation,pos,base,9-",
             ]
             select_result = subprocess.run(
                 select_command,
@@ -272,7 +272,7 @@ def devconvolve(
             # Fourth subprocess: sed
             sed_command = [
                 "sed",
-                "1s/sampling_date/date/;1s/coverage/cov/;1s/frequency/frac/",
+                "1s/samplingDate/date/;1s/coverage/cov/;1s/frequency/frac/",
             ]
             with open(tallymut_file, "w") as f:
                 subprocess.run(

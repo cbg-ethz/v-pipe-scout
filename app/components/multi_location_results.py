@@ -37,10 +37,10 @@ def render_location_results_tabs(
         return
     
     # Create tabs for each location
-    location_names = list(location_tasks.keys())
-    tabs = st.tabs([f"📍 {loc}" for loc in location_names])
+    locationNames = list(location_tasks.keys())
+    tabs = st.tabs([f"📍 {loc}" for loc in locationNames])
     
-    for i, (location, tab) in enumerate(zip(location_names, tabs)):
+    for i, (location, tab) in enumerate(zip(locationNames, tabs)):
         with tab:
             task_id = location_tasks[location]
             

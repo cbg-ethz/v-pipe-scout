@@ -125,7 +125,7 @@ def app():
             mutations_in_timeframe_df = asyncio.run(wiseLoculus.sample_mutations(
                 type=mutation_type,
                 date_range=(start_date, end_date),
-                location_name=location,
+                locationName=location,
                 min_proportion=min_proportion  # Lower threshold to get more mutations
             ))
 

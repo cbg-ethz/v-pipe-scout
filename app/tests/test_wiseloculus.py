@@ -91,7 +91,7 @@ class TestWiseLoculusLapis:
                 result = await self.api.sample_mutations(
                     type=MutationType.NUCLEOTIDE,
                     date_range=self.date_range,
-                    location_name="Zurich",
+                    locationName="Zurich",
                     min_proportion=0.01
                 )
 
@@ -163,7 +163,7 @@ class TestWiseLoculusLapis:
                 result = await self.api.sample_mutations(
                     type=MutationType.AMINO_ACID,
                     date_range=self.date_range,
-                    location_name="Zurich"
+                    locationName="Zurich"
                 )
 
         # Assertions
@@ -177,14 +177,14 @@ class TestWiseLoculusLapis:
         """Test that the payload is constructed correctly for sample_mutations."""
         # This tests the payload construction logic without making actual HTTP calls
         date_range = (datetime(2024, 1, 1), datetime(2024, 1, 31))
-        location_name = "Zurich"
+        locationName = "Zurich"
         min_proportion = 0.05
 
         # Expected payload structure
         expected_payload = {
-            "sampling_dateFrom": "2024-01-01",
-            "sampling_dateTo": "2024-01-31",
-            "location_name": location_name,
+            "samplingDateFrom": "2024-01-01",
+            "samplingDateTo": "2024-01-31",
+            "locationName": locationName,
             "minProportion": min_proportion,
             "orderBy": "proportion",
             "limit": 10000,
@@ -268,7 +268,7 @@ class TestWiseLoculusLapisLiveAPI:
             result = await self.api.sample_mutations(
                 type=MutationType.NUCLEOTIDE,
                 date_range=self.date_range,
-                location_name="Zürich (ZH)",
+                locationName="Zürich (ZH)",
                 min_proportion=0.001  # Lower threshold to get some results
             )
 
@@ -309,7 +309,7 @@ class TestWiseLoculusLapisLiveAPI:
             result = await self.api.sample_mutations(
                 type=MutationType.AMINO_ACID,
                 date_range=self.date_range,
-                location_name="Zürich (ZH)",
+                locationName="Zürich (ZH)",
                 min_proportion=0.001  # Lower threshold to get some results
             )
             
@@ -344,12 +344,12 @@ class TestWiseLoculusLapisLiveAPI:
                 (datetime(2025, 6, 12), datetime(2025, 6, 18)),
                 (datetime(2025, 6, 19), datetime(2025, 6, 26))
             ]
-            location_name = "Zürich (ZH)"
+            locationName = "Zürich (ZH)"
             
             result = await self.api.component_aminoAcidMutationsOverTime(
                 mutations=mutations,
                 date_ranges=date_ranges,
-                location_name=location_name
+                locationName=locationName
             )
             
             print(f"Live component test result keys: {list(result.keys()) if isinstance(result, dict) else type(result)}")
@@ -432,12 +432,12 @@ class TestWiseLoculusLapisLiveAPI:
                 (datetime(2025, 6, 12), datetime(2025, 6, 18)),
                 (datetime(2025, 6, 19), datetime(2025, 6, 26))
             ]
-            location_name = "Zürich (ZH)"
+            locationName = "Zürich (ZH)"
             
             result = await self.api.component_nucleotideMutationsOverTime(
                 mutations=mutations,
                 date_ranges=date_ranges,
-                location_name=location_name
+                locationName=locationName
             )
             
             print(f"Live nucleotide component test result keys: {list(result.keys()) if isinstance(result, dict) else type(result)}")
@@ -528,14 +528,14 @@ class TestWiseLoculusLapisLiveAPI:
                 mutations=["A123T", "C456G"],
                 mutation_type=MutationType.NUCLEOTIDE,
                 date_range=(datetime(2024, 1, 1), datetime(2024, 1, 2)),
-                location_name="Test Location",
+                locationName="Test Location",
                 interval="daily"
             ))
         
         # Assertions
         assert isinstance(result, pd.DataFrame), "Result should be a DataFrame"
         assert isinstance(result.index, pd.MultiIndex), "Result should have MultiIndex"
-        assert list(result.index.names) == ["mutation", "sampling_date"], "Index names should be correct"
+        assert list(result.index.names) == ["mutation", "samplingDate"], "Index names should be correct"
         assert list(result.columns) == ["count", "coverage", "frequency"], "Columns should be correct"
         
         # Check data content
@@ -577,13 +577,13 @@ class TestWiseLoculusLapisLiveAPI:
             # Test with nucleotide mutations that actually exist in the data
             mutations = ["C16407A", "T8104G"]  # Using real mutations from the API
             date_range = (datetime(2025, 7, 1), datetime(2025, 7, 7))  # One week
-            location_name = "Zürich (ZH)"
+            locationName = "Zürich (ZH)"
             
             result = await self.api.mutations_over_time(
                 mutations=mutations,
                 mutation_type=MutationType.NUCLEOTIDE,
                 date_range=date_range,
-                location_name=location_name,
+                locationName=locationName,
                 interval="daily"
             )
             
@@ -592,7 +592,7 @@ class TestWiseLoculusLapisLiveAPI:
             # Basic structure assertions
             assert isinstance(result, pd.DataFrame), "Result should be a DataFrame"
             assert isinstance(result.index, pd.MultiIndex), "Result should have MultiIndex"
-            assert list(result.index.names) == ["mutation", "sampling_date"], "Index names should be correct"
+            assert list(result.index.names) == ["mutation", "samplingDate"], "Index names should be correct"
             assert list(result.columns) == ["count", "coverage", "frequency"], "Columns should be correct"
             
             if not result.empty:
@@ -639,13 +639,13 @@ class TestWiseLoculusLapisLiveAPI:
             # Test with amino acid mutations that actually exist in the data
             mutations = ["S:N501Y", "ORF1a:G1829I"]  # Using real mutations from the API
             date_range = (datetime(2025, 7, 1), datetime(2025, 7, 14))  # Two weeks
-            location_name = "Zürich (ZH)"
+            locationName = "Zürich (ZH)"
             
             result = await self.api.mutations_over_time(
                 mutations=mutations,
                 mutation_type=MutationType.AMINO_ACID,
                 date_range=date_range,
-                location_name=location_name,
+                locationName=locationName,
                 interval="weekly"  # Use weekly for amino acid test
             )
             
@@ -654,7 +654,7 @@ class TestWiseLoculusLapisLiveAPI:
             # Basic structure assertions
             assert isinstance(result, pd.DataFrame), "Result should be a DataFrame"
             assert isinstance(result.index, pd.MultiIndex), "Result should have MultiIndex"
-            assert list(result.index.names) == ["mutation", "sampling_date"], "Index names should be correct"
+            assert list(result.index.names) == ["mutation", "samplingDate"], "Index names should be correct"
             assert list(result.columns) == ["count", "coverage", "frequency"], "Columns should be correct"
             
             if not result.empty:
@@ -683,7 +683,7 @@ class TestWiseLoculusLapisLiveAPI:
                 print(f"Sample amino acid data:\n{result.head()}")
                 
                 # Check that we have reasonable date distribution for weekly intervals
-                dates_found = result.index.get_level_values('sampling_date').unique()
+                dates_found = result.index.get_level_values('samplingDate').unique()
                 print(f"Date points found: {sorted(dates_found)}")
                 
             else:

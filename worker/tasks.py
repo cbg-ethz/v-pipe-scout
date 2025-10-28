@@ -90,7 +90,7 @@ def long_running_task(self, n_iterations, sleep_time):
 @app.task(bind=True)
 def run_deconvolve(self, mutation_counts_df, mutation_variant_matrix_df, 
                    bootstraps=None, bandwidth=None, regressor=None, 
-                   regressor_params=None, deconv_params=None, location_name=None):
+                   regressor_params=None, deconv_params=None, locationName=None):
     """
     A task that runs the deconvolve function with progress tracking.
     
@@ -102,7 +102,7 @@ def run_deconvolve(self, mutation_counts_df, mutation_variant_matrix_df,
         regressor (str, optional): Regressor type
         regressor_params (dict, optional): Parameters for the regressor
         deconv_params (dict, optional): Parameters for deconvolution
-        location_name (str, optional): Name of the location for proper result structuring
+        locationName (str, optional): Name of the location for proper result structuring
     """
     
     task_id = self.request.id
@@ -173,7 +173,7 @@ def run_deconvolve(self, mutation_counts_df, mutation_variant_matrix_df,
             'mutation_variant_matrix_df': mutation_variant_matrix_df
         }
         
-        # Add optional parameters only if they're not None (exclude location_name)
+        # Add optional parameters only if they're not None (exclude locationName)
         if bootstraps is not None:
             kwargs['bootstraps'] = bootstraps
         if bandwidth is not None:
@@ -194,12 +194,12 @@ def run_deconvolve(self, mutation_counts_df, mutation_variant_matrix_df,
         # Update progress after deconvolution is complete
         update_progress(4, "Processing results")
         
-        # If location_name is provided, restructure the result to use the actual location name
-        if location_name and isinstance(deconvolved_data, dict) and "location" in deconvolved_data:
+        # If locationName is provided, restructure the result to use the actual location name
+        if locationName and isinstance(deconvolved_data, dict) and "location" in deconvolved_data:
             # Replace the generic "location" key with the actual location name
             location_data = deconvolved_data.pop("location")  # Remove and get the data
-            deconvolved_data[location_name] = location_data   # Add with proper name
-            update_progress(4.5, f"Restructured result for location: {location_name}")
+            deconvolved_data[locationName] = location_data   # Add with proper name
+            update_progress(4.5, f"Restructured result for location: {locationName}")
         
         # Stage 5: Finalize results
         progress_data["current"] = 5

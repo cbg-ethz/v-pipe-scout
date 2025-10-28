@@ -38,7 +38,7 @@ async def fetch_multi_location_data(
         interval: Time interval for data aggregation (default: "daily")
     
     Returns:
-        Dict[location_name, DataFrame] - One DataFrame per location
+        Dict[locationName, DataFrame] - One DataFrame per location
         
     Raises:
         ValueError: If no data is retrieved for any location

@@ -40,14 +40,14 @@ class Lapis:
             locations = st.session_state.locations
             return locations
         # Use the full server_ip URL directly instead of parsing it
-        location_url = f'{self.server_ip.rstrip("/")}/sample/aggregated?fields=location_name&limit=100&orderBy=location_name&dataFormat=JSON&downloadAsFile=false'
+        location_url = f'{self.server_ip.rstrip("/")}/sample/aggregated?fields=locationName&limit=100&orderBy=locationName&dataFormat=JSON&downloadAsFile=false'
         try:
             logging.info(f"Attempting to fetch locations from: {location_url}")
             st.toast("Attempting to fetch locations from API...", icon="🔄") # Temporary toast
             response = requests.get(location_url, headers={'accept': 'application/json'}, timeout=5)
             response.raise_for_status() # Raise an exception for bad status codes
             location_data = response.json()
-            fetched_locations = [item['location_name'] for item in location_data.get('data', []) if 'location_name' in item]
+            fetched_locations = [item['locationName'] for item in location_data.get('data', []) if 'locationName' in item]
             if fetched_locations:
                 logging.info(f"Successfully fetched locations: {fetched_locations}")
                 st.session_state.locations = fetched_locations
