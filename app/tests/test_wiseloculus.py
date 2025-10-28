@@ -238,6 +238,28 @@ class TestWiseLoculusLapis:
         with pytest.raises(ValueError, match="Unsupported interval"):
             self.api._generate_date_ranges(date_range, "invalid")
 
+    def test_fallback_date_range(self):
+        """Test that fallback date range is approximately 3 months."""
+        from api.wiseloculus import FALLBACK_START_DATE, FALLBACK_END_DATE, get_fallback_date_range
+        
+        # Test the constants
+        diff = FALLBACK_END_DATE - FALLBACK_START_DATE
+        
+        # Should be approximately 3 months (90 days, allow ±5 days tolerance)
+        assert 85 <= diff.days <= 95, f"Fallback range should be ~90 days, got {diff.days}"
+        
+        # Test the function
+        start, end = get_fallback_date_range()
+        func_diff = end - start
+        assert 85 <= func_diff.days <= 95, f"Function should return ~90 days, got {func_diff.days}"
+        
+        # Verify they are datetime objects
+        assert isinstance(FALLBACK_START_DATE, datetime), "FALLBACK_START_DATE should be datetime"
+        assert isinstance(FALLBACK_END_DATE, datetime), "FALLBACK_END_DATE should be datetime"
+        
+        # Verify start < end
+        assert FALLBACK_START_DATE < FALLBACK_END_DATE, "Start should be before end"
+
 
 @pytest.mark.skip_in_ci
 class TestWiseLoculusLapisLiveAPI:
