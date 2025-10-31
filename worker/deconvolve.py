@@ -19,6 +19,8 @@ import json
 import pandas as pd
 import logging
 
+from lapis_fields import DF_SAMPLING_DATE, DF_COUNT, DF_COVERAGE, DF_FREQUENCY
+
 # Configure logging for the worker
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -152,8 +154,8 @@ def devconvolve(
 
         # # add the  above-update matrix to the mutation counts+coverage table
         # xsv join --left mutation  /tmp/mutation_counts_coverage.csv  Mutation /tmp/mutation_variant_matrix2.csv |
-        #  xsv select samplingDate,count,coverage,frequency,mutation,pos,base,9-  |
-        #  xsv fmt --out-delimiter '\t'  | sed '1s/samplingDate/date/;1s/coverage/cov/;1s/frequency/frac/' >  /tmp/tallymut.tsv
+        #  xsv select {DF_SAMPLING_DATE},{DF_COUNT},{DF_COVERAGE},{DF_FREQUENCY},mutation,pos,base,9-  |
+        #  xsv fmt --out-delimiter '\t'  | sed '1s/{DF_SAMPLING_DATE}/date/;1s/{DF_COVERAGE}/cov/;1s/{DF_FREQUENCY}/frac/' >  /tmp/tallymut.tsv
 
         # Create output filename with descriptive suffix
         tallymut_file = output_dir / (mutation_counts.stem + "_tallymut.tsv")
@@ -247,7 +249,7 @@ def devconvolve(
             select_command = [
                 "xsv",
                 "select",
-                "samplingDate,count,coverage,frequency,mutation,pos,base,9-",
+                f"{DF_SAMPLING_DATE},{DF_COUNT},{DF_COVERAGE},{DF_FREQUENCY},mutation,pos,base,9-",
             ]
             select_result = subprocess.run(
                 select_command,
@@ -272,7 +274,7 @@ def devconvolve(
             # Fourth subprocess: sed
             sed_command = [
                 "sed",
-                "1s/samplingDate/date/;1s/coverage/cov/;1s/frequency/frac/",
+                f"1s/{DF_SAMPLING_DATE}/date/;1s/{DF_COVERAGE}/cov/;1s/{DF_FREQUENCY}/frac/",
             ]
             with open(tallymut_file, "w") as f:
                 subprocess.run(
