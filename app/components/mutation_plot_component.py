@@ -14,6 +14,7 @@ from typing import List, Dict, Optional, Tuple, Any
 from interface import MutationType
 from visualize.mutations import mutations_over_time
 from api.exceptions import APIError
+from api.lapis_fields import DF_MUTATION, DF_SAMPLING_DATE, DF_COUNT, DF_FREQUENCY
 
 # Sequencing error rate threshold (0.32%)
 SEQUENCING_ERROR_RATE = 0.0032
@@ -128,7 +129,7 @@ def render_mutation_plot_component(
             df_reset = mutations_over_time_df.reset_index()
             
             # Check for duplicate entries and throw error if found
-            duplicates = df_reset.duplicated(subset=['mutation', 'samplingDate'], keep=False)
+            duplicates = df_reset.duplicated(subset=[DF_MUTATION, DF_SAMPLING_DATE], keep=False)
             if duplicates.any():
                 duplicate_rows = df_reset[duplicates]
                 error_msg = f"Duplicate mutation-date combinations detected: {len(duplicate_rows)} entries"
@@ -136,17 +137,17 @@ def render_mutation_plot_component(
                 
                 with target.expander("🔍 Duplicate entries details", expanded=True):
                     target.write("**Duplicate entries found:**")
-                    target.dataframe(duplicate_rows[['mutation', 'samplingDate', 'count', 'frequency']])
+                    target.dataframe(duplicate_rows[[DF_MUTATION, DF_SAMPLING_DATE, DF_COUNT, DF_FREQUENCY]])
                     target.write("**This indicates a problem with data processing that needs to be fixed.**")
                 
                 # Throw a detailed error for debugging
-                duplicate_details = duplicate_rows[['mutation', 'samplingDate', 'count', 'frequency']].to_string()
+                duplicate_details = duplicate_rows[[DF_MUTATION, DF_SAMPLING_DATE, DF_COUNT, DF_FREQUENCY]].to_string()
                 raise ValueError(f"Index contains duplicate entries, cannot reshape. "
                                f"Found {len(duplicate_rows)} duplicate mutation-date combinations:\n{duplicate_details}")
             
             # No duplicates, use regular pivot
-            counts_df = df_reset.pivot(index='mutation', columns='samplingDate', values='count')
-            freq_df = df_reset.pivot(index='mutation', columns='samplingDate', values='frequency')
+            counts_df = df_reset.pivot(index=DF_MUTATION, columns=DF_SAMPLING_DATE, values=DF_COUNT)
+            freq_df = df_reset.pivot(index=DF_MUTATION, columns=DF_SAMPLING_DATE, values=DF_FREQUENCY)
             
             # Keep the original MultiIndex structure for coverage_freq_df for compatibility with visualization
             coverage_freq_df = mutations_over_time_df
