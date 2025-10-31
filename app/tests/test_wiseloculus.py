@@ -13,6 +13,11 @@ import aiohttp
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from api.wiseloculus import WiseLoculusLapis
+from api.lapis_fields import (
+    SAMPLING_DATE_FROM, SAMPLING_DATE_TO, LOCATION_NAME,
+    MIN_PROPORTION, ORDER_BY, LIMIT, DATA_FORMAT, DOWNLOAD_AS_FILE,
+    PROPORTION, DF_MUTATION, DF_SAMPLING_DATE
+)
 from interface import MutationType
 
 
@@ -182,14 +187,14 @@ class TestWiseLoculusLapis:
 
         # Expected payload structure
         expected_payload = {
-            "samplingDateFrom": "2024-01-01",
-            "samplingDateTo": "2024-01-31",
-            "locationName": locationName,
-            "minProportion": min_proportion,
-            "orderBy": "proportion",
-            "limit": 10000,
-            "dataFormat": "JSON",
-            "downloadAsFile": "false"
+            SAMPLING_DATE_FROM: "2024-01-01",
+            SAMPLING_DATE_TO: "2024-01-31",
+            LOCATION_NAME: locationName,
+            MIN_PROPORTION: min_proportion,
+            ORDER_BY: PROPORTION,
+            LIMIT: 10000,
+            DATA_FORMAT: "JSON",
+            DOWNLOAD_AS_FILE: "false"
         }
 
         # Test nucleotide endpoint construction
@@ -557,7 +562,7 @@ class TestWiseLoculusLapisLiveAPI:
         # Assertions
         assert isinstance(result, pd.DataFrame), "Result should be a DataFrame"
         assert isinstance(result.index, pd.MultiIndex), "Result should have MultiIndex"
-        assert list(result.index.names) == ["mutation", "samplingDate"], "Index names should be correct"
+        assert list(result.index.names) == [DF_MUTATION, DF_SAMPLING_DATE], "Index names should be correct"
         assert list(result.columns) == ["count", "coverage", "frequency"], "Columns should be correct"
         
         # Check data content
@@ -614,7 +619,7 @@ class TestWiseLoculusLapisLiveAPI:
             # Basic structure assertions
             assert isinstance(result, pd.DataFrame), "Result should be a DataFrame"
             assert isinstance(result.index, pd.MultiIndex), "Result should have MultiIndex"
-            assert list(result.index.names) == ["mutation", "samplingDate"], "Index names should be correct"
+            assert list(result.index.names) == [DF_MUTATION, DF_SAMPLING_DATE], "Index names should be correct"
             assert list(result.columns) == ["count", "coverage", "frequency"], "Columns should be correct"
             
             if not result.empty:
@@ -676,7 +681,7 @@ class TestWiseLoculusLapisLiveAPI:
             # Basic structure assertions
             assert isinstance(result, pd.DataFrame), "Result should be a DataFrame"
             assert isinstance(result.index, pd.MultiIndex), "Result should have MultiIndex"
-            assert list(result.index.names) == ["mutation", "samplingDate"], "Index names should be correct"
+            assert list(result.index.names) == [DF_MUTATION, DF_SAMPLING_DATE], "Index names should be correct"
             assert list(result.columns) == ["count", "coverage", "frequency"], "Columns should be correct"
             
             if not result.empty:
