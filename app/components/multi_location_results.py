@@ -92,7 +92,7 @@ def render_single_location_result(location: str, result_data: Any) -> None:
     try:
         fig = create_variant_plot(variants_data, location)
         if fig:
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="container")
         else:
             st.warning("⚠️ Could not create plot - no valid time series data found")           
     except Exception as e:

@@ -237,7 +237,7 @@ def render_signature_composer(
             edited_df = target.data_editor(
                 merged,
                 num_rows="dynamic",
-                use_container_width=True,
+                width="container",
                 key=f'{session_prefix}mutation_editor',
                 disabled=disabled_cols,
             )
@@ -319,7 +319,7 @@ def render_distribution_plots(target, session_prefix: str = ""):
             ax1.set_ylabel('Mutation Count', fontsize=12)
             ax1.grid(axis='y', linestyle=':', alpha=0.5)
             # No custom facecolor for a cleaner look
-            target.pyplot(fig1, use_container_width=True)
+            target.pyplot(fig1, width="container")
         else:
             target.info('No coverage data available.')
 
@@ -333,7 +333,7 @@ def render_distribution_plots(target, session_prefix: str = ""):
             ax2.set_ylabel('Mutation Count', fontsize=12)
             ax2.grid(axis='y', linestyle=':', alpha=0.5)
             # No custom facecolor for a cleaner look
-            target.pyplot(fig2, use_container_width=True)
+            target.pyplot(fig2, width="container")
         else:
             target.info('No proportion data available.')
 

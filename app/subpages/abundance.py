@@ -691,7 +691,7 @@ def app():
                         # Display the venn diagram with controlled size using columns
                         venn_col1, venn_col2, venn_col3 = st.columns([1, 2, 1])
                         with venn_col2:
-                            st.pyplot(fig_venn, use_container_width=True)
+                            st.pyplot(fig_venn, width="container")
                         
                     elif len(combined_variants.variants) == 3:
                         from matplotlib_venn import venn3
@@ -723,7 +723,7 @@ def app():
                         # Display the venn diagram with controlled size using columns
                         venn_col1, venn_col2, venn_col3 = st.columns([1, 2, 1])
                         with venn_col2:
-                            st.pyplot(fig_venn, use_container_width=True)
+                            st.pyplot(fig_venn, width="container")
                 else:
                     st.markdown("#### Mutation Overlap")
                     st.info("Venn diagram is only available for 2-3 variants")
@@ -785,7 +785,7 @@ def app():
                 fig.update_traces(hoverinfo='text', text=hover_text)
                 
                 # Display the interactive Plotly chart in Streamlit
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="container")
         else:
             st.warning("At least two variants are required to visualize the mutation-variant matrix.")
     
