@@ -27,7 +27,7 @@ wiseLoculus = WiseLoculusLapis(server_ip)
 def app():
     url_state = create_url_state_manager("complex")
 
-    st.title("Complex Queries (Prototype)")
+    st.title("Co-occurrence of Mutations Over Time (Prototype)")
     st.write("Track a **set of mutations** (AND filter) over time to see the proportion of reads matching ALL specified mutations.")
     st.info("💡 This differs from other pages: here mutations are combined as a filter (must have ALL), not tracked individually.")
     st.markdown("---")
@@ -98,7 +98,7 @@ def app():
     
     # Add "All locations" option
     location_options = ["All locations"] + locations
-    default_selection = ["All locations"]
+    default_selection = [locations[0]] if locations else []
     
     url_locs = url_state.load_from_url("locations", default_selection, list)
     # Ensure URL locations are valid
