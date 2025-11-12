@@ -37,7 +37,7 @@ def app():
 
     # Mutation input
     st.write("### Input Mutations and Deletions")
-    st.caption("Comma-separated nucleotide mutations, e.g., A23403G, 23403G, 23403-, 23403N")
+    st.caption("Comma-separated nucleotide mutations, e.g., A22893G, T22896G (XFG variant currently circulating)")
     
     with st.expander("ℹ️ Mutation Format Examples", expanded=False):
         st.markdown("""
@@ -52,7 +52,7 @@ def app():
         For more details, see [CoV-Spectrum documentation](https://cov-spectrum.org/about#faq-search-variants).
         """)
     
-    default_mut = "C43T, G96A, 456A"
+    default_mut = "A22893G, T22896G"
 
     url_mut_input = url_state.load_from_url("mutation_input", default_mut, str)
     mutation_input = st.text_area("Mutations | Deletions (nucleotide only):", value=url_mut_input, height=100)
@@ -81,8 +81,8 @@ def app():
 
     # Date range
     default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("complex_queries")
-    url_start = url_state.load_from_url("start_date", default_start, date)
-    url_end = url_state.load_from_url("end_date", default_end, date)
+    url_start = url_state.load_from_url("start_date", default_start, type(default_start))
+    url_end = url_state.load_from_url("end_date", default_end, type(default_end))
     date_range_input = st.date_input("Select a date range:", [url_start, url_end], min_value=min_date, max_value=max_date)
     if len(date_range_input) != 2:
         st.error("Please select a valid date range.")
@@ -170,10 +170,24 @@ def app():
                 dates = df['samplingDate'].tolist()
                 frequencies = df['frequency'].tolist()
                 counts = df['count'].tolist()
+                coverages = df['coverage'].tolist()
                 
                 # Create single-row dataframes
                 freq_df = pd.DataFrame([frequencies], columns=dates, index=[mutation_label])
                 counts_df = pd.DataFrame([counts], columns=dates, index=[mutation_label])
+                
+                # Create coverage dataframe in MultiIndex format for hover info
+                coverage_records = []
+                for i, date in enumerate(dates):
+                    coverage_records.append({
+                        'mutation': mutation_label,
+                        'samplingDate': date,
+                        'coverage': coverages[i],
+                        'count': counts[i],
+                        'frequency': frequencies[i]
+                    })
+                coverage_df = pd.DataFrame(coverage_records)
+                coverage_df = coverage_df.set_index(['mutation', 'samplingDate'])
 
                 info_placeholder = st.empty()
                 progress = st.progress(0)
@@ -185,7 +199,7 @@ def app():
                 fig = proportions_lineplot(
                     freq_df=freq_df,
                     counts_df=counts_df,
-                    coverage_freq_df=None,
+                    coverage_freq_df=coverage_df,
                     title=f"Proportion of Reads with ALL Mutations — {loc} ({interval})",
                     smoothing_window_days=smoothing,
                     progress_callback=cb
