@@ -585,3 +585,115 @@ class WiseLoculusLapis(Lapis):
             df = pd.DataFrame(columns=["count", "coverage", "frequency"])
             df.index = pd.MultiIndex.from_tuples([], names=["mutation", "samplingDate"])
             return df
+
+    async def complex_query_over_time(
+            self,
+            mutations: List[str],
+            date_range: Tuple[datetime, datetime],
+            locationName: str,
+            interval: str = "daily"
+        ) -> pd.DataFrame:
+        """
+        Fetch proportion data for a SET of mutations (AND filter) over time.
+        
+        Unlike mutations_over_time which tracks individual mutations separately,
+        this tracks all mutations together as a filter condition.
+        
+        Makes two requests per date:
+        1. Coverage (total reads at location/date)
+        2. Filtered count (reads matching ALL mutations)
+        
+        Args:
+            mutations: List of nucleotide mutations to filter by (AND condition)
+            date_range: Tuple of (start_date, end_date)
+            locationName: Location name to filter by
+            interval: "daily", "weekly", or "monthly"
+            
+        Returns:
+            DataFrame with columns: samplingDate, count, coverage, frequency
+        """
+        try:
+            # Generate date ranges based on interval
+            date_ranges = self._generate_date_ranges(date_range, interval)
+            
+            records = []
+            
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
+                for date_start, date_end in date_ranges:
+                    # Request 1: Coverage (no mutation filter)
+                    coverage_payload = {
+                        "locationName": locationName,
+                        "samplingDateFrom": date_start.strftime('%Y-%m-%d'),
+                        "samplingDateTo": date_end.strftime('%Y-%m-%d'),
+                        "fields": ["samplingDate"]
+                    }
+                    
+                    # Request 2: Filtered count (with mutation filter)
+                    filtered_payload = {
+                        "locationName": locationName,
+                        "samplingDateFrom": date_start.strftime('%Y-%m-%d'),
+                        "samplingDateTo": date_end.strftime('%Y-%m-%d'),
+                        "nucleotideMutations": mutations,
+                        "fields": ["samplingDate"]
+                    }
+                    
+                    # Execute both requests in parallel
+                    coverage_task = session.post(
+                        f'{self.server_ip}/sample/aggregated',
+                        headers={'accept': 'application/json', 'Content-Type': 'application/json'},
+                        json=coverage_payload
+                    )
+                    
+                    filtered_task = session.post(
+                        f'{self.server_ip}/sample/aggregated',
+                        headers={'accept': 'application/json', 'Content-Type': 'application/json'},
+                        json=filtered_payload
+                    )
+                    
+                    coverage_resp, filtered_resp = await asyncio.gather(coverage_task, filtered_task)
+                    
+                    if coverage_resp.status == 200 and filtered_resp.status == 200:
+                        coverage_data = await coverage_resp.json()
+                        filtered_data = await filtered_resp.json()
+                        
+                        # Extract counts from response
+                        coverage_items = coverage_data.get('data', [])
+                        filtered_items = filtered_data.get('data', [])
+                        
+                        # Build lookup for filtered counts by date
+                        filtered_lookup = {}
+                        for item in filtered_items:
+                            date_str = item.get('samplingDate')
+                            count = item.get('count', 0)
+                            if date_str:
+                                filtered_lookup[date_str] = count
+                        
+                        # Combine data
+                        for cov_item in coverage_items:
+                            date_str = cov_item.get('samplingDate')
+                            coverage_count = cov_item.get('count', 0)
+                            filtered_count = filtered_lookup.get(date_str, 0)
+                            
+                            if date_str and coverage_count > 0:
+                                frequency = filtered_count / coverage_count
+                                records.append({
+                                    'samplingDate': pd.to_datetime(date_str),
+                                    'count': filtered_count,
+                                    'coverage': coverage_count,
+                                    'frequency': frequency
+                                })
+                    else:
+                        logging.error(f"API error for date range {date_start} to {date_end}: "
+                                    f"coverage={coverage_resp.status}, filtered={filtered_resp.status}")
+            
+            # Create DataFrame
+            if records:
+                df = pd.DataFrame(records)
+                df = df.sort_values('samplingDate')
+                return df
+            else:
+                return pd.DataFrame(columns=['samplingDate', 'count', 'coverage', 'frequency'])
+                
+        except Exception as e:
+            logging.error(f"Error in complex_query_over_time: {e}")
+            return pd.DataFrame(columns=['samplingDate', 'count', 'coverage', 'frequency'])
