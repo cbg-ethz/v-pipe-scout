@@ -1,0 +1,84 @@
+# Impolementation Plan for Complex Queries
+
+AIM: amable fast UI based composing of complex queries
+
+Objectives:
+    * Addlarge lists of mutations and insertions into one query
+    * get proportion, coverage and count - just as all other plots
+    * make a heatmap of observing amplicon sequenes fitting these filters
+
+
+## Implementaiton Notes
+- for now we want to keep this to nuclitides only first
+
+
+Here the request that will probably be the one we want to use:
+
+````
+curl -X 'POST' \
+  'https://lapis.wasap.genspectrum.org/component/nucleotideMutationsOverTime' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "filters": {
+    "sampleId": "string",
+    "sampleId.regex": "string",
+    "batchId": "string",
+    "batchId.regex": "string",
+    "locationCode": "string",
+    "locationCode.regex": "string",
+    "samplingDate": "string",
+    "samplingDateFrom": "string",
+    "samplingDateTo": "string",
+    "locationName": "string",
+    "locationName.regex": "string",
+    "readId": "string",
+    "readId.regex": "string",
+    "sr2siloVersion": "string",
+    "sr2siloVersion.regex": "string",
+    "nucleotideMutations": [
+      "sequence1:A123T"
+    ],
+    "aminoAcidMutations": [
+      "S:123T"
+    ],
+    "nucleotideInsertions": [
+      "ins_123:ATT"
+    ],
+    "aminoAcidInsertions": [
+      "ins_ORF1a:123:ATT"
+    ]
+  },
+  "downloadAsFile": false,
+  "downloadFileBasename": "string",
+  "compression": "gzip",
+  "includeMutations": [
+    "C44T"
+  ],
+  "dateRanges": [
+    {
+      "dateFrom": "2025-05-12",
+      "dateTo": "2025-06-12"
+    }
+  ],
+  "dateField": "date"
+}'
+````
+
+And we will want to filter by 
+- locationName
+- nucleotideMutations (included deletions)
+
+where on can specify these mutations in a free text form, seperate by commas, ideally once put in there are nicely highlited
+
+For date ranges best filter by
+- samplingDateFrom
+- samplingDateTo
+and to split the respons by days into days as this
+  "dateRanges": [
+    {
+      "dateFrom": "2025-05-12",
+      "dateTo": "2025-06-12"
+    }
+
+
