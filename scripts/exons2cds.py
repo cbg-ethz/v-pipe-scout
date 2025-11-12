@@ -123,9 +123,9 @@ def check_mutation_consistency(mutations, gene):
 def main():
     # Load Data – as downloaded from the Stanford database
     options = {
-        "3C-like proteinase": '../data/3CLpro_inhibitors_datasheet.csv',
-        "RNA-dependent RNA polymerase": '../data/RdRP_inhibitors_datasheet.csv',
-        "spike glycoprotein": '../data/spike_mAbs_datasheet.csv'
+        "3C-like proteinase": 'app/data/3CLpro_inhibitors_datasheet.csv',
+        "RNA-dependent RNA polymerase": 'app/data/RdRP_inhibitors_datasheet.csv',
+        "spike glycoprotein": 'app/data/spike_mAbs_datasheet.csv'
     }
     dfs = {}
     for product, file in options.items():
@@ -146,11 +146,32 @@ def main():
     translated_rdrp = translate_mutations(rdrp_mutations, "RdRp")
     translated_clpro = translate_mutations(clpro_mutations, "3CLpro")
 
+    # Create tables
+    rdrp_df = pd.DataFrame({'Original Mutation': rdrp_mutations, 'Translated Mutation': translated_rdrp})
+    clpro_df = pd.DataFrame({'Original Mutation': clpro_mutations, 'Translated Mutation': translated_clpro})
+
+    # Also output Spike mutations as S:<mutation> (no mapping needed)
+    spike_mutations = dfs["spike glycoprotein"]["Mutation"].tolist()
+    formatted_spike = [f"S:{mut}" for mut in spike_mutations]
+    spike_df = pd.DataFrame({'Original Mutation': spike_mutations, 'Translated Mutation': formatted_spike})
+
     # Output results
-    print("Translated RdRp mutations:")
-    print("\n".join(translated_rdrp))
-    print("\nTranslated 3CLpro mutations:")
-    print("\n".join(translated_clpro))
+    print("RdRp Mutations:")
+    print(rdrp_df.to_string(index=False))
+    print("\n3CLpro Mutations:")
+    print(clpro_df.to_string(index=False))
+    print("\nSpike Mutations:")
+    print(spike_df.to_string(index=False))
+
+    # Write tables to file
+    with open("mutation_tables.txt", "w") as f:
+        f.write("RdRp Mutations:\n")
+        f.write(rdrp_df.to_string(index=False))
+        f.write("\n\n3CLpro Mutations:\n")
+        f.write(clpro_df.to_string(index=False))
+        f.write("\n\nSpike Mutations:\n")
+        f.write(spike_df.to_string(index=False))
+    print("\nTables saved to mutation_tables.txt.")
 
     # Save to CSV
     translated_rdrp_df = pd.DataFrame(translated_rdrp, columns=["Mutation"])
@@ -159,9 +180,6 @@ def main():
     translated_clpro_df.to_csv("translated_3CLpro_in_ORF1a_mutations.csv", index=False)
     print("\nResults saved to CSV files.")
 
-    # Also output Spike mutations as S:<mutation> (no mapping needed)
-    spike_mutations = dfs["spike glycoprotein"]["Mutation"].tolist()
-    formatted_spike = [f"S:{mut}" for mut in spike_mutations]
     formatted_spike_df = pd.DataFrame(formatted_spike, columns=["Mutation"])
     formatted_spike_df.to_csv("translated_Spike_in_S_mutations.csv", index=False)
     print("\nSpike mutations formatted and saved to translated_Spike_in_S_mutations.csv.")
