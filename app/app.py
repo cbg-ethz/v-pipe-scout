@@ -36,7 +36,7 @@ if __name__ == "__main__":
         {"app": signature_explorer.app, "title": "Variant Signature Explorer", "icon": "🔍", "url_path": "signature-explorer"},
         {"app": abundance.app, "title": "Variant Abundances", "icon": "🧩", "url_path": "abundance"},
         {"app": region.app, "title": "Region Explorer", "icon": "📍", "url_path": "region"},
-        {"app": complex_queries.app, "title": "Complex Queries (Prototype)", "icon": "📈", "url_path": "complex"},
+        {"app": complex_queries.app, "title": "Co-occurrence (Prototype)", "icon": "🔗", "url_path": "cooccurrence"},
     ]
     
     # Create pages dynamically from configurations
