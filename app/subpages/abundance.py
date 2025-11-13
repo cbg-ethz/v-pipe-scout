@@ -785,7 +785,7 @@ def app():
                 fig.update_traces(hoverinfo='text', text=hover_text)
                 
                 # Display the interactive Plotly chart in Streamlit
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig)
         else:
             st.warning("At least two variants are required to visualize the mutation-variant matrix.")
     

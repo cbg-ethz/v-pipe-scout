@@ -125,7 +125,7 @@ def app():
                 coverage_freq_df,
                 title="Proportion of Resistance Mutations Over Time"
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig)
 
 if __name__ == "__main__":
     app()
