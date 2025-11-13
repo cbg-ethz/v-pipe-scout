@@ -373,7 +373,7 @@ def render_mutation_plot_component(
                 status_text.text("🔄 Rendering plot...")
                 progress_bar.progress(0.8)
                 
-                target.plotly_chart(fig, width="container")
+                target.plotly_chart(fig, use_container_width=True)
                 
                 progress_bar.progress(1.0)
                 status_text.text("✅ Plot ready!")
@@ -521,7 +521,7 @@ def _create_download_section(
     # Show preview of the data
     with target.expander("📖 Preview download data", expanded=False):
         target.write(f"**Data Preview** ({len(download_df)} rows)")
-        target.dataframe(download_df.head(10), width="container")
+        target.dataframe(download_df.head(10), use_container_width=True)
         
         # Show summary statistics
         target.write("**Summary Statistics:**")

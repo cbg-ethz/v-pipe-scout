@@ -60,10 +60,10 @@ if __name__ == "__main__":
         # Display theme-appropriate logo
         if theme and theme.get('base') == 'dark':
             # Dark theme - use inverted logo
-            st.image("images/logo/v-pipe-scout-inverted.png", width="container")
+            st.image("images/logo/v-pipe-scout-inverted.png")
         else:
             # Light theme or unknown theme - use regular logo
-            st.image("images/logo/v-pipe-scout.png", width="container")
+            st.image("images/logo/v-pipe-scout.png")
         
         
         # Create custom navigation links using page_link
