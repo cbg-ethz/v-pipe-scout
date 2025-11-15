@@ -95,6 +95,10 @@ For production deployments on VMs or servers, you can set up automatic deploymen
 - **Celery Worker**: Background task processing  
 - **Redis**: Message broker (password-protected, internal only)
 
+## Developer Documentation
+
+- **[LAPIS Field Centralization](docs/LAPIS_FIELD_CENTRALIZATION.md)**: How API field names are centralized to simplify maintenance
+
 
 ## Project Origin
 
