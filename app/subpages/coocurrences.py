@@ -1,8 +1,7 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import logging
-from datetime import datetime, date
+from datetime import datetime
 
 from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
@@ -56,9 +55,9 @@ def app():
 
     url_mut_input = url_state.load_from_url("mutation_input", default_mut, str)
     mutation_input = st.text_area("Mutations | Deletions (nucleotide only):", value=url_mut_input, height=100)
-    url_state.save_to_url(mutation_input=mutation_input if len(mutation_input) < 1500 else None)
+    url_state.save_to_url(mutation_input=mutation_input if mutation_input and len(mutation_input) < 1500 else None)
 
-    raw_mutations = [m.strip() for m in mutation_input.split(',') if m.strip()]
+    raw_mutations = [m.strip() for m in (mutation_input or "").split(',') if m.strip()]
     valid_mutations, invalid_mutations = [], []
     for m in raw_mutations:
         if validate_mutation(m, mutation_type_value):
@@ -80,7 +79,7 @@ def app():
     st.info(f"Using {len(valid_mutations)} mutations.")
 
     # Date range
-    default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("complex_queries")
+    default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("coocurrences")
     url_start = url_state.load_from_url("start_date", default_start, type(default_start))
     url_end = url_state.load_from_url("end_date", default_end, type(default_end))
     date_range_input = st.date_input("Select a date range:", [url_start, url_end], min_value=min_date, max_value=max_date)
@@ -148,7 +147,7 @@ def app():
         with st.spinner(f"Fetching data for {loc}..."):
             try:
                 df = __import__('asyncio').run(
-                    wiseLoculus.complex_query_over_time(
+                    wiseLoculus.coocurrences_over_time(
                         mutations=valid_mutations,
                         date_range=(start_date_dt, end_date_dt),
                         locationName=loc,
@@ -162,7 +161,7 @@ def app():
 
                 # Show dataframe for debugging
                 with st.expander(f"📊 View Raw Data for {loc}", expanded=False):
-                    st.dataframe(df, use_container_width=True)
+                    st.dataframe(df)
 
                 # Prepare data for lineplot
                 mutation_label = f"Set of {len(valid_mutations)} mutations"
@@ -204,7 +203,7 @@ def app():
                     smoothing_window_days=smoothing,
                     progress_callback=cb
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig)
                 
                 # Clear progress indicators
                 progress.empty()

@@ -288,10 +288,11 @@ def proportions_lineplot(freq_df: pd.DataFrame,
         fig.add_trace(go.Scatter(
             x=all_dates,
             y=y_vals,
-            mode="lines",
+            mode="lines+markers",
             name=mutation,
             customdata=customdata,
-            hovertemplate=hovertemplate
+            hovertemplate=hovertemplate,
+            marker=dict(size=6, line=dict(width=0.5, color="white"))
         ))
 
     # Layout
