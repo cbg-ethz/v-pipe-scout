@@ -1,6 +1,11 @@
 # V-Pipe Scout: GitHub Copilot Instructions
 
-Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
+Always reference these instruc### Frontend (`app/` directory)
+- **Main app**: `app.py` - Streamlit entry point
+- **Subpages**: `subpages/` - Individual pages (background.py, dynamic_mutations.py, resistance_mut_silo.py, signature_explorer.py, abundance.py, task_runner.py, index.py)
+- **Core components**: `components/` - Reusable UI components
+- **Configuration**: `config.yaml` - LAPIS server settings
+- **Environment**: `pyproject.toml` - Python 3.13, Streamlit 1.49.1, pandas, matplotlib, plotly (managed by uv)first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
 
 V-Pipe Scout is a Streamlit-based interactive web application for rapid viral variant detection from wastewater sequencing data, with a Celery worker backend for background processing. The application uses Docker Compose orchestration with Redis as message broker.
 
@@ -14,9 +19,8 @@ V-Pipe Scout is a Streamlit-based interactive web application for rapid viral va
 
 ### Development Environment Setup
 - **Frontend development** (Streamlit app):
-  - `conda env create -f app/environment.yml` - takes 2-3 minutes. NEVER CANCEL. Set timeout to 10+ minutes.
-  - `conda activate v-pipe-scout-app`
-  - Test: `conda run -n v-pipe-scout-app streamlit run app/app.py --server.port=8888`
+  - `cd app && pip install uv && uv sync` - installs dependencies in ~1 second
+  - Test: `uv run streamlit run app.py --server.port=8888`
 
 - **Worker development** (Celery background tasks):
   - `conda env create -f worker/environment.yml` - takes 1-2 minutes, may fail on slow networks. NEVER CANCEL. Set timeout to 10+ minutes.
@@ -30,7 +34,7 @@ V-Pipe Scout is a Streamlit-based interactive web application for rapid viral va
 - Services: Redis (internal), Streamlit frontend (port 9001), Celery worker
 
 ### Testing
-- **Frontend tests**: `conda run -n v-pipe-scout-app pytest` - takes 8-10 seconds
+- **Frontend tests**: `cd app && uv run pytest` - takes 8-10 seconds
 - **Worker tests**: `conda run -n v-pipe-scout-worker pytest` - may require manual redis installation
 - **Full test suite**: `pytest` from repository root (uses both environments)
 - **Deployment validation**: `bash scripts/test-deployment.sh` - takes < 1 second
@@ -55,7 +59,7 @@ V-Pipe Scout is a Streamlit-based interactive web application for rapid viral va
 ## Build Timing Expectations
 
 **CRITICAL - NEVER CANCEL these operations:**
-- Conda environment creation: 2-10 minutes (network dependent)
+- uv dependency installation: < 5 seconds (dramatically faster than conda)
 - Docker Compose build: 5-30 minutes (network dependent) 
 - Frontend tests: 8-10 seconds
 - Worker tests: 5-15 seconds (if dependencies available)
@@ -79,12 +83,12 @@ V-Pipe Scout is a Streamlit-based interactive web application for rapid viral va
 - **Subpages**: `subpages/` - Individual pages (background.py, dynamic_mutations.py, resistance_mut_silo.py, signature_explorer.py, abundance.py, task_runner.py, index.py)
 - **Core components**: `components/` - Reusable UI components
 - **Configuration**: `config.yaml` - LAPIS server settings
-- **Environment**: `environment.yml` - Python 3.12, Streamlit 1.47, pandas, matplotlib, plotly
+- **Environment**: `pyproject.toml` - Python 3.13, Streamlit 1.49.1, pandas, matplotlib, plotly (managed by uv)
 
 ### Worker (`worker/` directory)
 - **Tasks**: `tasks.py` - Celery task definitions  
 - **Deconvolution**: `deconvolve.py` - Core analysis logic
-- **Environment**: `environment.yml` - Python 3.12, pandas, scipy, lollipop, celery, redis
+- **Environment**: `environment.yml` - Python 3.13, pandas, scipy, lollipop, celery, redis (conda for scientific packages)
 
 ### Infrastructure
 - **Docker**: `docker-compose.yml` - Redis, Streamlit frontend, Celery worker
@@ -121,11 +125,11 @@ V-Pipe Scout is a Streamlit-based interactive web application for rapid viral va
 │   ├── subpages/          # Individual pages
 │   ├── components/        # UI components  
 │   ├── config.yaml        # LAPIS configuration
-│   └── environment.yml    # Frontend dependencies
+│   └── pyproject.toml     # Frontend dependencies (uv)
 ├── worker/                # Celery worker
 │   ├── tasks.py          # Background tasks
 │   ├── deconvolve.py     # Analysis logic
-│   └── environment.yml   # Worker dependencies
+│   └── environment.yml   # Worker dependencies (conda)
 ├── scripts/              # Deployment and utility scripts
 ├── .github/workflows/    # CI/CD pipelines
 └── docker-compose.yml    # Container orchestration
@@ -134,8 +138,8 @@ V-Pipe Scout is a Streamlit-based interactive web application for rapid viral va
 ### Always Test These Commands Before Documenting:
 - Environment setup: `./setup.sh`
 - Docker build: `docker compose up --build` (with 30+ minute timeout)
-- Frontend tests: `conda run -n v-pipe-scout-app pytest`
-- Application startup: `streamlit run app/app.py` or Docker access via port 9001
+- Frontend tests: `cd app && uv run pytest`
+- Application startup: `uv run streamlit run app/app.py` or Docker access via port 9001
 - Deployment validation: `bash scripts/test-deployment.sh`
 
 ## Architecture Notes
