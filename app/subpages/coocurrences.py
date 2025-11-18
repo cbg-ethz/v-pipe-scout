@@ -29,7 +29,10 @@ def app():
     st.title("Co-occurrence of Mutations Over Time (Prototype)")
     st.write("Track a **set of mutations** (AND filter) over time to see the proportion of reads matching ALL specified mutations.")
     st.info("💡 This differs from other pages: here mutations are combined as a filter (must have ALL), not tracked individually.")
-    st.warning("⚠️ **Coverage Definition:** Coverage is defined as the minimum number of reads covering all mutation positions. For a set of mutations, we take the least coverage across all positions to ensure accurate frequency calculations.")
+    st.warning("""⚠️ **Coverage Metrics:**  
+    - **Min Coverage:** Minimum number of reads across all mutation positions (used for frequency calculation)         
+    - **Intersection Coverage:** Number of reads covering all mutation positions simultaneously
+    """)
     st.markdown("---")
 
     # Fixed to nucleotide only for now
@@ -175,6 +178,12 @@ def app():
             # Show dataframe for debugging
             with st.expander(f"📊 View Raw Data for {loc}", expanded=False):
                 st.dataframe(df)
+                
+                # Display coverage metrics explanation
+                if 'min_coverage' in df.columns and 'intersection_coverage' in df.columns:
+                    st.caption("**Coverage Metrics:**")
+                    st.caption("- **min_coverage**: Minimum reads across all mutation positions (used for frequency calculation)")
+                    st.caption("- **intersection_coverage**: Reads covering all mutation positions simultaneously")
 
             # Prepare data for lineplot
             mutation_label = f"Set of {len(valid_mutations)} mutations"
@@ -182,7 +191,14 @@ def app():
             dates = df['samplingDate'].tolist()
             frequencies = df['frequency'].tolist()
             counts = df['count'].tolist()
-            coverages = df['coverage'].tolist()
+            
+            # Handle both old and new column names for backward compatibility
+            if 'min_coverage' in df.columns:
+                coverages = df['min_coverage'].tolist()
+                intersection_coverages = df['intersection_coverage'].tolist() if 'intersection_coverage' in df.columns else coverages
+            else:
+                coverages = df['coverage'].tolist()
+                intersection_coverages = coverages
             
             # Create single-row dataframes
             freq_df = pd.DataFrame([frequencies], columns=dates, index=[mutation_label])
@@ -195,6 +211,7 @@ def app():
                     'mutation': mutation_label,
                     'samplingDate': date,
                     'coverage': coverages[i],
+                    'intersection_coverage': intersection_coverages[i],
                     'count': counts[i],
                     'frequency': frequencies[i]
                 })

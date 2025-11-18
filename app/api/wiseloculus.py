@@ -529,7 +529,9 @@ class WiseLoculusLapis(Lapis):
         
         Strategy:
         1. Use mutations_over_time to get coverage for each mutation position
-        2. Take minimum coverage across all positions (most restrictive)
+        2. Calculate two coverage metrics:
+           - min_coverage: minimum reads across all positions (most restrictive)
+           - intersection_coverage: reads covering ALL positions simultaneously
         3. Query for count of reads matching ALL mutations
         4. Calculate frequency = count / min_coverage
         
@@ -540,7 +542,7 @@ class WiseLoculusLapis(Lapis):
             interval: "daily", "weekly", or "monthly"
             
         Returns:
-            DataFrame with columns: samplingDate, count, coverage, frequency
+            DataFrame with columns: samplingDate, count, min_coverage, intersection_coverage, frequency
         """
         try:
             # Step 1: Get coverage for each mutation position using mutations_over_time
@@ -587,17 +589,19 @@ class WiseLoculusLapis(Lapis):
             
             if not coverage_by_date:
                 logging.warning("No coverage data available for any mutation positions")
-                return pd.DataFrame(columns=['samplingDate', 'count', 'coverage', 'frequency'])
+                return pd.DataFrame(columns=['samplingDate', 'count', 'min_coverage', 'intersection_coverage', 'frequency'])
             
-            # Step 3: Query for reads matching ALL mutations (AND filter)
+            # Step 3: Query for reads matching ALL mutations (AND filter) and intersection coverage
             date_ranges = self._generate_date_ranges(date_range, interval)
             
             filtered_lookup = {}  # date -> count of reads with ALL mutations
+            intersection_coverage_lookup = {}  # date -> reads covering all positions
             
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
-                filtered_tasks = []
+                tasks = []
                 
                 for date_start, date_end in date_ranges:
+                    # Task 1: Filtered count (reads with ALL mutations)
                     filtered_payload = {
                         "locationName": locationName,
                         "samplingDateFrom": date_start.strftime('%Y-%m-%d'),
@@ -606,46 +610,83 @@ class WiseLoculusLapis(Lapis):
                         "fields": ["samplingDate"]
                     }
                     
-                    task = session.post(
+                    filtered_task = session.post(
                         f'{self.server_ip}/sample/aggregated',
                         headers={'accept': 'application/json', 'Content-Type': 'application/json'},
                         json=filtered_payload
                     )
-                    filtered_tasks.append(task)
+                    
+                    # Task 2: Intersection coverage (reads covering all positions)
+                    # Use just the position numbers without target base
+                    intersection_payload = {
+                        "locationName": locationName,
+                        "samplingDateFrom": date_start.strftime('%Y-%m-%d'),
+                        "samplingDateTo": date_end.strftime('%Y-%m-%d'),
+                        "nucleotideMutations": mutation_positions,  # Just positions, any base
+                        "fields": ["samplingDate"]
+                    }
+                    
+                    intersection_task = session.post(
+                        f'{self.server_ip}/sample/aggregated',
+                        headers={'accept': 'application/json', 'Content-Type': 'application/json'},
+                        json=intersection_payload
+                    )
+                    
+                    tasks.append((filtered_task, intersection_task))
                 
-                # Execute all filtered queries in parallel
-                filtered_responses = await asyncio.gather(*filtered_tasks, return_exceptions=True)
+                # Execute all queries in parallel
+                all_results = await asyncio.gather(*[task for pair in tasks for task in pair], return_exceptions=True)
                 
-                # Process filtered responses
-                for resp in filtered_responses:
-                    if isinstance(resp, Exception):
-                        logging.error(f"Error fetching filtered data: {resp}")
-                        continue
+                # Process results in pairs (filtered, intersection)
+                for idx in range(0, len(all_results), 2):
+                    filtered_resp = all_results[idx]
+                    intersection_resp = all_results[idx + 1]
                     
-                    if resp.status != 200:
-                        logging.error(f"API error for filtered data: status={resp.status}")
-                        continue
+                    # Process filtered response
+                    if not isinstance(filtered_resp, Exception) and filtered_resp.status == 200:
+                        filtered_data = await filtered_resp.json()
+                        filtered_items = filtered_data.get('data', [])
+                        
+                        for item in filtered_items:
+                            date_str = item.get('samplingDate')
+                            count = item.get('count', 0)
+                            if date_str:
+                                filtered_lookup[date_str] = count
+                    else:
+                        if isinstance(filtered_resp, Exception):
+                            logging.error(f"Error fetching filtered data: {filtered_resp}")
+                        else:
+                            logging.error(f"API error for filtered data: status={filtered_resp.status}")
                     
-                    filtered_data = await resp.json()
-                    filtered_items = filtered_data.get('data', [])
-                    
-                    for item in filtered_items:
-                        date_str = item.get('samplingDate')
-                        count = item.get('count', 0)
-                        if date_str:
-                            filtered_lookup[date_str] = count
+                    # Process intersection coverage response
+                    if not isinstance(intersection_resp, Exception) and intersection_resp.status == 200:
+                        intersection_data = await intersection_resp.json()
+                        intersection_items = intersection_data.get('data', [])
+                        
+                        for item in intersection_items:
+                            date_str = item.get('samplingDate')
+                            count = item.get('count', 0)
+                            if date_str:
+                                intersection_coverage_lookup[date_str] = count
+                    else:
+                        if isinstance(intersection_resp, Exception):
+                            logging.error(f"Error fetching intersection coverage: {intersection_resp}")
+                        else:
+                            logging.error(f"API error for intersection coverage: status={intersection_resp.status}")
             
             # Step 4: Combine coverage and filtered count to calculate frequency
             records = []
             for date_str, min_coverage in coverage_by_date.items():
                 filtered_count = filtered_lookup.get(date_str, 0)
+                intersection_coverage = intersection_coverage_lookup.get(date_str, 0)
                 
                 if min_coverage > 0:
                     frequency = filtered_count / min_coverage
                     records.append({
                         'samplingDate': pd.to_datetime(date_str),
                         'count': filtered_count,
-                        'coverage': min_coverage,
+                        'min_coverage': min_coverage,
+                        'intersection_coverage': intersection_coverage,
                         'frequency': frequency
                     })
             
@@ -655,10 +696,10 @@ class WiseLoculusLapis(Lapis):
                 df = df.sort_values('samplingDate')
                 return df
             else:
-                return pd.DataFrame(columns=['samplingDate', 'count', 'coverage', 'frequency'])
+                return pd.DataFrame(columns=['samplingDate', 'count', 'min_coverage', 'intersection_coverage', 'frequency'])
                 
         except Exception as e:
             logging.error(f"Error in coocurrences_over_time: {e}")
             import traceback
             logging.error(traceback.format_exc())
-            return pd.DataFrame(columns=['samplingDate', 'count', 'coverage', 'frequency'])
+            return pd.DataFrame(columns=['samplingDate', 'count', 'min_coverage', 'intersection_coverage', 'frequency'])
