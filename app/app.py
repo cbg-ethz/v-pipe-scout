@@ -10,9 +10,10 @@ import subpages.signature_explorer as signature_explorer
 import subpages.abundance as abundance
 import subpages.untracked as untracked
 import subpages.region as region
+import subpages.coocurrences as coocurrences
 from utils.system_health import initialize_health_monitoring, display_global_system_status
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 if __name__ == "__main__":
     st.set_page_config(
@@ -35,6 +36,7 @@ if __name__ == "__main__":
         {"app": signature_explorer.app, "title": "Variant Signature Explorer", "icon": "🔍", "url_path": "signature-explorer"},
         {"app": abundance.app, "title": "Variant Abundances", "icon": "🧩", "url_path": "abundance"},
         {"app": region.app, "title": "Region Explorer", "icon": "📍", "url_path": "region"},
+        {"app": coocurrences.app, "title": "Co-occurrence (Prototype)", "icon": "🔗", "url_path": "cooccurrence"},
     ]
     
     # Create pages dynamically from configurations

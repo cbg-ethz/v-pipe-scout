@@ -28,78 +28,6 @@ FALLBACK_START_DATE, FALLBACK_END_DATE = get_fallback_date_range()
 class WiseLoculusLapis(Lapis):
     """Wise-Loculus Instance API"""
 
-    # TODO: phase out
-    async def fetch_sample_aggregated(
-            self,
-            session: aiohttp.ClientSession, 
-            mutation: str, 
-            mutation_type: MutationType, 
-            date_range: Tuple[datetime, datetime], 
-            locationName: Optional[str] = None
-            ) -> dict[str, Any]:
-        """
-        Fetches aggregated sample data for a given mutation, type, date range, and optional location.
-        """
-        payload: dict[str, Any] = { 
-            "samplingDateFrom": date_range[0].strftime('%Y-%m-%d'),
-            "samplingDateTo": date_range[1].strftime('%Y-%m-%d'),
-            "fields": ["samplingDate"],
-            "orderBy": ["samplingDate"]  # API expects array, not string
-        }
-
-        if mutation_type == MutationType.AMINO_ACID:
-            payload["aminoAcidMutations"] = [mutation]
-        elif mutation_type == MutationType.NUCLEOTIDE:
-            payload["nucleotideMutations"] = [mutation]
-        else:
-            logging.error(f"Unknown mutation type: {mutation_type}")
-            return {"mutation": mutation, "data": None, "error": "Unknown mutation type"}
-
-        if locationName:
-            payload["locationName"] = locationName  
-
-        logging.debug(f"Fetching sample aggregated with payload: {payload}")
-        try:
-            async with session.post(
-                f'{self.server_ip}/sample/aggregated',
-                headers={
-                    'accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-                json=payload
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return {"mutation": mutation, "data": data.get('data', [])}
-                else:
-                    logging.error(f"Failed to fetch data for mutation {mutation} (type: {mutation_type}, location: {locationName}).")
-                    logging.error(f"Status code: {response.status}")
-                    logging.error(await response.text())
-                    return {"mutation": mutation, "data": None, "status_code": response.status, "error_details": await response.text()}
-        except Exception as e:
-            logging.error(f"Connection error fetching data for mutation {mutation}: {e}")
-            return {"mutation": mutation, "data": None, "error": str(e)}
-
-    # TODO: phase out
-    async def fetch_mutation_counts(
-            self, 
-            mutations: List[str], 
-            mutation_type: MutationType, 
-            date_range: Tuple[datetime, datetime], 
-            locationName: Optional[str] = None
-            ) -> List[dict[str, Any]]:
-        """
-        Fetches the mutation counts for a list of mutations, specifying their type and optional location.
-        """
-        # validate mutation_type
-        if mutation_type not in [MutationType.AMINO_ACID, MutationType.NUCLEOTIDE]:
-            raise ValueError(f"Unsupported mutation type: {mutation_type}")
-
-        async with aiohttp.ClientSession() as session:
-            tasks = [self.fetch_sample_aggregated(session, m, mutation_type, date_range, locationName) for m in mutations]
-            return await asyncio.gather(*tasks, return_exceptions=True)  # return_exceptions to avoid failing the entire batch
-            
-
     async def sample_mutations(
             self, 
             type: MutationType,
@@ -585,3 +513,193 @@ class WiseLoculusLapis(Lapis):
             df = pd.DataFrame(columns=["count", "coverage", "frequency"])
             df.index = pd.MultiIndex.from_tuples([], names=["mutation", "samplingDate"])
             return df
+
+    async def coocurrences_over_time(
+            self,
+            mutations: List[str],
+            date_range: Tuple[datetime, datetime],
+            locationName: str,
+            interval: str = "daily"
+        ) -> pd.DataFrame:
+        """
+        Fetch proportion data for a SET of mutations (AND filter) over time.
+        
+        Unlike mutations_over_time which tracks individual mutations separately,
+        this tracks all mutations together as a filter condition.
+        
+        Strategy:
+        1. Use mutations_over_time to get coverage for each mutation position
+        2. Calculate two coverage metrics:
+           - min_coverage: minimum reads across all positions (most restrictive)
+           - intersection_coverage: reads covering ALL positions simultaneously
+        3. Query for count of reads matching ALL mutations
+        4. Calculate frequency = count / min_coverage
+        
+        Args:
+            mutations: List of nucleotide mutations to filter by (AND condition)
+            date_range: Tuple of (start_date, end_date)
+            locationName: Location name to filter by
+            interval: "daily", "weekly", or "monthly"
+            
+        Returns:
+            DataFrame with columns: samplingDate, count, min_coverage, intersection_coverage, frequency
+        """
+        try:
+            # Step 1: Get coverage for each mutation position using mutations_over_time
+            # For each mutation like "A5341C", we want coverage at position 5341
+            # We can get this by querying for just the position (e.g., "5341")
+            mutation_positions = [mut[:-1] if mut[-1].isalpha() else mut for mut in mutations]
+            
+            # Fetch coverage data for all mutation positions in parallel
+            coverage_tasks = [
+                self.mutations_over_time(
+                    mutations=[pos],
+                    mutation_type=MutationType.NUCLEOTIDE,
+                    date_range=date_range,
+                    locationName=locationName,
+                    interval=interval
+                )
+                for pos in mutation_positions
+            ]
+            
+            coverage_dfs = await asyncio.gather(*coverage_tasks, return_exceptions=True)
+            
+            # Step 2: Process coverage data and find minimum coverage per date
+            coverage_by_date = {}  # date -> min_coverage
+            
+            for i, cov_df in enumerate(coverage_dfs):
+                if isinstance(cov_df, Exception):
+                    logging.error(f"Error fetching coverage for mutation {mutations[i]}: {cov_df}")
+                    continue
+                
+                if cov_df.empty:
+                    logging.warning(f"No coverage data for mutation {mutations[i]}")
+                    continue
+                
+                # Extract coverage data for this mutation position
+                # cov_df has MultiIndex (mutation, samplingDate) with columns: count, coverage, frequency
+                for (mutation, date_str), row in cov_df.iterrows():
+                    coverage = row['coverage']
+                    
+                    if date_str not in coverage_by_date:
+                        coverage_by_date[date_str] = coverage
+                    else:
+                        # Take minimum coverage across all mutation positions
+                        coverage_by_date[date_str] = min(coverage_by_date[date_str], coverage)
+            
+            if not coverage_by_date:
+                logging.warning("No coverage data available for any mutation positions")
+                return pd.DataFrame(columns=['samplingDate', 'count', 'min_coverage', 'intersection_coverage', 'frequency'])
+            
+            # Step 3: Query for reads matching ALL mutations (AND filter) and intersection coverage
+            date_ranges = self._generate_date_ranges(date_range, interval)
+            
+            filtered_lookup = {}  # date -> count of reads with ALL mutations
+            intersection_coverage_lookup = {}  # date -> reads covering all positions
+            
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
+                tasks = []
+                
+                for date_start, date_end in date_ranges:
+                    # Task 1: Filtered count (reads with ALL mutations)
+                    filtered_payload = {
+                        "locationName": locationName,
+                        "samplingDateFrom": date_start.strftime('%Y-%m-%d'),
+                        "samplingDateTo": date_end.strftime('%Y-%m-%d'),
+                        "nucleotideMutations": mutations,  # ALL mutations must match
+                        "fields": ["samplingDate"]
+                    }
+                    
+                    filtered_task = session.post(
+                        f'{self.server_ip}/sample/aggregated',
+                        headers={'accept': 'application/json', 'Content-Type': 'application/json'},
+                        json=filtered_payload
+                    )
+                    
+                    # Task 2: Intersection coverage (reads covering all positions)
+                    # Use just the position numbers without target base
+                    intersection_payload = {
+                        "locationName": locationName,
+                        "samplingDateFrom": date_start.strftime('%Y-%m-%d'),
+                        "samplingDateTo": date_end.strftime('%Y-%m-%d'),
+                        "nucleotideMutations": mutation_positions,  # Just positions, any base
+                        "fields": ["samplingDate"]
+                    }
+                    
+                    intersection_task = session.post(
+                        f'{self.server_ip}/sample/aggregated',
+                        headers={'accept': 'application/json', 'Content-Type': 'application/json'},
+                        json=intersection_payload
+                    )
+                    
+                    tasks.append((filtered_task, intersection_task))
+                
+                # Execute all queries in parallel
+                all_results = await asyncio.gather(*[task for pair in tasks for task in pair], return_exceptions=True)
+                
+                # Process results in pairs (filtered, intersection)
+                for idx in range(0, len(all_results), 2):
+                    filtered_resp = all_results[idx]
+                    intersection_resp = all_results[idx + 1]
+                    
+                    # Process filtered response
+                    if not isinstance(filtered_resp, Exception) and filtered_resp.status == 200:
+                        filtered_data = await filtered_resp.json()
+                        filtered_items = filtered_data.get('data', [])
+                        
+                        for item in filtered_items:
+                            date_str = item.get('samplingDate')
+                            count = item.get('count', 0)
+                            if date_str:
+                                filtered_lookup[date_str] = count
+                    else:
+                        if isinstance(filtered_resp, Exception):
+                            logging.error(f"Error fetching filtered data: {filtered_resp}")
+                        else:
+                            logging.error(f"API error for filtered data: status={filtered_resp.status}")
+                    
+                    # Process intersection coverage response
+                    if not isinstance(intersection_resp, Exception) and intersection_resp.status == 200:
+                        intersection_data = await intersection_resp.json()
+                        intersection_items = intersection_data.get('data', [])
+                        
+                        for item in intersection_items:
+                            date_str = item.get('samplingDate')
+                            count = item.get('count', 0)
+                            if date_str:
+                                intersection_coverage_lookup[date_str] = count
+                    else:
+                        if isinstance(intersection_resp, Exception):
+                            logging.error(f"Error fetching intersection coverage: {intersection_resp}")
+                        else:
+                            logging.error(f"API error for intersection coverage: status={intersection_resp.status}")
+            
+            # Step 4: Combine coverage and filtered count to calculate frequency
+            records = []
+            for date_str, min_coverage in coverage_by_date.items():
+                filtered_count = filtered_lookup.get(date_str, 0)
+                intersection_coverage = intersection_coverage_lookup.get(date_str, 0)
+                
+                if min_coverage > 0:
+                    frequency = filtered_count / min_coverage
+                    records.append({
+                        'samplingDate': pd.to_datetime(date_str),
+                        'count': filtered_count,
+                        'min_coverage': min_coverage,
+                        'intersection_coverage': intersection_coverage,
+                        'frequency': frequency
+                    })
+            
+            # Create DataFrame
+            if records:
+                df = pd.DataFrame(records)
+                df = df.sort_values('samplingDate')
+                return df
+            else:
+                return pd.DataFrame(columns=['samplingDate', 'count', 'min_coverage', 'intersection_coverage', 'frequency'])
+                
+        except Exception as e:
+            logging.error(f"Error in coocurrences_over_time: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            return pd.DataFrame(columns=['samplingDate', 'count', 'min_coverage', 'intersection_coverage', 'frequency'])

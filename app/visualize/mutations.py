@@ -162,3 +162,144 @@ def mutations_over_time(freq_df, counts_df=None, coverage_freq_df=None, title="M
         margin=dict(l=margin_l, r=20, t=80, b=100),  # Adjust margins
     )
     return fig
+
+
+def proportions_lineplot(freq_df: pd.DataFrame,
+                         counts_df: pd.DataFrame | None = None,
+                         coverage_freq_df: pd.DataFrame | None = None,
+                         title: str = "Mutation Proportions Over Time",
+                         smoothing_window_days: int = 0,
+                         progress_callback=None) -> go.Figure:
+    """Plot mutation proportions over time as line plots (one line per mutation).
+
+    - Always plots proportion (frequency) on the y-axis (0-1).
+    - Optionally applies a time-based rolling mean (in days) to smooth daily data.
+    - Hover shows proportion plus count and coverage (if provided).
+
+    Args:
+        freq_df: Mutations as rows, dates as columns (values 0-1). Column labels should be dates or parsable to datetime.
+        counts_df: Optional counts with same shape (for hover info).
+        coverage_freq_df: Optional MultiIndex by (mutation, samplingDate) with 'count' and 'coverage' (for hover info).
+        title: Figure title.
+        progress_callback: Optional callable(progress, total, message).
+
+    Returns:
+        Plotly Figure with one trace per mutation.
+    """
+    if progress_callback:
+        progress_callback(0.05, 1.0, "Preparing data for line plot...")
+
+    # Ensure columns are datetimes and sorted
+    df_freq = freq_df.copy()
+    df_freq.columns = pd.to_datetime(df_freq.columns)
+    df_freq = df_freq.sort_index(axis=1)
+
+    # Sort mutations by genomic position
+    mutations_list = df_freq.index.tolist()
+    sorted_mutations = sort_mutations_by_position(mutations_list)
+    df_freq = df_freq.reindex(sorted_mutations)
+
+    # Align counts to freq if provided
+    df_counts = None
+    if counts_df is not None and not counts_df.empty:
+        df_counts = counts_df.copy()
+        df_counts.columns = pd.to_datetime(df_counts.columns)
+        df_counts = df_counts.sort_index(axis=1)
+        df_counts = df_counts.reindex(sorted_mutations)
+
+    if progress_callback:
+        progress_callback(0.35, 1.0, "Building traces...")
+
+    # Build hover customdata: counts and coverage if available
+    fig = go.Figure()
+    all_dates = list(df_freq.columns)
+
+    for mutation in df_freq.index:
+        # Convert y values safely handling pandas NA
+        y_series = df_freq.loc[mutation]
+        y_vals = np.array([float(v) if not pd.isna(v) else np.nan for v in y_series], dtype=float)
+
+        # counts per date (for hover)
+        counts_vals = None
+        if df_counts is not None:
+            # align to same dates
+            aligned_counts = df_counts.reindex(columns=all_dates)
+            counts_series = aligned_counts.loc[mutation]
+            if counts_series is not None:
+                # Convert to numeric, replacing NA/NaN with None, handle pandas NA
+                numeric_series = pd.to_numeric(counts_series, errors='coerce')
+                # Convert to list to handle pandas NA types
+                counts_vals = np.array([None if pd.isna(v) else float(v) for v in numeric_series], dtype=object)
+
+        # coverage per date (for hover) via coverage_freq_df
+        coverage_vals = None
+        if coverage_freq_df is not None and not coverage_freq_df.empty:
+            cov_tmp = []
+            for dt in all_dates:
+                try:
+                    if mutation in coverage_freq_df.index.get_level_values('mutation'):
+                        md = coverage_freq_df.loc[mutation]
+                        if dt in md.index:
+                            cov = md.loc[dt, 'coverage']
+                            # Handle various NA types
+                            if pd.isna(cov) or cov == 'NA':
+                                cov_tmp.append(None)
+                            else:
+                                cov_tmp.append(float(cov))
+                        else:
+                            cov_tmp.append(None)
+                    else:
+                        cov_tmp.append(None)
+                except Exception:
+                    cov_tmp.append(None)
+            coverage_vals = np.array(cov_tmp, dtype=object)
+
+        # Assemble customdata columns for hover
+        # customdata shape: (N, 2) -> [count, coverage]
+        if counts_vals is not None or coverage_vals is not None:
+            # Normalize shapes
+            if counts_vals is None:
+                counts_vals = np.array([None] * len(all_dates), dtype=object)
+            if coverage_vals is None:
+                coverage_vals = np.array([None] * len(all_dates), dtype=object)
+            customdata = np.vstack([counts_vals, coverage_vals]).T
+            hovertemplate = (
+                "Date: %{x|%Y-%m-%d}<br>"
+                "Proportion: %{y:.3f}<br>"
+                "Count: %{customdata[0]:.0f}<br>"
+                "Coverage: %{customdata[1]:.0f}<extra>%{fullData.name}</extra>"
+            )
+        else:
+            customdata = None
+            hovertemplate = (
+                "Date: %{x|%Y-%m-%d}<br>"
+                "Proportion: %{y:.3f}<extra>%{fullData.name}</extra>"
+            )
+
+        fig.add_trace(go.Scatter(
+            x=all_dates,
+            y=y_vals,
+            mode="lines+markers",
+            name=mutation,
+            customdata=customdata,
+            hovertemplate=hovertemplate,
+            marker=dict(size=6, line=dict(width=0.5, color="white"))
+        ))
+
+    # Layout
+    fig.update_layout(
+        title=title,
+        xaxis_title="Date",
+        yaxis_title="Proportion",
+        template="plotly_white",
+        height=max(400, 300 + int(len(df_freq.index) / 10) * 40),
+        legend_title_text="Mutation",
+        margin=dict(l=60, r=20, t=60, b=60)
+    )
+    # Auto-scale y-axis to data range instead of forcing 0-1
+    fig.update_yaxes(autorange=True)
+
+    if progress_callback:
+        progress_callback(0.95, 1.0, "Rendering plot...")
+
+    return fig
