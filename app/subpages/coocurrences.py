@@ -29,6 +29,7 @@ def app():
     st.title("Co-occurrence of Mutations Over Time (Prototype)")
     st.write("Track a **set of mutations** (AND filter) over time to see the proportion of reads matching ALL specified mutations.")
     st.info("💡 This differs from other pages: here mutations are combined as a filter (must have ALL), not tracked individually.")
+    st.warning("⚠️ **Coverage Definition:** Coverage is defined as the minimum number of reads covering all mutation positions. For a set of mutations, we take the least coverage across all positions to ensure accurate frequency calculations.")
     st.markdown("---")
 
     # Fixed to nucleotide only for now
@@ -134,80 +135,97 @@ def app():
     # Interval selection (API-side aggregation)
     interval = st.selectbox("Interval:", ["daily", "weekly", "monthly"], index=0)
 
+    # Fetch data for all locations concurrently
+    async def fetch_all_locations(locations):
+        """Fetch data for all locations in parallel."""
+        tasks = [
+            wiseLoculus.coocurrences_over_time(
+                mutations=valid_mutations,
+                date_range=(start_date_dt, end_date_dt),
+                locationName=loc,
+                interval=interval
+            )
+            for loc in locations
+        ]
+        return await __import__('asyncio').gather(*tasks, return_exceptions=True)
 
-    # Fetch and display one location at a time for faster progressive rendering
-    for loc in query_locations:
+    # Execute all fetches in parallel
+    with st.spinner(f"Fetching data for {len(query_locations)} location(s)..."):
+        all_results = __import__('asyncio').run(fetch_all_locations(query_locations))
+
+    # Render results for each location
+    for loc, result in zip(query_locations, all_results):
         st.write(f"#### {loc}")
         
-        with st.spinner(f"Fetching data for {loc}..."):
-            try:
-                df = __import__('asyncio').run(
-                    wiseLoculus.coocurrences_over_time(
-                        mutations=valid_mutations,
-                        date_range=(start_date_dt, end_date_dt),
-                        locationName=loc,
-                        interval=interval
-                    )
-                )
+        # Handle exceptions from fetch
+        if isinstance(result, Exception):
+            st.error(f"Error fetching data for {loc}: {result}")
+            import traceback
+            with st.expander(f"🔍 Error Details for {loc}", expanded=False):
+                st.code(''.join(traceback.format_exception(type(result), result, result.__traceback__)))
+            continue
+        
+        df = result
+        
+        try:
+            if df.empty:
+                st.warning(f"No data available for {loc}.")
+                continue
 
-                if df.empty:
-                    st.warning(f"No data available for {loc}.")
-                    continue
+            # Show dataframe for debugging
+            with st.expander(f"📊 View Raw Data for {loc}", expanded=False):
+                st.dataframe(df)
 
-                # Show dataframe for debugging
-                with st.expander(f"📊 View Raw Data for {loc}", expanded=False):
-                    st.dataframe(df)
+            # Prepare data for lineplot
+            mutation_label = f"Set of {len(valid_mutations)} mutations"
+            
+            dates = df['samplingDate'].tolist()
+            frequencies = df['frequency'].tolist()
+            counts = df['count'].tolist()
+            coverages = df['coverage'].tolist()
+            
+            # Create single-row dataframes
+            freq_df = pd.DataFrame([frequencies], columns=dates, index=[mutation_label])
+            counts_df = pd.DataFrame([counts], columns=dates, index=[mutation_label])
+            
+            # Create coverage dataframe in MultiIndex format for hover info
+            coverage_records = []
+            for i, date in enumerate(dates):
+                coverage_records.append({
+                    'mutation': mutation_label,
+                    'samplingDate': date,
+                    'coverage': coverages[i],
+                    'count': counts[i],
+                    'frequency': frequencies[i]
+                })
+            coverage_df = pd.DataFrame(coverage_records)
+            coverage_df = coverage_df.set_index(['mutation', 'samplingDate'])
 
-                # Prepare data for lineplot
-                mutation_label = f"Set of {len(valid_mutations)} mutations"
-                
-                dates = df['samplingDate'].tolist()
-                frequencies = df['frequency'].tolist()
-                counts = df['count'].tolist()
-                coverages = df['coverage'].tolist()
-                
-                # Create single-row dataframes
-                freq_df = pd.DataFrame([frequencies], columns=dates, index=[mutation_label])
-                counts_df = pd.DataFrame([counts], columns=dates, index=[mutation_label])
-                
-                # Create coverage dataframe in MultiIndex format for hover info
-                coverage_records = []
-                for i, date in enumerate(dates):
-                    coverage_records.append({
-                        'mutation': mutation_label,
-                        'samplingDate': date,
-                        'coverage': coverages[i],
-                        'count': counts[i],
-                        'frequency': frequencies[i]
-                    })
-                coverage_df = pd.DataFrame(coverage_records)
-                coverage_df = coverage_df.set_index(['mutation', 'samplingDate'])
+            info_placeholder = st.empty()
+            progress = st.progress(0)
 
-                info_placeholder = st.empty()
-                progress = st.progress(0)
+            def cb(cur, tot, msg):
+                progress.progress(min(1.0, cur))
+                info_placeholder.info(msg)
 
-                def cb(cur, tot, msg):
-                    progress.progress(min(1.0, cur))
-                    info_placeholder.info(msg)
+            fig = proportions_lineplot(
+                freq_df=freq_df,
+                counts_df=counts_df,
+                coverage_freq_df=coverage_df,
+                title=f"Proportion of Reads with ALL Mutations — {loc} ({interval})",
+                progress_callback=cb
+            )
+            st.plotly_chart(fig)
+            
+            # Clear progress indicators
+            progress.empty()
+            info_placeholder.empty()
 
-                fig = proportions_lineplot(
-                    freq_df=freq_df,
-                    counts_df=counts_df,
-                    coverage_freq_df=coverage_df,
-                    title=f"Proportion of Reads with ALL Mutations — {loc} ({interval})",
-                    progress_callback=cb
-                )
-                st.plotly_chart(fig)
-                
-                # Clear progress indicators
-                progress.empty()
-                info_placeholder.empty()
-
-            except Exception as e:
-                st.error(f"Error fetching or plotting data for {loc}: {e}")
-                import traceback
-                with st.expander(f"🔍 Error Details for {loc}", expanded=False):
-                    st.code(traceback.format_exc())
+        except Exception as e:
+            st.error(f"Error plotting data for {loc}: {e}")
+            import traceback
+            with st.expander(f"🔍 Error Details for {loc}", expanded=False):
+                st.code(traceback.format_exc())
 
 
 if __name__ == "__main__":
