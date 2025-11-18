@@ -128,17 +128,6 @@ def app():
     # Interval selection (API-side aggregation)
     interval = st.selectbox("Interval:", ["daily", "weekly", "monthly"], index=0)
 
-    # Rolling mean (client-side)
-    col1, col2 = st.columns(2)
-    with col1:
-        enable_smooth = st.checkbox("Apply rolling mean (days)", value=False)
-    with col2:
-        window_days = st.number_input("Window size (days)", min_value=3, max_value=60, value=7, step=1, disabled=not enable_smooth)
-    smoothing = int(window_days) if enable_smooth else 0
-
-    st.markdown("---")
-    st.write("### Mutation Set Proportion Over Time")
-    st.caption(f"Showing proportion of reads that have ALL {len(valid_mutations)} mutations")
 
     # Fetch and display one location at a time for faster progressive rendering
     for loc in query_locations:
@@ -200,7 +189,6 @@ def app():
                     counts_df=counts_df,
                     coverage_freq_df=coverage_df,
                     title=f"Proportion of Reads with ALL Mutations — {loc} ({interval})",
-                    smoothing_window_days=smoothing,
                     progress_callback=cb
                 )
                 st.plotly_chart(fig)

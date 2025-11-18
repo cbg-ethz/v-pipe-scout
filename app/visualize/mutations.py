@@ -181,7 +181,6 @@ def proportions_lineplot(freq_df: pd.DataFrame,
         counts_df: Optional counts with same shape (for hover info).
         coverage_freq_df: Optional MultiIndex by (mutation, samplingDate) with 'count' and 'coverage' (for hover info).
         title: Figure title.
-        smoothing_window_days: If > 0, apply rolling mean over this many days (time-based window).
         progress_callback: Optional callable(progress, total, message).
 
     Returns:
@@ -208,24 +207,16 @@ def proportions_lineplot(freq_df: pd.DataFrame,
         df_counts = df_counts.sort_index(axis=1)
         df_counts = df_counts.reindex(sorted_mutations)
 
-    # Optional smoothing: time-based rolling over the date index
-    if smoothing_window_days and smoothing_window_days > 0:
-        if progress_callback:
-            progress_callback(0.15, 1.0, f"Applying {smoothing_window_days}-day rolling mean to proportions...")
-        df_smoothed = df_freq.T.rolling(f"{int(smoothing_window_days)}D").mean().T
-    else:
-        df_smoothed = df_freq
-
     if progress_callback:
         progress_callback(0.35, 1.0, "Building traces...")
 
     # Build hover customdata: counts and coverage if available
     fig = go.Figure()
-    all_dates = list(df_smoothed.columns)
+    all_dates = list(df_freq.columns)
 
-    for mutation in df_smoothed.index:
+    for mutation in df_freq.index:
         # Convert y values safely handling pandas NA
-        y_series = df_smoothed.loc[mutation]
+        y_series = df_freq.loc[mutation]
         y_vals = np.array([float(v) if not pd.isna(v) else np.nan for v in y_series], dtype=float)
 
         # counts per date (for hover)
@@ -301,7 +292,7 @@ def proportions_lineplot(freq_df: pd.DataFrame,
         xaxis_title="Date",
         yaxis_title="Proportion",
         template="plotly_white",
-        height=max(400, 300 + int(len(df_smoothed.index) / 10) * 40),
+        height=max(400, 300 + int(len(df_freq.index) / 10) * 40),
         legend_title_text="Mutation",
         margin=dict(l=60, r=20, t=60, b=60)
     )
