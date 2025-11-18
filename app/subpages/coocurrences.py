@@ -51,7 +51,8 @@ def app():
         For more details, see [CoV-Spectrum documentation](https://cov-spectrum.org/about#faq-search-variants).
         """)
     
-    default_mut = "A22893G, T22896G"
+    #default_mut = "A22893G, T22896G"
+    default_mut = "23149T, 23224T, 23311T, 23403G, 23436G"
 
     url_mut_input = url_state.load_from_url("mutation_input", default_mut, str)
     mutation_input = st.text_area("Mutations | Deletions (nucleotide only):", value=url_mut_input, height=100)
@@ -97,13 +98,18 @@ def app():
     
     # Add "All locations" option
     location_options = ["All locations"] + locations
-    default_selection = [locations[0]] if locations else []
+    default_selection = ["All locations"]
     
-    url_locs = url_state.load_from_url("locations", default_selection, list)
-    # Ensure URL locations are valid
-    valid_url_locs = [loc for loc in url_locs if loc in location_options]
-    if not valid_url_locs:
+    # Load from URL, but ensure default is "All locations" if not in URL
+    url_locs = url_state.load_from_url("locations", None, list)
+    if url_locs is None:
+        # No URL state - use default
         valid_url_locs = default_selection
+    else:
+        # Ensure URL locations are valid
+        valid_url_locs = [loc for loc in url_locs if loc in location_options]
+        if not valid_url_locs:
+            valid_url_locs = default_selection
     
     selected_locations = st.multiselect(
         "Select Location(s):", 
