@@ -3,6 +3,7 @@
 import logging
 import aiohttp
 import asyncio
+import re
 from typing import Optional, List, Tuple, Any
 from datetime import datetime, timedelta
 
@@ -27,6 +28,58 @@ FALLBACK_START_DATE, FALLBACK_END_DATE = get_fallback_date_range()
 
 class WiseLoculusLapis(Lapis):
     """Wise-Loculus Instance API"""
+
+    def _mutations_to_and_query(self, mutations: List[str]) -> str:
+        """
+        Convert a list of mutations to an AND query string for advancedQuery.
+        
+        Args:
+            mutations: List of mutations (e.g., ["23149T", "23224T", "23311T"])
+            
+        Returns:
+            str: AND query string (e.g., "23149T & 23224T & 23311T")
+            
+        Examples:
+            >>> _mutations_to_and_query(["23149T"])
+            "23149T"
+            >>> _mutations_to_and_query(["23149T", "23224T", "23311T"])
+            "23149T & 23224T & 23311T"
+            >>> _mutations_to_and_query([])
+            ""
+        """
+        if not mutations:
+            return ""
+        if len(mutations) == 1:
+            return mutations[0]
+        return " & ".join(mutations)
+
+    def _extract_position(self, mutation: str) -> Optional[str]:
+        """
+        Extract numeric genomic position from a mutation string.
+        Examples:
+        - "A13T" -> "13"
+        - "301-" -> "301"
+        - "303" -> "303"
+        Returns None if no position is found.
+        """
+        m = re.search(r"(\d+)", str(mutation))
+        return m.group(1) if m else None
+
+    def _intersection_coverage_query(self, mutations: List[str]) -> str:
+        """
+        Build an advancedQuery ensuring reads have non-N calls at ALL positions.
+        For positions {13, 301, 303} → "!13N & !301N & !303N".
+        """
+        positions: List[str] = []
+        for mut in mutations:
+            pos = self._extract_position(mut)
+            if pos:
+                positions.append(pos)
+        if not positions:
+            return ""
+        # De-duplicate and sort for stability
+        unique_positions = sorted(set(positions), key=int)  
+        return " & ".join([f"!{p}N" for p in unique_positions])
 
     async def sample_mutations(
             self, 
@@ -528,12 +581,9 @@ class WiseLoculusLapis(Lapis):
         this tracks all mutations together as a filter condition.
         
         Strategy:
-        1. Use mutations_over_time to get coverage for each mutation position
-        2. Calculate two coverage metrics:
-           - min_coverage: minimum reads across all positions (most restrictive)
-           - intersection_coverage: reads covering ALL positions simultaneously
-        3. Query for count of reads matching ALL mutations
-        4. Calculate frequency = count / min_coverage
+        1. Use advanced queries to get coverage: reads covering ALL positions simultaneously ("!posN" AND ...)
+        2. Query for count of reads matching ALL mutations (AND)
+        3. Calculate frequency = count / coverage
         
         Args:
             mutations: List of nucleotide mutations to filter by (AND condition)
@@ -542,60 +592,14 @@ class WiseLoculusLapis(Lapis):
             interval: "daily", "weekly", or "monthly"
             
         Returns:
-            DataFrame with columns: samplingDate, count, min_coverage, intersection_coverage, frequency
+            DataFrame with columns: samplingDate, count, coverage, frequency 
         """
         try:
-            # Step 1: Get coverage for each mutation position using mutations_over_time
-            # For each mutation like "A5341C", we want coverage at position 5341
-            # We can get this by querying for just the position (e.g., "5341")
-            mutation_positions = [mut[:-1] if mut[-1].isalpha() else mut for mut in mutations]
-            
-            # Fetch coverage data for all mutation positions in parallel
-            coverage_tasks = [
-                self.mutations_over_time(
-                    mutations=[pos],
-                    mutation_type=MutationType.NUCLEOTIDE,
-                    date_range=date_range,
-                    locationName=locationName,
-                    interval=interval
-                )
-                for pos in mutation_positions
-            ]
-            
-            coverage_dfs = await asyncio.gather(*coverage_tasks, return_exceptions=True)
-            
-            # Step 2: Process coverage data and find minimum coverage per date
-            coverage_by_date = {}  # date -> min_coverage
-            
-            for i, cov_df in enumerate(coverage_dfs):
-                if isinstance(cov_df, Exception):
-                    logging.error(f"Error fetching coverage for mutation {mutations[i]}: {cov_df}")
-                    continue
-                
-                if cov_df.empty:
-                    logging.warning(f"No coverage data for mutation {mutations[i]}")
-                    continue
-                
-                # Extract coverage data for this mutation position
-                # cov_df has MultiIndex (mutation, samplingDate) with columns: count, coverage, frequency
-                for (mutation, date_str), row in cov_df.iterrows():
-                    coverage = row['coverage']
-                    
-                    if date_str not in coverage_by_date:
-                        coverage_by_date[date_str] = coverage
-                    else:
-                        # Take minimum coverage across all mutation positions
-                        coverage_by_date[date_str] = min(coverage_by_date[date_str], coverage)
-            
-            if not coverage_by_date:
-                logging.warning("No coverage data available for any mutation positions")
-                return pd.DataFrame(columns=['samplingDate', 'count', 'min_coverage', 'intersection_coverage', 'frequency'])
-            
-            # Step 3: Query for reads matching ALL mutations (AND filter) and intersection coverage
+            # Step 1: Query for reads matching ALL mutations (AND filter) and intersection coverage simultaneously
             date_ranges = self._generate_date_ranges(date_range, interval)
             
             filtered_lookup = {}  # date -> count of reads with ALL mutations
-            intersection_coverage_lookup = {}  # date -> reads covering all positions
+            coverage_lookup = {}  # date -> reads covering all positions
             
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
                 tasks = []
@@ -606,7 +610,7 @@ class WiseLoculusLapis(Lapis):
                         "locationName": locationName,
                         "samplingDateFrom": date_start.strftime('%Y-%m-%d'),
                         "samplingDateTo": date_end.strftime('%Y-%m-%d'),
-                        "nucleotideMutations": mutations,  # ALL mutations must match
+                        "advancedQuery": self._mutations_to_and_query(mutations),  # ALL mutations must match (AND)
                         "fields": ["samplingDate"]
                     }
                     
@@ -617,12 +621,12 @@ class WiseLoculusLapis(Lapis):
                     )
                     
                     # Task 2: Intersection coverage (reads covering all positions)
-                    # Use just the position numbers without target base
+                    # Require non-N calls at all positions: !posN & !posN ...
                     intersection_payload = {
                         "locationName": locationName,
                         "samplingDateFrom": date_start.strftime('%Y-%m-%d'),
                         "samplingDateTo": date_end.strftime('%Y-%m-%d'),
-                        "nucleotideMutations": mutation_positions,  # Just positions, any base
+                        "advancedQuery": self._intersection_coverage_query(mutations),
                         "fields": ["samplingDate"]
                     }
                     
@@ -658,7 +662,7 @@ class WiseLoculusLapis(Lapis):
                         else:
                             logging.error(f"API error for filtered data: status={filtered_resp.status}")
                     
-                    # Process intersection coverage response
+                    # Process coverage (intersection) response
                     if not isinstance(intersection_resp, Exception) and intersection_resp.status == 200:
                         intersection_data = await intersection_resp.json()
                         intersection_items = intersection_data.get('data', [])
@@ -667,26 +671,23 @@ class WiseLoculusLapis(Lapis):
                             date_str = item.get('samplingDate')
                             count = item.get('count', 0)
                             if date_str:
-                                intersection_coverage_lookup[date_str] = count
+                                coverage_lookup[date_str] = count
                     else:
                         if isinstance(intersection_resp, Exception):
                             logging.error(f"Error fetching intersection coverage: {intersection_resp}")
                         else:
                             logging.error(f"API error for intersection coverage: status={intersection_resp.status}")
             
-            # Step 4: Combine coverage and filtered count to calculate frequency
+            # Step 2: Combine coverage and filtered count to calculate frequency
             records = []
-            for date_str, min_coverage in coverage_by_date.items():
+            for date_str, coverage in coverage_lookup.items():
                 filtered_count = filtered_lookup.get(date_str, 0)
-                intersection_coverage = intersection_coverage_lookup.get(date_str, 0)
-                
-                if min_coverage > 0:
-                    frequency = filtered_count / min_coverage
+                if coverage > 0:
+                    frequency = filtered_count / coverage
                     records.append({
                         'samplingDate': pd.to_datetime(date_str),
                         'count': filtered_count,
-                        'min_coverage': min_coverage,
-                        'intersection_coverage': intersection_coverage,
+                        'coverage': coverage,
                         'frequency': frequency
                     })
             
@@ -696,10 +697,10 @@ class WiseLoculusLapis(Lapis):
                 df = df.sort_values('samplingDate')
                 return df
             else:
-                return pd.DataFrame(columns=['samplingDate', 'count', 'min_coverage', 'intersection_coverage', 'frequency'])
+                return pd.DataFrame(columns=['samplingDate', 'count', 'coverage', 'frequency'])
                 
         except Exception as e:
             logging.error(f"Error in coocurrences_over_time: {e}")
             import traceback
             logging.error(traceback.format_exc())
-            return pd.DataFrame(columns=['samplingDate', 'count', 'min_coverage', 'intersection_coverage', 'frequency'])
+            return pd.DataFrame(columns=['samplingDate', 'count', 'coverage', 'frequency'])
