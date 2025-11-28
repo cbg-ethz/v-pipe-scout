@@ -2,6 +2,7 @@ services:
   # Redis service: Acts as both message broker and result backend for Celery
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     # Removed port exposure - Redis only needs to be accessible within Docker network
     volumes:
       - redis-data:/data
@@ -20,6 +21,7 @@ services:
       # Use the app directory as build context so environment.yml is available
       context: ./app
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "${STREAMLIT_PORT:-9001}:8000"
     volumes:
@@ -42,6 +44,7 @@ services:
       # Use the worker subdirectory as build context so environment.yml is available
       context: ./worker
       dockerfile: Dockerfile
+    restart: unless-stopped
     volumes:
       - ./worker:/app
     depends_on:
