@@ -16,6 +16,45 @@ from api.wiseloculus import WiseLoculusLapis
 from interface import MutationType
 
 
+def test_mutations_to_and_query_empty():
+    """Test _mutations_to_and_query with empty list."""
+    api = WiseLoculusLapis("http://test-server.com")
+    result = api._mutations_to_and_query([])
+    assert result == "", "Empty list should return empty string"
+
+def test_mutations_to_and_query_single():
+    """Test _mutations_to_and_query with single mutation."""
+    api = WiseLoculusLapis("http://test-server.com")
+    result = api._mutations_to_and_query(["23149T"])
+    assert result == "23149T", "Single mutation should return as-is"
+
+def test_mutations_to_and_query_multiple():
+    """Test _mutations_to_and_query with multiple mutations."""
+    api = WiseLoculusLapis("http://test-server.com")
+    result = api._mutations_to_and_query(["23149T", "23224T", "23311T"])
+    assert result == "23149T & 23224T & 23311T", "Multiple mutations should be joined with ' & '"
+
+def test_mutations_to_and_query_with_deletions():
+    """Test _mutations_to_and_query with deletions."""
+    api = WiseLoculusLapis("http://test-server.com")
+    result = api._mutations_to_and_query(["123A", "234T", "345-"])
+    assert result == "123A & 234T & 345-", "Should handle deletions correctly"
+
+def test_extract_position_variants():
+    """Test _extract_position handles different mutation formats."""
+    api = WiseLoculusLapis("http://test-server.com")
+    assert api._extract_position("A13T") == "13"
+    assert api._extract_position("301-") == "301"
+    assert api._extract_position("303") == "303"
+    assert api._extract_position("S:N501Y") == "501"
+
+def test_intersection_coverage_query():
+    """Test building intersection coverage advancedQuery (!posN AND ...)."""
+    api = WiseLoculusLapis("http://test-server.com")
+    q = api._intersection_coverage_query(["A13T", "301-", "C303G"])
+    parts = set(q.split(" & "))
+    assert parts == {"!13N", "!301N", "!303N"}
+
 class TestWiseLoculusLapis:
     """Test cases for WiseLoculusLapis class."""
     
@@ -713,4 +752,6 @@ class TestWiseLoculusLapisLiveAPI:
                 
         except Exception as e:
             pytest.fail(f"Live mutations_over_time amino acid test failed: {e}")
+
+
 

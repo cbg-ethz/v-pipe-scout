@@ -6,7 +6,9 @@
 
 LAPIS now supports advanced query filters via the `advancedQuery` parameter, enabling complex logical operations.
 
-📚 **Official Documentation:** [LAPIS Advanced Query Syntax](https://lapis.cov-spectrum.org/advanced-queries/)
+📚 **Official Documentation:** [LAPIS Advanced Query Syntax](https://lapis.cov-spectrum.org/open/v2/docs/concepts/variant-query)
+
+also see the Symboles refernece https://lapis.cov-spectrum.org/open/v2/docs/references/nucleotide-and-amino-acid-symbols
 
 ### Example Advanced Query (URL-encoded)
 ```bash
