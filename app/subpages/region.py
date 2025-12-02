@@ -322,11 +322,11 @@ def app():
     st.write("Shows the mutations over time in wastewater for the selected date range.")
 
     # Add radio button for showing/hiding dates with no data
-    url_show_empty = url_state.load_from_url("show_empty", "Show all dates", str)
+    url_show_empty = url_state.load_from_url("show_empty", "Skip dates with no coverage", str)
     show_empty_dates = st.radio(
         "Date display options:",
         options=["Show all dates", "Skip dates with no coverage"],
-        index=0 if url_show_empty == "Show all dates" else 1
+        index=1 if url_show_empty == "Skip dates with no coverage" else 0
     )
     
     # Save radio button selection to URL
