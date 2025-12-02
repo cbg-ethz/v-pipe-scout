@@ -150,6 +150,46 @@ def render_mutation_plot_component(
             
             # Keep the original MultiIndex structure for coverage_freq_df for compatibility with visualization
             coverage_freq_df = mutations_over_time_df
+            
+            # -------------------------------------------------------------------------
+            # Custom Filtering: Wildtype and No-Data
+            # -------------------------------------------------------------------------
+            
+            # 1. Filter out wildtype mutations (where Ref == Alt)
+            # e.g. A345A, ORF1a:T103T
+            import re
+            
+            def is_wildtype(mut_str):
+                # Remove gene prefix if present
+                if ':' in mut_str:
+                    _, mut_part = mut_str.split(':', 1)
+                else:
+                    mut_part = mut_str
+                
+                # Check if it matches RefPosAlt format where Ref == Alt
+                # We assume Ref and Alt are single letters.
+                match = re.match(r'^([A-Z])\d+([A-Z])$', mut_part)
+                if match:
+                    return match.group(1) == match.group(2)
+                return False
+
+            if not counts_df.empty:
+                non_wildtype_mutations = [m for m in counts_df.index if not is_wildtype(m)]
+                if len(non_wildtype_mutations) < len(counts_df.index):
+                    counts_df = counts_df.loc[non_wildtype_mutations]
+                    freq_df = freq_df.loc[non_wildtype_mutations]
+
+                # 2. Filter out mutations with no counts (max count < 1)
+                # Convert to numeric to be safe, treating errors as NaN
+                counts_numeric = counts_df.apply(pd.to_numeric, errors='coerce').fillna(0)
+                max_counts = counts_numeric.max(axis=1)
+                mutations_with_data = max_counts[max_counts >= 1].index.tolist()
+                
+                if len(mutations_with_data) < len(counts_df.index):
+                    counts_df = counts_df.loc[mutations_with_data]
+                    freq_df = freq_df.loc[mutations_with_data]
+            
+            # -------------------------------------------------------------------------
 
         except APIError as api_err:
             # Handle API-specific errors with clear messaging
@@ -317,7 +357,7 @@ def render_mutation_plot_component(
         show_empty_dates = target.radio(
             "Date display options:",
             options=["Show all dates", "Skip dates with no coverage"],
-            index=0,  # Default to showing all dates
+            index=1,  # Default to skipping dates with no coverage
             key=f"{session_prefix}show_empty_dates"
         )
         
