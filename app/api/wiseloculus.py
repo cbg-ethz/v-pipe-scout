@@ -10,6 +10,14 @@ import pandas as pd
 
 from .lapis import Lapis
 from .exceptions import APIError
+from .lapis_fields import (
+    SAMPLING_DATE, SAMPLING_DATE_FROM, SAMPLING_DATE_TO,
+    LOCATION_NAME, AMINO_ACID_MUTATIONS, NUCLEOTIDE_MUTATIONS,
+    FIELDS, ORDER_BY, MIN_PROPORTION, LIMIT, DATA_FORMAT, DOWNLOAD_AS_FILE,
+    FILTERS, INCLUDE_MUTATIONS, DATE_RANGES, DATE_FROM, DATE_TO, DATE_FIELD,
+    DATA, MUTATIONS, COUNT, COVERAGE, PROPORTION,
+    DF_SAMPLING_DATE, DF_MUTATION, DF_COUNT, DF_COVERAGE, DF_FREQUENCY
+)
 from interface import MutationType
 
 # Constants for fallback date range
@@ -41,22 +49,22 @@ class WiseLoculusLapis(Lapis):
         Fetches aggregated sample data for a given mutation, type, date range, and optional location.
         """
         payload: dict[str, Any] = { 
-            "samplingDateFrom": date_range[0].strftime('%Y-%m-%d'),
-            "samplingDateTo": date_range[1].strftime('%Y-%m-%d'),
-            "fields": ["samplingDate"],
-            "orderBy": ["samplingDate"]  # API expects array, not string
+            SAMPLING_DATE_FROM: date_range[0].strftime('%Y-%m-%d'),
+            SAMPLING_DATE_TO: date_range[1].strftime('%Y-%m-%d'),
+            FIELDS: [SAMPLING_DATE],
+            ORDER_BY: [SAMPLING_DATE]  # API expects array, not string
         }
 
         if mutation_type == MutationType.AMINO_ACID:
-            payload["aminoAcidMutations"] = [mutation]
+            payload[AMINO_ACID_MUTATIONS] = [mutation]
         elif mutation_type == MutationType.NUCLEOTIDE:
-            payload["nucleotideMutations"] = [mutation]
+            payload[NUCLEOTIDE_MUTATIONS] = [mutation]
         else:
             logging.error(f"Unknown mutation type: {mutation_type}")
             return {"mutation": mutation, "data": None, "error": "Unknown mutation type"}
 
         if locationName:
-            payload["locationName"] = locationName  
+            payload[LOCATION_NAME] = locationName  
 
         logging.debug(f"Fetching sample aggregated with payload: {payload}")
         try:
@@ -119,21 +127,21 @@ class WiseLoculusLapis(Lapis):
         """
 
         payload = {
-            "samplingDateFrom": date_range[0].strftime('%Y-%m-%d'),
-            "samplingDateTo": date_range[1].strftime('%Y-%m-%d'),
-            "locationName": locationName,
-            "minProportion": min_proportion, 
-            "orderBy": "proportion",
-            "limit": 10000,  # Adjust limit as needed
-            "dataFormat": "JSON",
-            "downloadAsFile": "false"
+            SAMPLING_DATE_FROM: date_range[0].strftime('%Y-%m-%d'),
+            SAMPLING_DATE_TO: date_range[1].strftime('%Y-%m-%d'),
+            LOCATION_NAME: locationName,
+            MIN_PROPORTION: min_proportion, 
+            ORDER_BY: PROPORTION,
+            LIMIT: 10000,  # Adjust limit as needed
+            DATA_FORMAT: "JSON",
+            DOWNLOAD_AS_FILE: "false"
         }
 
         # Add mutation filters if provided
         if nucleotide_mutations:
-            payload["nucleotideMutations"] = nucleotide_mutations
+            payload[NUCLEOTIDE_MUTATIONS] = nucleotide_mutations
         if amino_acid_mutations:
-            payload["aminoAcidMutations"] = amino_acid_mutations
+            payload[AMINO_ACID_MUTATIONS] = amino_acid_mutations
 
         if type == MutationType.AMINO_ACID:
             endpoint = f'{self.server_ip}/sample/aminoAcidMutations'
@@ -175,7 +183,7 @@ class WiseLoculusLapis(Lapis):
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
                     f'{self.server_ip}/sample/aggregated',
-                    params={'fields': 'samplingDate'},
+                    params={FIELDS: SAMPLING_DATE},
                     headers={'accept': 'application/json'}
                 ) as response:
                     if response.status == 200:
@@ -189,12 +197,12 @@ class WiseLoculusLapis(Lapis):
                         # Extract all dates and convert to datetime objects
                         dates = []
                         for entry in sample_data:
-                            if 'samplingDate' in entry:
+                            if SAMPLING_DATE in entry:
                                 try:
-                                    date_obj = datetime.strptime(entry['samplingDate'], '%Y-%m-%d')
+                                    date_obj = datetime.strptime(entry[SAMPLING_DATE], '%Y-%m-%d')
                                     dates.append(date_obj)
                                 except ValueError as e:
-                                    logging.warning(f"Invalid date format: {entry['samplingDate']}: {e}")
+                                    logging.warning(f"Invalid date format: {entry[SAMPLING_DATE]}: {e}")
                         
                         if not dates:
                             logging.warning("No valid sampling dates found")
@@ -305,18 +313,18 @@ class WiseLoculusLapis(Lapis):
             Dict containing the API response with mutations, dateRanges, and data matrix
         """
         payload = {
-            "filters": {
-                "locationName": locationName
+            FILTERS: {
+                LOCATION_NAME: locationName
             },
-            "includeMutations": mutations,
-            "dateRanges": [
+            INCLUDE_MUTATIONS: mutations,
+            DATE_RANGES: [
                 {
-                    "dateFrom": date_range[0].strftime('%Y-%m-%d'),
-                    "dateTo": date_range[1].strftime('%Y-%m-%d')
+                    DATE_FROM: date_range[0].strftime('%Y-%m-%d'),
+                    DATE_TO: date_range[1].strftime('%Y-%m-%d')
                 }
                 for date_range in date_ranges
             ],
-            "dateField": "samplingDate"
+            DATE_FIELD: SAMPLING_DATE
         }
 
         logging.debug(f"Fetching {mutation_type_name} mutations over time with payload: {payload}")
@@ -508,10 +516,10 @@ class WiseLoculusLapis(Lapis):
 
             # Parse the API response (no need to check for "error" key anymore as we raise APIError)
             records = []
-            api_data_content = api_data.get("data", {})
-            api_mutations = api_data_content.get("mutations", [])
-            api_date_ranges = api_data_content.get("dateRanges", [])
-            data_matrix = api_data_content.get("data", [])
+            api_data_content = api_data.get(DATA, {})
+            api_mutations = api_data_content.get(MUTATIONS, [])
+            api_date_ranges = api_data_content.get(DATE_RANGES, [])
+            data_matrix = api_data_content.get(DATA, [])
 
             # Debug logging
             logging.debug(f"mutations_over_time: Received {len(api_mutations)} mutations, {len(api_date_ranges)} date ranges")
@@ -523,16 +531,16 @@ class WiseLoculusLapis(Lapis):
                         mutation_data = data_matrix[i][j]
                         
                         # Extract count and coverage from the API response
-                        count = mutation_data.get("count", 0)
-                        coverage = mutation_data.get("coverage", 0)
+                        count = mutation_data.get(COUNT, 0)
+                        coverage = mutation_data.get(COVERAGE, 0)
                         
                         # Calculate frequency from count and coverage
                         frequency = count / coverage if coverage > 0 else pd.NA
                         
                         # For interval-based data, use the start date as the samplingDate
                         # or use the midpoint for better representation
-                        start_date = pd.to_datetime(date_range_info["dateFrom"])
-                        end_date = pd.to_datetime(date_range_info["dateTo"])
+                        start_date = pd.to_datetime(date_range_info[DATE_FROM])
+                        end_date = pd.to_datetime(date_range_info[DATE_TO])
                         
                         if interval == "daily":
                             samplingDate = start_date.strftime('%Y-%m-%d')
@@ -544,11 +552,11 @@ class WiseLoculusLapis(Lapis):
                         # Add all records, even those with coverage = 0
                         # This allows us to see when data is missing vs when mutations don't exist
                         records.append({
-                            "mutation": mutation,
-                            "samplingDate": samplingDate,
-                            "count": count,
-                            "coverage": coverage,
-                            "frequency": frequency
+                            DF_MUTATION: mutation,
+                            DF_SAMPLING_DATE: samplingDate,
+                            DF_COUNT: count,
+                            DF_COVERAGE: coverage,
+                            DF_FREQUENCY: frequency
                         })
 
             logging.debug(f"Created {len(records)} records from component API data")
@@ -557,31 +565,31 @@ class WiseLoculusLapis(Lapis):
             df = pd.DataFrame(records)
 
             # Check for and handle duplicates before setting MultiIndex
-            if not df.empty and "mutation" in df.columns and "samplingDate" in df.columns:
+            if not df.empty and DF_MUTATION in df.columns and DF_SAMPLING_DATE in df.columns:
                 # Check for duplicates
-                duplicates = df.duplicated(subset=['mutation', 'samplingDate'], keep=False)
+                duplicates = df.duplicated(subset=[DF_MUTATION, DF_SAMPLING_DATE], keep=False)
                 if duplicates.any():
                     logging.warning(f"Found {duplicates.sum()} duplicate mutation-date combinations, removing duplicates")
                     # Keep first occurrence of each duplicate, preferring non-zero values
-                    df = df.drop_duplicates(subset=['mutation', 'samplingDate'], keep='first')
+                    df = df.drop_duplicates(subset=[DF_MUTATION, DF_SAMPLING_DATE], keep='first')
                     logging.debug(f"After deduplication: {len(df)} records remain")
                 
-                df.set_index(["mutation", "samplingDate"], inplace=True)
+                df.set_index([DF_MUTATION, DF_SAMPLING_DATE], inplace=True)
             else:
                 # Create empty DataFrame with proper MultiIndex structure
-                df = pd.DataFrame(columns=["count", "coverage", "frequency"])
-                df.index = pd.MultiIndex.from_tuples([], names=["mutation", "samplingDate"])
+                df = pd.DataFrame(columns=[DF_COUNT, DF_COVERAGE, DF_FREQUENCY])
+                df.index = pd.MultiIndex.from_tuples([], names=[DF_MUTATION, DF_SAMPLING_DATE])
             return df
 
         except APIError as api_error:
             # Log the API error and return empty DataFrame
             logging.error(f"APIError encountered in mutations_over_time: {api_error}")
-            df = pd.DataFrame(columns=["count", "coverage", "frequency"])
-            df.index = pd.MultiIndex.from_tuples([], names=["mutation", "samplingDate"])
+            df = pd.DataFrame(columns=[DF_COUNT, DF_COVERAGE, DF_FREQUENCY])
+            df.index = pd.MultiIndex.from_tuples([], names=[DF_MUTATION, DF_SAMPLING_DATE])
             return df
         except Exception as e:
             logging.error(f"Error in mutations_over_time: {e}")
             # Return empty DataFrame with proper MultiIndex structure
-            df = pd.DataFrame(columns=["count", "coverage", "frequency"])
-            df.index = pd.MultiIndex.from_tuples([], names=["mutation", "samplingDate"])
+            df = pd.DataFrame(columns=[DF_COUNT, DF_COVERAGE, DF_FREQUENCY])
+            df.index = pd.MultiIndex.from_tuples([], names=[DF_MUTATION, DF_SAMPLING_DATE])
             return df
