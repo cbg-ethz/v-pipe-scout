@@ -353,6 +353,17 @@ async def test_coocurrences_over_time_advanced():
         "data": [{"samplingDate": "2024-01-01", "count": 50}]
     }
     
+    class MockResponse:
+        def __init__(self, status=200, json_data=None):
+            self.status = status
+            self._json_data = json_data or {}
+        async def json(self): return self._json_data
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        def __await__(self):
+            async def _ret(): return self
+            return _ret().__await__()
+
     class MockSession:
         def __init__(self, *args, **kwargs): pass
         def post(self, url, json=None, **kwargs):
@@ -367,17 +378,6 @@ async def test_coocurrences_over_time_advanced():
         async def __aenter__(self): return self
         async def __aexit__(self, *args): pass
         
-    class MockResponse:
-        def __init__(self, status=200, json_data=None):
-            self.status = status
-            self._json_data = json_data or {}
-        async def json(self): return self._json_data
-        async def __aenter__(self): return self
-        async def __aexit__(self, *args): pass
-        def __await__(self):
-            async def _ret(): return self
-            return _ret().__await__()
-
     with patch('aiohttp.ClientSession', side_effect=MockSession):
         with patch('aiohttp.ClientTimeout'):
             result = await api.coocurrences_over_time(
