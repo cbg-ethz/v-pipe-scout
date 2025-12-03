@@ -283,7 +283,7 @@ def app():
             mut_title_str = ", ".join(valid_mutations)
             if len(mut_title_str) > 100:
                 mut_title_str = mut_title_str[:97] + "..."
-            title = f"Co-Occuring Mutations over Time: {mut_title_str}"
+            title = f"Co-Occurring Mutations over Time: {mut_title_str}"
         else:
             title_query = advanced_query or ""
             if len(title_query) > 100:
