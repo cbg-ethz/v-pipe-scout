@@ -40,21 +40,6 @@ def test_mutations_to_and_query_with_deletions():
     result = api._mutations_to_and_query(["123A", "234T", "345-"])
     assert result == "123A & 234T & 345-", "Should handle deletions correctly"
 
-def test_extract_position_variants():
-    """Test _extract_position handles different mutation formats."""
-    api = WiseLoculusLapis("http://test-server.com")
-    assert api._extract_position("A13T") == "13"
-    assert api._extract_position("301-") == "301"
-    assert api._extract_position("303") == "303"
-    assert api._extract_position("S:N501Y") == "501"
-
-def test_intersection_coverage_query():
-    """Test building intersection coverage advancedQuery (!posN AND ...)."""
-    api = WiseLoculusLapis("http://test-server.com")
-    q = api._intersection_coverage_query(["A13T", "301-", "C303G"])
-    parts = set(q.split(" & "))
-    assert parts == {"!13N", "!301N", "!303N"}
-
 class TestWiseLoculusLapis:
     """Test cases for WiseLoculusLapis class."""
     
@@ -299,6 +284,112 @@ class TestWiseLoculusLapis:
         # Verify start < end
         assert FALLBACK_START_DATE < FALLBACK_END_DATE, "Start should be before end"
 
+@pytest.mark.asyncio
+async def test_coocurrences_over_time_simple():
+    """Test coocurrences_over_time with simple mutations list (backward compatibility)."""
+    api = WiseLoculusLapis("http://test-server.com")
+    date_range = (datetime(2024, 1, 1), datetime(2024, 1, 2))
+    
+    # Mock responses
+    mock_filtered_response = {
+        "data": [{"samplingDate": "2024-01-01", "count": 10}]
+    }
+    mock_intersection_response = {
+        "data": [{"samplingDate": "2024-01-01", "count": 100}]
+    }
+    
+    # Mock session
+    class MockResponse:
+        def __init__(self, status=200, json_data=None):
+            self.status = status
+            self._json_data = json_data or {}
+        async def json(self): return self._json_data
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        def __await__(self):
+            async def _ret(): return self
+            return _ret().__await__()
+
+    class MockSession:
+        def __init__(self, *args, **kwargs): pass
+        def post(self, url, json=None, **kwargs):
+            if "advancedQuery" in json:
+                query = json["advancedQuery"]
+                # Check if it's the filtered query (AND logic)
+                if " & " in query and "!" not in query:
+                    return MockResponse(json_data=mock_filtered_response)
+                # Check if it's the intersection query (!posN)
+                elif "!123N" in query:
+                    return MockResponse(json_data=mock_intersection_response)
+            return MockResponse(status=404)
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+
+    with patch('aiohttp.ClientSession', side_effect=MockSession):
+        with patch('aiohttp.ClientTimeout'):
+            result = await api.coocurrences_over_time(
+                date_range=date_range,
+                locationName="Test",
+                mutations=["123T", "456G"]
+            )
+            
+    assert not result.empty
+    assert result.iloc[0]["count"] == 10
+    assert result.iloc[0]["coverage"] == 100
+    assert result.iloc[0]["frequency"] == 0.1
+
+@pytest.mark.asyncio
+async def test_coocurrences_over_time_advanced():
+    """Test coocurrences_over_time with advanced query."""
+    api = WiseLoculusLapis("http://test-server.com")
+    date_range = (datetime(2024, 1, 1), datetime(2024, 1, 2))
+    advanced_query = "[3-of: 123T, 456G, 789A]"
+    
+    # Mock responses
+    mock_filtered_response = {
+        "data": [{"samplingDate": "2024-01-01", "count": 5}]
+    }
+    mock_intersection_response = {
+        "data": [{"samplingDate": "2024-01-01", "count": 50}]
+    }
+    
+    class MockSession:
+        def __init__(self, *args, **kwargs): pass
+        def post(self, url, json=None, **kwargs):
+            if "advancedQuery" in json:
+                query = json["advancedQuery"]
+                if query == advanced_query:
+                    return MockResponse(json_data=mock_filtered_response)
+                # Intersection query should contain !posN for extracted mutations
+                elif "!123N" in query and "!456N" in query and "!789N" in query:
+                    return MockResponse(json_data=mock_intersection_response)
+            return MockResponse(status=404)
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        
+    class MockResponse:
+        def __init__(self, status=200, json_data=None):
+            self.status = status
+            self._json_data = json_data or {}
+        async def json(self): return self._json_data
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        def __await__(self):
+            async def _ret(): return self
+            return _ret().__await__()
+
+    with patch('aiohttp.ClientSession', side_effect=MockSession):
+        with patch('aiohttp.ClientTimeout'):
+            result = await api.coocurrences_over_time(
+                date_range=date_range,
+                locationName="Test",
+                advanced_query=advanced_query
+            )
+            
+    assert not result.empty
+    assert result.iloc[0]["count"] == 5
+    assert result.iloc[0]["coverage"] == 50
+    assert result.iloc[0]["frequency"] == 0.1
 
 @pytest.mark.skip_in_ci
 class TestWiseLoculusLapisLiveAPI:
@@ -732,11 +823,13 @@ class TestWiseLoculusLapisLiveAPI:
                     # Check data types and ranges
                     assert mutation_data["count"].dtype in ['int64', 'float64'], "Count should be numeric"
                     assert mutation_data["coverage"].dtype in ['int64', 'float64'], "Coverage should be numeric"
-                    assert mutation_data["frequency"].dtype in ['int64', 'float64'], "Frequency should be numeric"
+                    assert mutation_data["frequency"].dtype in ['int64', 'float64', 'object'], "Frequency should be numeric or contain NA values"
                     
                     # Frequency should be between 0 and 1
-                    assert (mutation_data["frequency"] >= 0).all(), "Frequency should be >= 0"
-                    assert (mutation_data["frequency"] <= 1).all(), "Frequency should be <= 1"
+                    non_na_freq = mutation_data["frequency"].dropna()
+                    if not non_na_freq.empty:
+                        assert (non_na_freq >= 0).all(), "Frequency should be >= 0"
+                        assert (non_na_freq <= 1).all(), "Frequency should be <= 1"
                     
                     # Coverage should be >= count
                     assert (mutation_data["coverage"] >= mutation_data["count"]).all(), "Coverage should be >= count"
@@ -755,3 +848,69 @@ class TestWiseLoculusLapisLiveAPI:
 
 
 
+
+@pytest.mark.asyncio
+async def test_coocurrences_over_time_api_error():
+    """Test coocurrences_over_time raises APIError on failure."""
+    api = WiseLoculusLapis("http://test-server.com")
+    date_range = (datetime(2024, 1, 1), datetime(2024, 1, 2))
+    
+    class MockResponse:
+        def __init__(self, status=500, text="Internal Server Error"):
+            self.status = status
+            self._text = text
+        async def text(self): return self._text
+        async def json(self): return {}
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        def __await__(self):
+            async def _ret(): return self
+            return _ret().__await__()
+
+    class MockSession:
+        def __init__(self, *args, **kwargs): pass
+        def post(self, url, json=None, **kwargs):
+            return MockResponse(status=500)
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+
+    from api.exceptions import APIError
+
+    with patch('aiohttp.ClientSession', side_effect=MockSession):
+        with patch('aiohttp.ClientTimeout'):
+            with pytest.raises(APIError) as excinfo:
+                await api.coocurrences_over_time(
+                    date_range=date_range,
+                    locationName="Test",
+                    mutations=["123T"]
+                )
+            assert "500" in str(excinfo.value)
+
+def test_transform_query_to_coverage():
+    """Test _transform_query_to_coverage with various inputs."""
+    api = WiseLoculusLapis("http://test-server.com")
+    
+    # Nucleotide mutations
+    query = "[3-of: 23149T, 23224T, 23311T]"
+    expected = "[3-of: !23149N, !23224N, !23311N]"
+    assert api._transform_query_to_coverage(query) == expected
+    
+    # Amino acid mutations
+    query = "(S:484K | S:501Y) & ORF1a:3675-"
+    expected = "(!S:484N | !S:501N) & !ORF1a:3675N"
+    assert api._transform_query_to_coverage(query) == expected
+    
+    # Mixed and complex
+    query = "A23403G & !23224- & (S:614G | S:614D)"
+    expected = "!23403N & !!23224N & (!S:614N | !S:614N)"
+    assert api._transform_query_to_coverage(query) == expected
+    
+    # Exact N-of
+    query = "[exactly-2-of: S:501Y, S:484K, S:417N]"
+    expected = "[exactly-2-of: !S:501N, !S:484N, !S:417N]"
+    assert api._transform_query_to_coverage(query) == expected
+
+    # With dots
+    query = "23403."
+    expected = "!23403N"
+    assert api._transform_query_to_coverage(query) == expected
