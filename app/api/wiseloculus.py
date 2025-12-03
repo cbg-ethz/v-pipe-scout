@@ -53,33 +53,27 @@ class WiseLoculusLapis(Lapis):
             return mutations[0]
         return " & ".join(mutations)
 
-    def _extract_position(self, mutation: str) -> Optional[str]:
+    def _transform_query_to_coverage(self, query: str) -> str:
         """
-        Extract numeric genomic position from a mutation string.
-        Examples:
-        - "A13T" -> "13"
-        - "301-" -> "301"
-        - "303" -> "303"
-        Returns None if no position is found.
+        Transforms a mutation query into a coverage query.
+        Replaces each mutation with a check that the position is not N.
+        Example: "(S:484K | S:501Y)" -> "(!S:484N | !S:501N)"
         """
-        m = re.search(r"(\d+)", str(mutation))
-        return m.group(1) if m else None
-
-    def _intersection_coverage_query(self, mutations: List[str]) -> str:
-        """
-        Build an advancedQuery ensuring reads have non-N calls at ALL positions.
-        For positions {13, 301, 303} → "!13N & !301N & !303N".
-        """
-        positions: List[str] = []
-        for mut in mutations:
-            pos = self._extract_position(mut)
-            if pos:
-                positions.append(pos)
-        if not positions:
-            return ""
-        # De-duplicate and sort for stability
-        unique_positions = sorted(set(positions), key=int)  
-        return " & ".join([f"!{p}N" for p in unique_positions])
+        # Regex to capture the mutation parts
+        # Group 1: Optional negation (e.g. "!")
+        # Group 2: Gene prefix (optional) e.g. "S:", "ORF1a:"
+        # Group 3: Position e.g. "501", "23149"
+        # Ref base (non-capturing) and Alt base (non-capturing) are ignored
+        # Negative lookahead (?!of) prevents matching "3-of" in "[3-of: ...]"
+        # Note: No trailing \b because mutations can end with "-" or "." which are not word chars
+        pattern = r'(!\s*)?\b([A-Za-z0-9]+:)?(?:[A-Z])?(\d+)[A-Z\-\.](?!of)'
+        
+        def replace_match(match):
+            gene_prefix = match.group(2) or ""
+            position = match.group(3)
+            return f"!{gene_prefix}{position}N"
+            
+        return re.sub(pattern, replace_match, query)
 
     async def sample_mutations(
             self, 
@@ -569,48 +563,56 @@ class WiseLoculusLapis(Lapis):
 
     async def coocurrences_over_time(
             self,
-            mutations: List[str],
             date_range: Tuple[datetime, datetime],
             locationName: str,
+            mutations: Optional[List[str]] = None,
+            advanced_query: Optional[str] = None,
             interval: str = "daily"
         ) -> pd.DataFrame:
         """
-        Fetch proportion data for a SET of mutations (AND filter) over time.
-        
-        Unlike mutations_over_time which tracks individual mutations separately,
-        this tracks all mutations together as a filter condition.
-        
-        Strategy:
-        1. Use advanced queries to get coverage: reads covering ALL positions simultaneously ("!posN" AND ...)
-        2. Query for count of reads matching ALL mutations (AND)
-        3. Calculate frequency = count / coverage
+        Fetch proportion data for a SET of mutations (AND filter) or an advanced query over time.
         
         Args:
-            mutations: List of nucleotide mutations to filter by (AND condition)
             date_range: Tuple of (start_date, end_date)
             locationName: Location name to filter by
+            mutations: List of nucleotide mutations to filter by (AND condition). Used if advanced_query is None.
+            advanced_query: Raw advanced query string. If provided, overrides mutations.
             interval: "daily", "weekly", or "monthly"
             
         Returns:
             DataFrame with columns: samplingDate, count, coverage, frequency 
         """
         try:
-            # Step 1: Query for reads matching ALL mutations (AND filter) and intersection coverage simultaneously
+            # Determine query string and mutations for coverage
+            if advanced_query:
+                query_str = advanced_query
+                # Transform query to coverage query (replace mutations with !posN)
+                coverage_query_str = self._transform_query_to_coverage(advanced_query)
+            elif mutations:
+                query_str = self._mutations_to_and_query(mutations)
+                # For simple mutations list, we can use the same transform logic on the AND query
+                # Or use the old method. Let's use the new transform logic for consistency.
+                coverage_query_str = self._transform_query_to_coverage(query_str)
+            else:
+                logging.warning("No mutations or advanced query provided")
+                return pd.DataFrame(columns=['samplingDate', 'count', 'coverage', 'frequency'])
+
+            # Step 1: Query for reads matching query and intersection coverage simultaneously
             date_ranges = self._generate_date_ranges(date_range, interval)
             
-            filtered_lookup = {}  # date -> count of reads with ALL mutations
+            filtered_lookup = {}  # date -> count of reads matching query
             coverage_lookup = {}  # date -> reads covering all positions
             
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
                 tasks = []
                 
                 for date_start, date_end in date_ranges:
-                    # Task 1: Filtered count (reads with ALL mutations)
+                    # Task 1: Filtered count (reads matching query)
                     filtered_payload = {
                         "locationName": locationName,
                         "samplingDateFrom": date_start.strftime('%Y-%m-%d'),
                         "samplingDateTo": date_end.strftime('%Y-%m-%d'),
-                        "advancedQuery": self._mutations_to_and_query(mutations),  # ALL mutations must match (AND)
+                        "advancedQuery": query_str,
                         "fields": ["samplingDate"]
                     }
                     
@@ -626,7 +628,7 @@ class WiseLoculusLapis(Lapis):
                         "locationName": locationName,
                         "samplingDateFrom": date_start.strftime('%Y-%m-%d'),
                         "samplingDateTo": date_end.strftime('%Y-%m-%d'),
-                        "advancedQuery": self._intersection_coverage_query(mutations),
+                        "advancedQuery": coverage_query_str,
                         "fields": ["samplingDate"]
                     }
                     
@@ -647,36 +649,38 @@ class WiseLoculusLapis(Lapis):
                     intersection_resp = all_results[idx + 1]
                     
                     # Process filtered response
-                    if not isinstance(filtered_resp, Exception) and filtered_resp.status == 200:
+                    if isinstance(filtered_resp, Exception):
+                        raise APIError(f"Connection error fetching filtered data: {filtered_resp}", details=str(filtered_resp))
+                    
+                    if filtered_resp.status == 200:
                         filtered_data = await filtered_resp.json()
                         filtered_items = filtered_data.get('data', [])
-                        
                         for item in filtered_items:
                             date_str = item.get('samplingDate')
                             count = item.get('count', 0)
                             if date_str:
                                 filtered_lookup[date_str] = count
                     else:
-                        if isinstance(filtered_resp, Exception):
-                            logging.error(f"Error fetching filtered data: {filtered_resp}")
-                        else:
-                            logging.error(f"API error for filtered data: status={filtered_resp.status}")
-                    
+                        error_text = await filtered_resp.text()
+                        logging.error(f"API error for filtered data: status={filtered_resp.status}, body={error_text}")
+                        raise APIError(f"API error (filtered data): {filtered_resp.status}", status_code=filtered_resp.status, details=error_text)
+
                     # Process coverage (intersection) response
-                    if not isinstance(intersection_resp, Exception) and intersection_resp.status == 200:
+                    if isinstance(intersection_resp, Exception):
+                        raise APIError(f"Connection error fetching intersection coverage: {intersection_resp}", details=str(intersection_resp))
+
+                    if intersection_resp.status == 200:
                         intersection_data = await intersection_resp.json()
                         intersection_items = intersection_data.get('data', [])
-                        
                         for item in intersection_items:
                             date_str = item.get('samplingDate')
                             count = item.get('count', 0)
                             if date_str:
                                 coverage_lookup[date_str] = count
                     else:
-                        if isinstance(intersection_resp, Exception):
-                            logging.error(f"Error fetching intersection coverage: {intersection_resp}")
-                        else:
-                            logging.error(f"API error for intersection coverage: status={intersection_resp.status}")
+                        error_text = await intersection_resp.text()
+                        logging.error(f"API error for intersection coverage: status={intersection_resp.status}, body={error_text}")
+                        raise APIError(f"API error (coverage data): {intersection_resp.status}", status_code=intersection_resp.status, details=error_text)
             
             # Step 2: Combine coverage and filtered count to calculate frequency
             records = []
@@ -699,8 +703,10 @@ class WiseLoculusLapis(Lapis):
             else:
                 return pd.DataFrame(columns=['samplingDate', 'count', 'coverage', 'frequency'])
                 
+        except APIError:
+            raise
         except Exception as e:
             logging.error(f"Error in coocurrences_over_time: {e}")
             import traceback
             logging.error(traceback.format_exc())
-            return pd.DataFrame(columns=['samplingDate', 'count', 'coverage', 'frequency'])
+            raise APIError(f"Error in coocurrences_over_time: {str(e)}", details=str(e))
