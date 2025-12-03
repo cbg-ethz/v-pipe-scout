@@ -66,11 +66,12 @@ class WiseLoculusLapis(Lapis):
         # Group 4: Alt base/deletion (ignore) e.g. "Y", "-", "."
         # Negative lookahead (?!of) prevents matching "3-of" in "[3-of: ...]"
         # Note: No trailing \b because mutations can end with "-" or "." which are not word chars
-        pattern = r'\b([A-Za-z0-9]+:)?(?:[A-Z])?(\d+)[A-Z\-\.](?!of)'
+        # Capture optional preceding "!" to handle negated mutations correctly (e.g. !23224- -> !23224N)
+        pattern = r'(!\s*)?\b([A-Za-z0-9]+:)?(?:[A-Z])?(\d+)[A-Z\-\.](?!of)'
         
         def replace_match(match):
-            gene_prefix = match.group(1) or ""
-            position = match.group(2)
+            gene_prefix = match.group(2) or ""
+            position = match.group(3)
             return f"!{gene_prefix}{position}N"
             
         return re.sub(pattern, replace_match, query)

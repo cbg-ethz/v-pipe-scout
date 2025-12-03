@@ -902,7 +902,7 @@ def test_transform_query_to_coverage():
     
     # Mixed and complex
     query = "A23403G & !23224- & (S:614G | S:614D)"
-    expected = "!23403N & !!23224N & (!S:614N | !S:614N)"
+    expected = "!23403N & !23224N & (!S:614N | !S:614N)"
     assert api._transform_query_to_coverage(query) == expected
     
     # Exact N-of
