@@ -8,7 +8,7 @@ from api.wiseloculus import WiseLoculusLapis
 from utils.config import get_wiseloculus_url
 from utils.url_state import create_url_state_manager
 from process.mutations import validate_mutation
-from visualize.mutations import proportions_lineplot
+from visualize.mutations import proportions_heatmap
 
 
 logging.basicConfig(level=logging.INFO)
@@ -94,48 +94,19 @@ def app():
     start_date_dt = datetime.fromisoformat(date_range_input[0].strftime('%Y-%m-%d'))
     end_date_dt = datetime.fromisoformat(date_range_input[1].strftime('%Y-%m-%d'))
 
-    # Location - multi-select with "All locations" option
+    # Fetch locations
     if "locations" not in st.session_state:
         st.session_state.locations = wiseLoculus.fetch_locations(["Zürich (ZH)"])
     locations = st.session_state.locations
-    
-    # Add "All locations" option
-    location_options = ["All locations"] + locations
-    default_selection = ["All locations"]
-    
-    # Load from URL, but ensure default is "All locations" if not in URL
-    url_locs = url_state.load_from_url("locations", None, list)
-    if url_locs is None:
-        # No URL state - use default
-        valid_url_locs = default_selection
-    else:
-        # Ensure URL locations are valid
-        valid_url_locs = [loc for loc in url_locs if loc in location_options]
-        if not valid_url_locs:
-            valid_url_locs = default_selection
-    
-    selected_locations = st.multiselect(
-        "Select Location(s):", 
-        options=location_options,
-        default=valid_url_locs
-    )
-    
-    if not selected_locations:
-        st.warning("Please select at least one location.")
-        return
-    
-    # Determine actual locations to query
-    if "All locations" in selected_locations:
-        query_locations = locations  # All available locations
-    else:
-        query_locations = selected_locations
-    
-    url_state.save_to_url(locations=selected_locations)
+    query_locations = locations  # Always use all available locations
 
     st.markdown("---")
 
-    # Interval selection (API-side aggregation)
-    interval = st.selectbox("Interval:", ["daily", "weekly", "monthly"], index=0)
+    # Interval fixed to daily
+    interval = "daily"
+
+    # Clean up obsolete URL parameters from previous versions
+    url_state.save_to_url(locations=None, interval=None)
 
     # Fetch data for all locations concurrently
     async def fetch_all_locations(locations):
@@ -155,92 +126,133 @@ def app():
     with st.spinner(f"Fetching data for {len(query_locations)} location(s)..."):
         all_results = __import__('asyncio').run(fetch_all_locations(query_locations))
 
-    # Render results for each location
+    # Consolidate results
+    freq_data = {}
+    counts_data = {}
+    coverage_records = []
+    
+    has_data = False
+    
     for loc, result in zip(query_locations, all_results):
-        st.write(f"#### {loc}")
-        
         # Handle exceptions from fetch
         if isinstance(result, Exception):
             st.error(f"Error fetching data for {loc}: {result}")
-            import traceback
-            with st.expander(f"🔍 Error Details for {loc}", expanded=False):
-                st.code(''.join(traceback.format_exception(type(result), result, result.__traceback__)))
             continue
         
         df = result
+        if df.empty:
+            continue
+            
+        has_data = True
         
-        try:
-            if df.empty:
-                st.warning(f"No data available for {loc}.")
-                continue
+        # Extract data for this location
+        dates = df['samplingDate'].tolist()
+        frequencies = df['frequency'].tolist()
+        counts = df['count'].tolist()
+        
+        # Handle both old and new column names for backward compatibility
+        if 'coverage' in df.columns:
+            coverages = df['coverage'].tolist()
+        elif 'intersection_coverage' in df.columns:  # legacy
+            coverages = df['intersection_coverage'].tolist()
+        elif 'min_coverage' in df.columns:  # legacy
+            coverages = df['min_coverage'].tolist()
+        else:
+            coverages = [None] * len(dates)
+            
+        # Store frequency and counts mapped by date
+        # We need to ensure dates are strings or consistent objects for DataFrame construction
+        loc_freqs = {d: f for d, f in zip(dates, frequencies)}
+        loc_counts = {d: c for d, c in zip(dates, counts)}
+        
+        freq_data[loc] = loc_freqs
+        counts_data[loc] = loc_counts
+        
+        # Store coverage records for MultiIndex DataFrame
+        for i, date in enumerate(dates):
+            coverage_records.append({
+                'location': loc,
+                'samplingDate': date,
+                'coverage': coverages[i],
+                'count': counts[i],
+                'frequency': frequencies[i]
+            })
 
-            # Show dataframe for debugging
-            with st.expander(f"📊 View Raw Data for {loc}", expanded=False):
-                st.dataframe(df)
-                
-                # Display coverage definition once per location
-                if 'coverage' in df.columns:
-                    st.caption("**Coverage:** Reads with non-N calls at all positions (intersection).")
+    if not has_data:
+        st.warning("No data available for the selected locations and date range.")
+        return
 
-            # Prepare data for lineplot
-            mutation_label = f"Set of {len(valid_mutations)} mutations"
-            
-            dates = df['samplingDate'].tolist()
-            frequencies = df['frequency'].tolist()
-            counts = df['count'].tolist()
-            
-            # Handle both old and new column names for backward compatibility
-            if 'coverage' in df.columns:
-                coverages = df['coverage'].tolist()
-            elif 'intersection_coverage' in df.columns:  # legacy
-                coverages = df['intersection_coverage'].tolist()
-            elif 'min_coverage' in df.columns:  # legacy
-                coverages = df['min_coverage'].tolist()
-            else:
-                coverages = [None] * len(dates)
-            
-            # Create single-row dataframes
-            freq_df = pd.DataFrame([frequencies], columns=dates, index=[mutation_label])
-            counts_df = pd.DataFrame([counts], columns=dates, index=[mutation_label])
-            
-            # Create coverage dataframe in MultiIndex format for hover info
-            coverage_records = []
-            for i, date in enumerate(dates):
-                coverage_records.append({
-                    'mutation': mutation_label,
-                    'samplingDate': date,
-                    'coverage': coverages[i],
-                    'count': counts[i],
-                    'frequency': frequencies[i]
-                })
+    try:
+        # Create DataFrames for heatmap
+        # freq_df: index=locations, columns=dates
+        freq_df = pd.DataFrame.from_dict(freq_data, orient='index')
+        # Sort columns (dates)
+        freq_df = freq_df.sort_index(axis=1)
+        
+        # counts_df: index=locations, columns=dates
+        counts_df = pd.DataFrame.from_dict(counts_data, orient='index')
+        if not counts_df.empty:
+            counts_df = counts_df.sort_index(axis=1)
+            # Align columns with freq_df
+            counts_df = counts_df.reindex(columns=freq_df.columns)
+        
+        # coverage_df: MultiIndex (location, samplingDate)
+        if coverage_records:
             coverage_df = pd.DataFrame(coverage_records)
-            coverage_df = coverage_df.set_index(['mutation', 'samplingDate'])
+            coverage_df = coverage_df.set_index(['location', 'samplingDate'])
+        else:
+            coverage_df = None
 
-            info_placeholder = st.empty()
-            progress = st.progress(0)
+        # Show raw data
+        with st.expander("📊 View Consolidated Raw Data", expanded=False):
+            if coverage_records:
+                st.dataframe(pd.DataFrame(coverage_records))
+                st.caption("**Coverage:** Reads with non-N calls at all positions (intersection).")
+            else:
+                st.write("No data to display.")
 
-            def cb(cur, tot, msg):
-                progress.progress(min(1.0, cur))
-                info_placeholder.info(msg)
+        # Render Heatmap
+        info_placeholder = st.empty()
+        progress = st.progress(0)
 
-            fig = proportions_lineplot(
-                freq_df=freq_df,
-                counts_df=counts_df,
-                coverage_freq_df=coverage_df,
-                title=f"Proportion of Reads with ALL Mutations — {loc} ({interval})",
-                progress_callback=cb
-            )
-            st.plotly_chart(fig)
+        def cb(cur, tot, msg):
+            progress.progress(min(1.0, cur))
+            info_placeholder.info(msg)
+
+        # Format mutation list for title (truncate if too long)
+        mut_title_str = ", ".join(valid_mutations)
+        if len(mut_title_str) > 100:
+            mut_title_str = mut_title_str[:97] + "..."
+
+        fig = proportions_heatmap(
+            freq_df=freq_df,
+            counts_df=counts_df,
+            coverage_freq_df=coverage_df,
+            title=f"Co-Occuring Mutations over Time: {mut_title_str}",
+            progress_callback=cb
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        with st.expander("ℹ️ About the Color Scale", expanded=False):
+            st.markdown("""
+            The heatmap uses a **power-transformed color scale** ($x^{0.25}$) to highlight low but non-zero frequencies.
             
-            # Clear progress indicators
-            progress.empty()
-            info_placeholder.empty()
+            - **0% (No detection)** appears white.
+            - **Low values (e.g., 1%)** appear significantly colored (~30% intensity) to be visible.
+            - **High values** appear dark blue.
+            
+            Hover over any cell to see the exact percentage, count, and coverage.
+            """)
+        
+        # Clear progress indicators
+        progress.empty()
+        info_placeholder.empty()
 
-        except Exception as e:
-            st.error(f"Error plotting data for {loc}: {e}")
-            import traceback
-            with st.expander(f"🔍 Error Details for {loc}", expanded=False):
-                st.code(traceback.format_exc())
+    except Exception as e:
+        st.error(f"Error plotting heatmap: {e}")
+        import traceback
+        with st.expander("🔍 Error Details", expanded=False):
+            st.code(traceback.format_exc())
 
 
 if __name__ == "__main__":
