@@ -22,14 +22,16 @@ from urllib.parse import quote, unquote
 class URLStateManager:
     """Manages application state through URL query parameters."""
     
-    def __init__(self, page_prefix: str = ""):
+    def __init__(self, page_prefix: str = "", legacy_prefixes: List[str] = None):
         """
         Initialize URL state manager.
         
         Args:
             page_prefix: Optional prefix for parameters to avoid conflicts between pages
+            legacy_prefixes: Optional list of legacy prefixes to check for backward compatibility
         """
         self.page_prefix = page_prefix
+        self.legacy_prefixes = legacy_prefixes or []
     
     def _get_param_key(self, key: str) -> str:
         """Get the full parameter key with optional page prefix."""
@@ -130,6 +132,13 @@ class URLStateManager:
         
         for key, value in params.items():
             param_key = self._get_param_key(key)
+            
+            # Remove legacy keys for this parameter to transform links
+            for prefix in self.legacy_prefixes:
+                legacy_key = f"{prefix}_{key}" if prefix else key
+                if legacy_key in current_params:
+                    del current_params[legacy_key]
+            
             if value is not None:
                 current_params[param_key] = self._encode_value(value)
             elif param_key in current_params:
@@ -137,6 +146,7 @@ class URLStateManager:
                 del current_params[param_key]
         
         # Update query params (this will update the URL)
+        st.query_params.clear()
         st.query_params.update(current_params)
     
     def load_from_url(self, key: str, default: Any = None, value_type: type = str) -> Any:
@@ -153,6 +163,14 @@ class URLStateManager:
         """
         param_key = self._get_param_key(key)
         encoded_value = st.query_params.get(param_key)
+        
+        # Check legacy prefixes if not found
+        if encoded_value is None:
+            for prefix in self.legacy_prefixes:
+                legacy_key = f"{prefix}_{key}" if prefix else key
+                encoded_value = st.query_params.get(legacy_key)
+                if encoded_value is not None:
+                    break
         
         if encoded_value is None:
             return default
@@ -187,17 +205,18 @@ class URLStateManager:
         st.query_params.update(current_params)
 
 
-def create_url_state_manager(page_name: str) -> URLStateManager:
+def create_url_state_manager(page_name: str, legacy_page_names: List[str] = None) -> URLStateManager:
     """
     Create a URL state manager for a specific page.
     
     Args:
         page_name: Name of the page (used as prefix)
+        legacy_page_names: Optional list of legacy page names for backward compatibility
         
     Returns:
         URLStateManager instance
     """
-    return URLStateManager(page_prefix=page_name)
+    return URLStateManager(page_prefix=page_name, legacy_prefixes=legacy_page_names)
 
 
 # Convenience functions for common use cases
