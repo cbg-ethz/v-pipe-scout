@@ -60,13 +60,12 @@ class WiseLoculusLapis(Lapis):
         Example: "(S:484K | S:501Y)" -> "(!S:484N | !S:501N)"
         """
         # Regex to capture the mutation parts
-        # Group 1: Gene prefix (optional) e.g. "S:", "ORF1a:"
-        # Group 2: Ref base (optional, ignore) e.g. "N" in N501Y
+        # Group 1: Optional negation (e.g. "!")
+        # Group 2: Gene prefix (optional) e.g. "S:", "ORF1a:"
         # Group 3: Position e.g. "501", "23149"
-        # Group 4: Alt base/deletion (ignore) e.g. "Y", "-", "."
+        # Ref base (non-capturing) and Alt base (non-capturing) are ignored
         # Negative lookahead (?!of) prevents matching "3-of" in "[3-of: ...]"
         # Note: No trailing \b because mutations can end with "-" or "." which are not word chars
-        # Capture optional preceding "!" to handle negated mutations correctly (e.g. !23224- -> !23224N)
         pattern = r'(!\s*)?\b([A-Za-z0-9]+:)?(?:[A-Z])?(\d+)[A-Z\-\.](?!of)'
         
         def replace_match(match):
