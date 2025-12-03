@@ -164,142 +164,154 @@ def mutations_over_time(freq_df, counts_df=None, coverage_freq_df=None, title="M
     return fig
 
 
-def proportions_lineplot(freq_df: pd.DataFrame,
-                         counts_df: pd.DataFrame | None = None,
-                         coverage_freq_df: pd.DataFrame | None = None,
-                         title: str = "Mutation Proportions Over Time",
-                         smoothing_window_days: int = 0,
-                         progress_callback=None) -> go.Figure:
-    """Plot mutation proportions over time as line plots (one line per mutation).
 
-    - Always plots proportion (frequency) on the y-axis (0-1).
-    - Optionally applies a time-based rolling mean (in days) to smooth daily data.
-    - Hover shows proportion plus count and coverage (if provided).
 
+
+def proportions_heatmap(freq_df, counts_df=None, coverage_freq_df=None, title="Proportions Heatmap", progress_callback=None):
+    """Plot proportions as a heatmap using Plotly.
+    
+    This function creates an interactive heatmap showing proportions (frequencies)
+    over time with enhanced hover information including counts and coverage data.
+    Designed for comparing multiple locations or categories over time.
+    
     Args:
-        freq_df: Mutations as rows, dates as columns (values 0-1). Column labels should be dates or parsable to datetime.
-        counts_df: Optional counts with same shape (for hover info).
-        coverage_freq_df: Optional MultiIndex by (mutation, samplingDate) with 'count' and 'coverage' (for hover info).
-        title: Figure title.
-        progress_callback: Optional callable(progress, total, message).
-
+        freq_df (pd.DataFrame): DataFrame with locations/categories as rows, dates as columns, 
+                               and frequency values (0-1 range)
+        counts_df (pd.DataFrame, optional): DataFrame with same shape as freq_df, 
+                                          containing count values (for hover info)
+        coverage_freq_df (pd.DataFrame, optional): MultiIndex DataFrame with detailed 
+                                                  coverage and frequency data. 
+                                                  Index should be (location, samplingDate).
+        title (str, optional): Title for the heatmap. Defaults to "Proportions Heatmap"
+        progress_callback (callable, optional): Function to call with progress updates.
+                                              Should accept (current, total, message) parameters.
+    
     Returns:
-        Plotly Figure with one trace per mutation.
+        plotly.graph_objects.Figure: Interactive heatmap figure
     """
     if progress_callback:
-        progress_callback(0.05, 1.0, "Preparing data for line plot...")
-
-    # Ensure columns are datetimes and sorted
-    df_freq = freq_df.copy()
-    df_freq.columns = pd.to_datetime(df_freq.columns)
-    df_freq = df_freq.sort_index(axis=1)
-
-    # Sort mutations by genomic position
-    mutations_list = df_freq.index.tolist()
-    sorted_mutations = sort_mutations_by_position(mutations_list)
-    df_freq = df_freq.reindex(sorted_mutations)
-
-    # Align counts to freq if provided
-    df_counts = None
-    if counts_df is not None and not counts_df.empty:
-        df_counts = counts_df.copy()
-        df_counts.columns = pd.to_datetime(df_counts.columns)
-        df_counts = df_counts.sort_index(axis=1)
-        df_counts = df_counts.reindex(sorted_mutations)
+        progress_callback(0.1, 1.0, "Preparing data for heatmap...")
+    
+    # Replace None with np.nan and remove commas from numbers
+    df_processed = freq_df.replace({None: np.nan, ',': ''}, regex=True)
+    df_processed = df_processed.apply(pd.to_numeric, errors='coerce')
 
     if progress_callback:
-        progress_callback(0.35, 1.0, "Building traces...")
-
-    # Build hover customdata: counts and coverage if available
-    fig = go.Figure()
-    all_dates = list(df_freq.columns)
-
-    for mutation in df_freq.index:
-        # Convert y values safely handling pandas NA
-        y_series = df_freq.loc[mutation]
-        y_vals = np.array([float(v) if not pd.isna(v) else np.nan for v in y_series], dtype=float)
-
-        # counts per date (for hover)
-        counts_vals = None
-        if df_counts is not None:
-            # align to same dates
-            aligned_counts = df_counts.reindex(columns=all_dates)
-            counts_series = aligned_counts.loc[mutation]
-            if counts_series is not None:
-                # Convert to numeric, replacing NA/NaN with None, handle pandas NA
-                numeric_series = pd.to_numeric(counts_series, errors='coerce')
-                # Convert to list to handle pandas NA types
-                counts_vals = np.array([None if pd.isna(v) else float(v) for v in numeric_series], dtype=object)
-
-        # coverage per date (for hover) via coverage_freq_df
-        coverage_vals = None
-        if coverage_freq_df is not None and not coverage_freq_df.empty:
-            cov_tmp = []
-            for dt in all_dates:
+        progress_callback(0.3, 1.0, "Creating enhanced hover text...")
+    
+    # Create enhanced hover text
+    hover_text = []
+    total_rows = len(df_processed.index)
+    
+    for idx, row_label in enumerate(df_processed.index):
+        # Update progress during hover text creation
+        if progress_callback and total_rows > 0:
+            hover_progress = 0.3 + (idx / total_rows) * 0.5  # Progress from 0.3 to 0.8
+            progress_callback(hover_progress, 1.0, f"Creating hover text for {row_label}...")
+        
+        row_hover_text = []
+        for date in df_processed.columns:
+            frequency = df_processed.loc[row_label, date]
+            
+            # Try to get additional data from other sources
+            count = None
+            coverage = None
+            
+            # First try to get count from counts_df if provided
+            if counts_df is not None and not counts_df.empty:
                 try:
-                    if mutation in coverage_freq_df.index.get_level_values('mutation'):
-                        md = coverage_freq_df.loc[mutation]
-                        if dt in md.index:
-                            cov = md.loc[dt, 'coverage']
-                            # Handle various NA types
-                            if pd.isna(cov) or cov == 'NA':
-                                cov_tmp.append(None)
-                            else:
-                                cov_tmp.append(float(cov))
-                        else:
-                            cov_tmp.append(None)
-                    else:
-                        cov_tmp.append(None)
-                except Exception:
-                    cov_tmp.append(None)
-            coverage_vals = np.array(cov_tmp, dtype=object)
+                    val = counts_df.loc[row_label, date]
+                    count = val if not pd.isna(val) else None
+                except KeyError:
+                    pass
+            
+            # Then try to get additional data from coverage_freq_df
+            if coverage_freq_df is not None and not coverage_freq_df.empty:
+                try:
+                    # Check if we can access by (row_label, date)
+                    # Assuming coverage_freq_df has MultiIndex (location, samplingDate)
+                    if (row_label, date) in coverage_freq_df.index:
+                        mutation_data = coverage_freq_df.loc[(row_label, date)]
+                        coverage_val = mutation_data.get('coverage')
+                        
+                        # If count is still None, try to get it from coverage_freq_df
+                        if count is None:
+                            count_val = mutation_data.get('count')
+                            count = count_val if count_val != 'NA' else None
+                        
+                        # Handle 'NA' values for coverage
+                        coverage = coverage_val if coverage_val != 'NA' else None
+                except (KeyError, IndexError, TypeError):
+                    pass  # Data not available for this combination
+            
+            # Build hover text
+            if pd.isna(frequency):
+                text = f"Location: {row_label}<br>Date: {date}<br>Status: No data"
+            else:
+                text = f"Location: {row_label}<br>Date: {date}<br>Proportion: {frequency * 100:.1f}%"
+                if count is not None:
+                    text += f"<br>Count: {float(count):.0f}"
+                if coverage is not None:
+                    text += f"<br>Coverage: {float(coverage):.0f}"
+            
+            row_hover_text.append(text)
+        hover_text.append(row_hover_text)
 
-        # Assemble customdata columns for hover
-        # customdata shape: (N, 2) -> [count, coverage]
-        if counts_vals is not None or coverage_vals is not None:
-            # Normalize shapes
-            if counts_vals is None:
-                counts_vals = np.array([None] * len(all_dates), dtype=object)
-            if coverage_vals is None:
-                coverage_vals = np.array([None] * len(all_dates), dtype=object)
-            customdata = np.vstack([counts_vals, coverage_vals]).T
-            hovertemplate = (
-                "Date: %{x|%Y-%m-%d}<br>"
-                "Proportion: %{y:.3f}<br>"
-                "Count: %{customdata[0]:.0f}<br>"
-                "Coverage: %{customdata[1]:.0f}<extra>%{fullData.name}</extra>"
-            )
-        else:
-            customdata = None
-            hovertemplate = (
-                "Date: %{x|%Y-%m-%d}<br>"
-                "Proportion: %{y:.3f}<extra>%{fullData.name}</extra>"
-            )
+    if progress_callback:
+        progress_callback(0.9, 1.0, "Finalizing plot layout...")
+    
+    # Determine dynamic height
+    height = max(400, len(df_processed.index) * 30 + 100)  # Base height + per row + padding
 
-        fig.add_trace(go.Scatter(
-            x=all_dates,
-            y=y_vals,
-            mode="lines+markers",
-            name=mutation,
-            customdata=customdata,
-            hovertemplate=hovertemplate,
-            marker=dict(size=6, line=dict(width=0.5, color="white"))
-        ))
+    # Determine dynamic left margin based on label length
+    max_len_label = 0
+    if not df_processed.index.empty:
+        max_len_label = max(len(str(m)) for m in df_processed.index)
+    
+    margin_l = max(80, max_len_label * 7 + 30)
 
-    # Layout
+    # Apply power transformation to highlight low non-zero values
+    # This acts similar to a log scale but preserves 0 -> 0 mapping
+    # Using power of 0.25 makes small values (e.g. 0.01) much more visible (0.01^0.25 ~= 0.31)
+    z_values = np.power(df_processed.values, 0.25)
+
+    fig = go.Figure(data=go.Heatmap(
+        z=z_values,
+        x=df_processed.columns,
+        y=df_processed.index,
+        colorscale='Blues',
+        showscale=False,
+        hoverongaps=True,
+        text=hover_text,
+        hoverinfo='text',
+        zmin=0,
+        zmax=1
+    ))
+
+    # Customize layout
+    num_cols = len(df_processed.columns)
+    tick_indices = []
+    tick_labels = []
+    if num_cols > 0:
+        # Show fewer ticks to avoid crowding
+        step = max(1, num_cols // 10)
+        tick_indices = df_processed.columns[::step]
+        tick_labels = [str(label) for label in tick_indices]
+
     fig.update_layout(
         title=title,
-        xaxis_title="Date",
-        yaxis_title="Proportion",
-        template="plotly_white",
-        height=max(400, 300 + int(len(df_freq.index) / 10) * 40),
-        legend_title_text="Mutation",
-        margin=dict(l=60, r=20, t=60, b=60)
+        xaxis=dict(
+            title='Date',
+            side='bottom',
+            tickmode='auto',
+            tickangle=45,
+        ),
+        yaxis=dict(
+            title='Location',
+            autorange='reversed'  # Show locations from top to bottom
+        ),
+        height=height,
+        plot_bgcolor='lightpink',  # NaN values will appear as this background color
+        margin=dict(l=margin_l, r=20, t=80, b=100),
     )
-    # Auto-scale y-axis to data range instead of forcing 0-1
-    fig.update_yaxes(autorange=True)
-
-    if progress_callback:
-        progress_callback(0.95, 1.0, "Rendering plot...")
-
     return fig
