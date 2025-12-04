@@ -1,15 +1,13 @@
-import numpy as np
 import streamlit as st
 import pandas as pd
-import asyncio
-import streamlit.components.v1 as components
-import plotly.graph_objects as go 
 import pathlib
+from datetime import datetime, date
 
 from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
-from visualize.mutations import mutations_over_time
 from utils.config import get_wiseloculus_url
+from utils.url_state import create_url_state_manager, load_date_range_from_url_with_validation
+from components.mutation_plot_component import render_mutation_plot_component
 
 pd.set_option('future.no_silent_downcasting', True)
 
@@ -20,6 +18,9 @@ wiseLoculus = WiseLoculusLapis(server_ip)
 
 
 def app():
+    # Initialize URL state manager for this page
+    url_state = create_url_state_manager("search")
+
     st.title("Resistance Mutations from Wastewater Data")
     st.write("This page allows you to visualize the number of observed resistance mutations over time.")
     st.write("The sets of resistance mutations are provided from Stanford's Coronavirus Antiviral & Resistance Database.")
@@ -33,7 +34,14 @@ def app():
         "Spike mAbs": str(data_dir / 'translated_Spike_in_S_mutations.csv')
     }
 
-    selected_option = st.selectbox("Select a resistance mutation set:", options.keys())
+    # Load selected option from URL or use default
+    default_option = url_state.load_from_url("resistance_set", "3CLpro Inhibitors", str)
+    selected_option = st.selectbox("Select a resistance mutation set:", 
+                                   options.keys(), 
+                                   index=list(options.keys()).index(default_option) if default_option in options else 0)
+    
+    # Save selected option to URL
+    url_state.save_to_url(resistance_set=selected_option)
 
     st.write("Note that mutation sets `3CLpro` and `RdRP`refer to mature proteins, " \
     "thus the mutations are in the ORF1a and ORF1b genes, respectively and translated here.")
@@ -55,77 +63,104 @@ def app():
     st.write("Choose your data to inspect:")
     # Get dynamic date range from API with bounds to enforce limits
     default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("resistance_mutations")
-    date_range = st.date_input(
+    
+    # Load date range from URL or use defaults
+    url_start_date, url_end_date, was_adjusted = load_date_range_from_url_with_validation(
+        url_state, default_start, default_end, min_date, max_date
+    )
+    
+    if was_adjusted:
+        st.toast("⚠️ Date range adjusted to match available data.", icon="⚠️")
+    
+    date_range_input = st.date_input(
         "Select a date range:", 
-        [default_start, default_end],
+        [url_start_date, url_end_date],
         min_value=min_date,
         max_value=max_date
     )
 
     # Ensure date_range is a tuple with two elements
-    if len(date_range) != 2:
+    if len(date_range_input) != 2:
         st.error("Please select a valid date range with a start and end date.")
         return
 
-    start_date = date_range[0].strftime('%Y-%m-%d')
-    end_date = date_range[1].strftime('%Y-%m-%d')
+    start_date = datetime.fromisoformat(date_range_input[0].strftime('%Y-%m-%d'))
+    end_date = datetime.fromisoformat(date_range_input[1].strftime('%Y-%m-%d'))
+    date_range = (start_date, end_date)
     
+    # Save date range to URL
+    url_state.save_to_url(start_date=date_range[0], end_date=date_range[1])
 
+    
     ## Fetch locations from API
-    default_locations = [
-        "Zürich (ZH)",
-    ]  # Define default locations
-    # Fetch locations using the fetch_locations function
+    default_locations = ["Zürich (ZH)"]
     locations = wiseLoculus.fetch_locations(default_locations)
-
-    location = st.selectbox("Select Location:", locations)
     
-    sequence_type_value = "amino acid"
-
-    formatted_mutations_str = str(formatted_mutations).replace("'", '"')
-
+    # Load location from URL or use default
+    default_location = locations[0] if locations else ""
+    url_location = url_state.load_from_url("location", default_location, str)
+    
+    # Make sure the URL location is still valid
+    if locations and url_location not in locations:
+        url_location = default_location
+    
+    location_index = locations.index(url_location) if locations and url_location in locations else 0
+    location = st.selectbox("Select Location:", locations, index=location_index)
+    
+    # Save location to URL
+    url_state.save_to_url(location=location)
+    
     st.markdown("---")
     st.write("### Resistance Mutations Over Time")
     st.write("Shows the mutations over time in wastewater for the selected date range.")
 
     # Add radio button for showing/hiding dates with no data
+    url_show_empty = url_state.load_from_url("show_empty", "Show all dates", str)
     show_empty_dates = st.radio(
         "Date display options:",
         options=["Show all dates", "Skip dates with no coverage"],
-        index=0  # Default to showing all dates (off)
+        index=0 if url_show_empty == "Show all dates" else 1
     )
-
+    
+    # Save radio button selection to URL
+    url_state.save_to_url(show_empty=show_empty_dates)
+    
     with st.spinner("Fetching resistance mutation data..."):
         try:
-            counts_df, freq_df, coverage_freq_df = wiseLoculus.mutations_over_time_dfs(formatted_mutations, MutationType.AMINO_ACID, date_range, location)
-        except Exception as e:
-            st.error(f"⚠️ Error fetching resistance mutation data: {str(e)}")
-            st.info("This could be due to API connectivity issues. Please try again later.")
-            # Create empty DataFrames for consistency
-            counts_df = pd.DataFrame()
-            freq_df = pd.DataFrame()
-            coverage_freq_df = pd.DataFrame()
-
-
-    # Only skip NA dates if the option is selected
-    if show_empty_dates == "Skip dates with no coverage":
-        plot_counts_df = counts_df.dropna(axis=1, how='all')
-        plot_freq_df = freq_df.dropna(axis=1, how='all')
-    else:
-        plot_counts_df = counts_df
-        plot_freq_df = freq_df
-
-    if not freq_df.empty:
-        if freq_df.isnull().all().all():
-            st.error("The fetched data contains only NaN values. Please try a different date range or mutation set.")
-        else:
-            fig = mutations_over_time(
-                plot_freq_df, 
-                plot_counts_df, 
-                coverage_freq_df,
-                title="Proportion of Resistance Mutations Over Time"
+            mutation_type = MutationType.AMINO_ACID
+            
+            # Configure the component for dynamic mutations
+            plot_config = {
+                'show_frequency_filtering': True,
+                'show_date_options': True,
+                'show_download': True,
+                'show_summary_stats': True,
+                'default_min_frequency': 0.01,
+                'default_max_frequency': 1.0,
+                'plot_title': f"Resistance Mutations Over Time",
+                'enable_empty_date_toggle': True,
+                'show_mutation_count': True
+            }
+            
+            # Use the mutation plot component
+            result = render_mutation_plot_component(
+                wiseLoculus=wiseLoculus,
+                mutations=formatted_mutations,
+                sequence_type=mutation_type,
+                date_range=date_range,
+                location=location,
+                config=plot_config,
+                session_prefix="search_",
+                url_state_manager=url_state
             )
-            st.plotly_chart(fig)
+            
+            if result is None:
+                st.info("💡 Try adjusting the date range, location, or minimum proportion.")
+            else:
+                st.success(f"Successfully analyzed {len(result['filtered_mutations'])} mutations.")
+        except Exception as e:
+            st.error(f"⚠️ Error fetching mutation data: {str(e)}")
+            st.info("This could be due to API connectivity issues. Please try again later.")
 
 if __name__ == "__main__":
     app()

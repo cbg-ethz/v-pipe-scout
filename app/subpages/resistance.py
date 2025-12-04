@@ -9,7 +9,7 @@ from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
 from visualize.mutations import mutations_over_time
 from utils.config import get_wiseloculus_url
-from utils.url_state import create_url_state_manager
+from utils.url_state import create_url_state_manager, load_date_range_from_url_with_validation
 from components.mutation_plot_component import render_mutation_plot_component
 
 pd.set_option('future.no_silent_downcasting', True)
@@ -68,8 +68,12 @@ def app():
     default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("resistance_mutations")
     
     # Load date range from URL or use defaults
-    url_start_date = url_state.load_from_url("start_date", default_start, date)
-    url_end_date = url_state.load_from_url("end_date", default_end, date)
+    url_start_date, url_end_date, was_adjusted = load_date_range_from_url_with_validation(
+        url_state, default_start, default_end, min_date, max_date
+    )
+    
+    if was_adjusted:
+        st.toast("⚠️ Date range adjusted to match available data.", icon="⚠️")
     
     date_range_in = st.date_input(
         "Select a date range:", 
