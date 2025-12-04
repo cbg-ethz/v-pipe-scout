@@ -7,7 +7,7 @@ from interface import MutationType
 from components.variant_signature_component import render_signature_composer
 from components.mutation_plot_component import render_mutation_plot_component
 from utils.config import get_wiseloculus_url, get_covspectrum_url
-from utils.url_state import create_url_state_manager
+from utils.url_state import create_url_state_manager, load_date_range_from_url_with_validation
 
 
 # Get server configuration from centralized config
@@ -67,8 +67,12 @@ def app():
     default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("signature_explorer")
     
     # Load date range from URL or use defaults
-    url_start_date = url_state.load_from_url("start_date", default_start, date)
-    url_end_date = url_state.load_from_url("end_date", default_end, date)
+    url_start_date, url_end_date, was_adjusted = load_date_range_from_url_with_validation(
+        url_state, default_start, default_end, min_date, max_date
+    )
+    
+    if was_adjusted:
+        st.toast("⚠️ Date range adjusted to match available data.", icon="⚠️")
     
     date_range = st.date_input(
         "Select a date range:", 
