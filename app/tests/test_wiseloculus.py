@@ -922,15 +922,8 @@ async def test_coocurrences_uses_connection_limiting():
     api = WiseLoculusLapis("http://test-server.com")
     date_range = (datetime(2024, 1, 1), datetime(2024, 1, 3))  # 3 days
     
-    session_created = False
     connector_limit = None
     connector_limit_per_host = None
-    
-    class MockConnector:
-        def __init__(self, limit=None, limit_per_host=None):
-            nonlocal connector_limit, connector_limit_per_host
-            connector_limit = limit
-            connector_limit_per_host = limit_per_host
     
     class MockResponse:
         def __init__(self, status=200):
@@ -947,13 +940,7 @@ async def test_coocurrences_uses_connection_limiting():
     
     class MockSession:
         def __init__(self, *args, **kwargs):
-            nonlocal session_created
-            session_created = True
-            # Verify connector was passed
-            if 'connector' in kwargs:
-                # The connector will be a real TCPConnector, not our mock
-                # so we'll check it differently
-                pass
+            pass
         def post(self, url, json=None, **kwargs):
             return MockResponse(status=200)
         async def __aenter__(self): return self

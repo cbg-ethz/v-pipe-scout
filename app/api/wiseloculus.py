@@ -605,22 +605,13 @@ class WiseLoculusLapis(Lapis):
             
             # Configure TCPConnector with connection limits to prevent "too many open files"
             # Limit to 50 concurrent connections per session, 30 per host
+            # This prevents exhausting file descriptors when querying many locations/dates
             connector = aiohttp.TCPConnector(limit=50, limit_per_host=30)
-            
-            # Create semaphore to limit concurrent requests (20 concurrent requests max)
-            # This is in addition to the connector limits for extra safety
-            semaphore = asyncio.Semaphore(20)
             
             async with aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=60),
                 connector=connector
             ) as session:
-                
-                async def fetch_with_semaphore(task_coro):
-                    """Execute a request with semaphore limiting."""
-                    async with semaphore:
-                        return await task_coro
-                
                 tasks = []
                 
                 for date_start, date_end in date_ranges:
@@ -633,12 +624,10 @@ class WiseLoculusLapis(Lapis):
                         "fields": ["samplingDate"]
                     }
                     
-                    filtered_task = fetch_with_semaphore(
-                        session.post(
-                            f'{self.server_ip}/sample/aggregated',
-                            headers={'accept': 'application/json', 'Content-Type': 'application/json'},
-                            json=filtered_payload
-                        )
+                    filtered_task = session.post(
+                        f'{self.server_ip}/sample/aggregated',
+                        headers={'accept': 'application/json', 'Content-Type': 'application/json'},
+                        json=filtered_payload
                     )
                     
                     # Task 2: Intersection coverage (reads covering all positions)
@@ -651,12 +640,10 @@ class WiseLoculusLapis(Lapis):
                         "fields": ["samplingDate"]
                     }
                     
-                    intersection_task = fetch_with_semaphore(
-                        session.post(
-                            f'{self.server_ip}/sample/aggregated',
-                            headers={'accept': 'application/json', 'Content-Type': 'application/json'},
-                            json=intersection_payload
-                        )
+                    intersection_task = session.post(
+                        f'{self.server_ip}/sample/aggregated',
+                        headers={'accept': 'application/json', 'Content-Type': 'application/json'},
+                        json=intersection_payload
                     )
                     
                     tasks.append((filtered_task, intersection_task))
