@@ -603,7 +603,24 @@ class WiseLoculusLapis(Lapis):
             filtered_lookup = {}  # date -> count of reads matching query
             coverage_lookup = {}  # date -> reads covering all positions
             
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
+            # Configure TCPConnector with connection limits to prevent "too many open files"
+            # Limit to 50 concurrent connections per session, 30 per host
+            connector = aiohttp.TCPConnector(limit=50, limit_per_host=30)
+            
+            # Create semaphore to limit concurrent requests (20 concurrent requests max)
+            # This is in addition to the connector limits for extra safety
+            semaphore = asyncio.Semaphore(20)
+            
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=60),
+                connector=connector
+            ) as session:
+                
+                async def fetch_with_semaphore(task_coro):
+                    """Execute a request with semaphore limiting."""
+                    async with semaphore:
+                        return await task_coro
+                
                 tasks = []
                 
                 for date_start, date_end in date_ranges:
@@ -616,10 +633,12 @@ class WiseLoculusLapis(Lapis):
                         "fields": ["samplingDate"]
                     }
                     
-                    filtered_task = session.post(
-                        f'{self.server_ip}/sample/aggregated',
-                        headers={'accept': 'application/json', 'Content-Type': 'application/json'},
-                        json=filtered_payload
+                    filtered_task = fetch_with_semaphore(
+                        session.post(
+                            f'{self.server_ip}/sample/aggregated',
+                            headers={'accept': 'application/json', 'Content-Type': 'application/json'},
+                            json=filtered_payload
+                        )
                     )
                     
                     # Task 2: Intersection coverage (reads covering all positions)
@@ -632,10 +651,12 @@ class WiseLoculusLapis(Lapis):
                         "fields": ["samplingDate"]
                     }
                     
-                    intersection_task = session.post(
-                        f'{self.server_ip}/sample/aggregated',
-                        headers={'accept': 'application/json', 'Content-Type': 'application/json'},
-                        json=intersection_payload
+                    intersection_task = fetch_with_semaphore(
+                        session.post(
+                            f'{self.server_ip}/sample/aggregated',
+                            headers={'accept': 'application/json', 'Content-Type': 'application/json'},
+                            json=intersection_payload
+                        )
                     )
                     
                     tasks.append((filtered_task, intersection_task))
@@ -650,7 +671,20 @@ class WiseLoculusLapis(Lapis):
                     
                     # Process filtered response
                     if isinstance(filtered_resp, Exception):
-                        raise APIError(f"Connection error fetching filtered data: {filtered_resp}", details=str(filtered_resp))
+                        error_msg = str(filtered_resp)
+                        # Provide more helpful error messages for common issues
+                        if "too many open files" in error_msg.lower():
+                            raise APIError(
+                                f"Too many concurrent connections to the API server. This can happen when querying many locations or a long date range. Try reducing the date range or querying fewer locations at once.",
+                                details=error_msg
+                            )
+                        elif "timeout" in error_msg.lower():
+                            raise APIError(
+                                f"Connection timeout while fetching data from the API server. The server may be busy or unresponsive.",
+                                details=error_msg
+                            )
+                        else:
+                            raise APIError(f"Connection error fetching filtered data: {error_msg}", details=error_msg)
                     
                     if filtered_resp.status == 200:
                         filtered_data = await filtered_resp.json()
@@ -667,7 +701,20 @@ class WiseLoculusLapis(Lapis):
 
                     # Process coverage (intersection) response
                     if isinstance(intersection_resp, Exception):
-                        raise APIError(f"Connection error fetching intersection coverage: {intersection_resp}", details=str(intersection_resp))
+                        error_msg = str(intersection_resp)
+                        # Provide more helpful error messages for common issues
+                        if "too many open files" in error_msg.lower():
+                            raise APIError(
+                                f"Too many concurrent connections to the API server. This can happen when querying many locations or a long date range. Try reducing the date range or querying fewer locations at once.",
+                                details=error_msg
+                            )
+                        elif "timeout" in error_msg.lower():
+                            raise APIError(
+                                f"Connection timeout while fetching data from the API server. The server may be busy or unresponsive.",
+                                details=error_msg
+                            )
+                        else:
+                            raise APIError(f"Connection error fetching intersection coverage: {error_msg}", details=error_msg)
 
                     if intersection_resp.status == 200:
                         intersection_data = await intersection_resp.json()
@@ -705,8 +752,23 @@ class WiseLoculusLapis(Lapis):
                 
         except APIError:
             raise
+        except aiohttp.ClientError as e:
+            # Handle aiohttp-specific errors with better messages
+            error_msg = str(e)
+            if "too many open files" in error_msg.lower():
+                raise APIError(
+                    f"Too many concurrent connections to the API server. This can happen when querying many locations or a long date range. Try reducing the date range or querying fewer locations at once.",
+                    details=error_msg
+                )
+            elif "timeout" in error_msg.lower():
+                raise APIError(
+                    f"Connection timeout while fetching data from the API server. The server may be busy or unresponsive.",
+                    details=error_msg
+                )
+            else:
+                raise APIError(f"Network error communicating with API server: {error_msg}", details=error_msg)
         except Exception as e:
             logging.error(f"Error in coocurrences_over_time: {e}")
             import traceback
             logging.error(traceback.format_exc())
-            raise APIError(f"Error in coocurrences_over_time: {str(e)}", details=str(e))
+            raise APIError(f"Unexpected error while fetching co-occurrence data: {str(e)}", details=str(e))

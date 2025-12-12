@@ -914,3 +914,113 @@ def test_transform_query_to_coverage():
     query = "23403."
     expected = "!23403N"
     assert api._transform_query_to_coverage(query) == expected
+
+
+@pytest.mark.asyncio
+async def test_coocurrences_uses_connection_limiting():
+    """Test that coocurrences_over_time uses TCPConnector with connection limits."""
+    api = WiseLoculusLapis("http://test-server.com")
+    date_range = (datetime(2024, 1, 1), datetime(2024, 1, 3))  # 3 days
+    
+    session_created = False
+    connector_limit = None
+    connector_limit_per_host = None
+    
+    class MockConnector:
+        def __init__(self, limit=None, limit_per_host=None):
+            nonlocal connector_limit, connector_limit_per_host
+            connector_limit = limit
+            connector_limit_per_host = limit_per_host
+    
+    class MockResponse:
+        def __init__(self, status=200):
+            self.status = status
+        async def json(self):
+            return {'data': []}
+        async def text(self):
+            return ""
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        def __await__(self):
+            async def _ret(): return self
+            return _ret().__await__()
+    
+    class MockSession:
+        def __init__(self, *args, **kwargs):
+            nonlocal session_created
+            session_created = True
+            # Verify connector was passed
+            if 'connector' in kwargs:
+                # The connector will be a real TCPConnector, not our mock
+                # so we'll check it differently
+                pass
+        def post(self, url, json=None, **kwargs):
+            return MockResponse(status=200)
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+    
+    original_tcp_connector = aiohttp.TCPConnector
+    
+    def mock_tcp_connector(*args, **kwargs):
+        nonlocal connector_limit, connector_limit_per_host
+        connector_limit = kwargs.get('limit')
+        connector_limit_per_host = kwargs.get('limit_per_host')
+        # Return a real connector for the session to use
+        return original_tcp_connector(*args, **kwargs)
+    
+    with patch('aiohttp.ClientSession', side_effect=MockSession):
+        with patch('aiohttp.ClientTimeout'):
+            with patch('aiohttp.TCPConnector', side_effect=mock_tcp_connector):
+                try:
+                    await api.coocurrences_over_time(
+                        date_range=date_range,
+                        locationName="Test",
+                        mutations=["123T"]
+                    )
+                except Exception:
+                    # We expect this to fail due to mocking, but we can still check connector creation
+                    pass
+    
+    # Verify that TCPConnector was created with connection limits
+    assert connector_limit is not None, "TCPConnector should be created with a limit"
+    assert connector_limit_per_host is not None, "TCPConnector should be created with limit_per_host"
+    assert connector_limit == 50, f"Expected connector limit of 50, got {connector_limit}"
+    assert connector_limit_per_host == 30, f"Expected connector limit_per_host of 30, got {connector_limit_per_host}"
+
+
+@pytest.mark.asyncio
+async def test_coocurrences_better_error_on_too_many_files():
+    """Test that coocurrences_over_time provides better error message for 'too many open files'."""
+    api = WiseLoculusLapis("http://test-server.com")
+    date_range = (datetime(2024, 1, 1), datetime(2024, 1, 2))
+    
+    class MockResponse:
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        def __await__(self):
+            async def _ret():
+                raise OSError("[Errno 24] Too many open files")
+            return _ret().__await__()
+    
+    class MockSession:
+        def __init__(self, *args, **kwargs): pass
+        def post(self, url, json=None, **kwargs):
+            return MockResponse()
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+    
+    from api.exceptions import APIError
+    
+    with patch('aiohttp.ClientSession', side_effect=MockSession):
+        with patch('aiohttp.ClientTimeout'):
+            with patch('aiohttp.TCPConnector'):
+                with pytest.raises(APIError) as excinfo:
+                    await api.coocurrences_over_time(
+                        date_range=date_range,
+                        locationName="Test",
+                        mutations=["123T"]
+                    )
+                # Verify the error message is user-friendly
+                error_message = str(excinfo.value)
+                assert "concurrent connections" in error_message.lower() or "date range" in error_message.lower(), \
+                    f"Error message should be user-friendly, got: {error_message}"
