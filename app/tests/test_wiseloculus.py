@@ -946,14 +946,19 @@ async def test_coocurrences_uses_connection_limiting():
         async def __aenter__(self): return self
         async def __aexit__(self, *args): pass
     
-    original_tcp_connector = aiohttp.TCPConnector
+    class MockConnector:
+        """Mock TCPConnector that doesn't create actual connections."""
+        def __init__(self, *args, **kwargs):
+            pass
+        async def close(self):
+            pass
     
     def mock_tcp_connector(*args, **kwargs):
         nonlocal connector_limit, connector_limit_per_host
         connector_limit = kwargs.get('limit')
         connector_limit_per_host = kwargs.get('limit_per_host')
-        # Return a real connector for the session to use
-        return original_tcp_connector(*args, **kwargs)
+        # Return a mock connector to avoid creating actual network connections
+        return MockConnector(*args, **kwargs)
     
     with patch('aiohttp.ClientSession', side_effect=MockSession):
         with patch('aiohttp.ClientTimeout'):
