@@ -14,7 +14,8 @@ import base64
 app_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(app_dir))
 
-from utils.url_state import URLStateManager, create_url_state_manager
+from utils.url_state import URLStateManager, create_url_state_manager, load_date_range_from_url_with_validation
+import pandas as pd
 
 
 class TestURLStateManager:
@@ -186,6 +187,117 @@ class TestConvenienceFunctions:
         
         mock_manager_class.assert_called_with("test_page")
         assert mock_manager.load_from_url.call_count == 2
+
+
+class TestDateRangeValidation:
+    """Test load_date_range_from_url_with_validation functionality."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.manager = MagicMock(spec=URLStateManager)
+        self.default_start = date(2024, 1, 10)
+        self.default_end = date(2024, 1, 20)
+        self.min_date = date(2024, 1, 1)
+        self.max_date = date(2024, 1, 31)
+
+    def test_dates_within_bounds(self):
+        """Test that dates within bounds are returned as is."""
+        self.manager.load_from_url.side_effect = [
+            date(2024, 1, 15),  # start_date
+            date(2024, 1, 25)   # end_date
+        ]
+
+        start, end, adjusted = load_date_range_from_url_with_validation(
+            self.manager, self.default_start, self.default_end, self.min_date, self.max_date
+        )
+
+        assert start == date(2024, 1, 15)
+        assert end == date(2024, 1, 25)
+        assert adjusted is False
+
+    def test_dates_clamped_to_bounds(self):
+        """Test that dates outside bounds are clamped."""
+        self.manager.load_from_url.side_effect = [
+            date(2023, 12, 31), # start_date (before min)
+            date(2024, 2, 1)    # end_date (after max)
+        ]
+
+        start, end, adjusted = load_date_range_from_url_with_validation(
+            self.manager, self.default_start, self.default_end, self.min_date, self.max_date
+        )
+
+        assert start == self.min_date
+        assert end == self.max_date
+        assert adjusted is True
+
+    def test_start_after_end_adjustment(self):
+        """Test that start date is adjusted if it's after end date."""
+        self.manager.load_from_url.side_effect = [
+            date(2024, 1, 25),  # start_date
+            date(2024, 1, 15)   # end_date
+        ]
+
+        start, end, adjusted = load_date_range_from_url_with_validation(
+            self.manager, self.default_start, self.default_end, self.min_date, self.max_date
+        )
+
+        # Start and end should be swapped
+        assert start == date(2024, 1, 15)
+        assert end == date(2024, 1, 25)
+        assert adjusted is True
+
+    def test_pandas_timestamp_conversion(self):
+        """Test that Pandas Timestamps are converted to date objects."""
+        self.manager.load_from_url.side_effect = [
+            pd.Timestamp("2024-01-15"),  # start_date
+            pd.Timestamp("2024-01-25")   # end_date
+        ]
+        
+        # Also test with Timestamp bounds
+        min_ts = pd.Timestamp("2024-01-01")
+        max_ts = pd.Timestamp("2024-01-31")
+
+        start, end, adjusted = load_date_range_from_url_with_validation(
+            self.manager, self.default_start, self.default_end, min_ts, max_ts
+        )
+
+        assert isinstance(start, date)
+        assert not isinstance(start, pd.Timestamp)
+        assert isinstance(end, date)
+        assert not isinstance(end, pd.Timestamp)
+        assert start == date(2024, 1, 15)
+        assert end == date(2024, 1, 25)
+        assert adjusted is False
+
+    def test_edge_cases(self):
+        """Test edge cases like both dates out of bounds in opposite directions."""
+        # Case 1: Both dates before min
+        self.manager.load_from_url.side_effect = [
+            date(2023, 1, 1),   # start_date
+            date(2023, 1, 5)    # end_date
+        ]
+        
+        start, end, adjusted = load_date_range_from_url_with_validation(
+            self.manager, self.default_start, self.default_end, self.min_date, self.max_date
+        )
+        
+        assert start == self.min_date
+        assert end == self.min_date
+        assert adjusted is True
+        
+        # Case 2: Both dates after max
+        self.manager.load_from_url.side_effect = [
+            date(2024, 2, 1),   # start_date
+            date(2024, 2, 5)    # end_date
+        ]
+        
+        start, end, adjusted = load_date_range_from_url_with_validation(
+            self.manager, self.default_start, self.default_end, self.min_date, self.max_date
+        )
+        
+        assert start == self.max_date
+        assert end == self.max_date
+        assert adjusted is True
 
 
 if __name__ == "__main__":

@@ -15,8 +15,8 @@ import streamlit as st
 import json
 import base64
 from datetime import datetime, date
-from typing import Any, Dict, List, Optional, Union
-from urllib.parse import quote, unquote
+from typing import Any, List, Optional
+import pandas as pd
 
 
 class URLStateManager:
@@ -286,7 +286,6 @@ def load_date_range_from_url_with_validation(
     Returns:
         (start_date, end_date, was_adjusted)
     """
-    import pandas as pd
     
     url_start = url_state_manager.load_from_url("start_date", default_start, date)
     url_end = url_state_manager.load_from_url("end_date", default_end, date)
@@ -320,7 +319,7 @@ def load_date_range_from_url_with_validation(
         
     # Ensure start <= end
     if url_start > url_end:
-        url_start = url_end
+        url_start, url_end = url_end, url_start
         was_adjusted = True
         
     return url_start, url_end, was_adjusted
