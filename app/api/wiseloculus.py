@@ -26,8 +26,41 @@ def get_fallback_date_range() -> Tuple[datetime, datetime]:
 
 FALLBACK_START_DATE, FALLBACK_END_DATE = get_fallback_date_range()
 
+# Connection pool limits to prevent "too many open files" errors
+# These limits control the maximum number of concurrent HTTP connections
+MAX_CONCURRENT_CONNECTIONS = 50  # Total connections per session
+MAX_CONNECTIONS_PER_HOST = 30    # Connections per host
+
 class WiseLoculusLapis(Lapis):
     """Wise-Loculus Instance API"""
+    
+    @staticmethod
+    def _handle_connection_error(error: Exception, context: str = "") -> APIError:
+        """
+        Convert connection errors to user-friendly APIError messages.
+        
+        Args:
+            error: The exception that occurred
+            context: Additional context about where the error occurred
+            
+        Returns:
+            APIError with user-friendly message
+        """
+        error_msg = str(error)
+        
+        if "too many open files" in error_msg.lower():
+            return APIError(
+                f"Too many concurrent connections to the API server. This can happen when querying many locations or a long date range. Try reducing the date range or querying fewer locations at once",
+                details=error_msg
+            )
+        elif "timeout" in error_msg.lower():
+            return APIError(
+                f"Connection timeout while fetching data from the API server. The server may be busy or unresponsive.",
+                details=error_msg
+            )
+        else:
+            prefix = f"Connection error {context}: " if context else "Connection error: "
+            return APIError(f"{prefix}{error_msg}", details=error_msg)
 
     def _mutations_to_and_query(self, mutations: List[str]) -> str:
         """
@@ -603,7 +636,17 @@ class WiseLoculusLapis(Lapis):
             filtered_lookup = {}  # date -> count of reads matching query
             coverage_lookup = {}  # date -> reads covering all positions
             
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
+            # Configure TCPConnector with connection limits to prevent "too many open files"
+            # This prevents exhausting file descriptors when querying many locations/dates
+            connector = aiohttp.TCPConnector(
+                limit=MAX_CONCURRENT_CONNECTIONS,
+                limit_per_host=MAX_CONNECTIONS_PER_HOST
+            )
+            
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=60),
+                connector=connector
+            ) as session:
                 tasks = []
                 
                 for date_start, date_end in date_ranges:
@@ -650,7 +693,7 @@ class WiseLoculusLapis(Lapis):
                     
                     # Process filtered response
                     if isinstance(filtered_resp, Exception):
-                        raise APIError(f"Connection error fetching filtered data: {filtered_resp}", details=str(filtered_resp))
+                        raise self._handle_connection_error(filtered_resp, "fetching filtered data")
                     
                     if filtered_resp.status == 200:
                         filtered_data = await filtered_resp.json()
@@ -667,7 +710,7 @@ class WiseLoculusLapis(Lapis):
 
                     # Process coverage (intersection) response
                     if isinstance(intersection_resp, Exception):
-                        raise APIError(f"Connection error fetching intersection coverage: {intersection_resp}", details=str(intersection_resp))
+                        raise self._handle_connection_error(intersection_resp, "fetching intersection coverage")
 
                     if intersection_resp.status == 200:
                         intersection_data = await intersection_resp.json()
@@ -705,8 +748,14 @@ class WiseLoculusLapis(Lapis):
                 
         except APIError:
             raise
+        except OSError as e:
+            # Handle OS-level connection errors (e.g., "too many open files") with better messages
+            raise self._handle_connection_error(e)
+        except aiohttp.ClientError as e:
+            # Handle aiohttp-specific errors with better messages
+            raise self._handle_connection_error(e)
         except Exception as e:
             logging.error(f"Error in coocurrences_over_time: {e}")
             import traceback
             logging.error(traceback.format_exc())
-            raise APIError(f"Error in coocurrences_over_time: {str(e)}", details=str(e))
+            raise APIError(f"Unexpected error while fetching co-occurrence data: {str(e)}", details=str(e))
