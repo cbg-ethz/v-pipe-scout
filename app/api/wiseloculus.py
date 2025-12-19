@@ -50,7 +50,7 @@ class WiseLoculusLapis(Lapis):
         
         if "too many open files" in error_msg.lower():
             return APIError(
-                f"Too many concurrent connections to the API server. This can happen when querying many locations or a long date range. Try reducing the date range or querying fewer locations at once.",
+                f"Too many concurrent connections to the API server. This can happen when querying many locations or a long date range. Try reducing the date range or querying fewer locations at once",
                 details=error_msg
             )
         elif "timeout" in error_msg.lower():
@@ -748,6 +748,9 @@ class WiseLoculusLapis(Lapis):
                 
         except APIError:
             raise
+        except OSError as e:
+            # Handle OS-level connection errors (e.g., "too many open files") with better messages
+            raise self._handle_connection_error(e)
         except aiohttp.ClientError as e:
             # Handle aiohttp-specific errors with better messages
             raise self._handle_connection_error(e)
