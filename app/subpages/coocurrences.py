@@ -6,7 +6,7 @@ from datetime import datetime
 from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
 from utils.config import get_wiseloculus_url
-from utils.url_state import create_url_state_manager
+from utils.url_state import create_url_state_manager, load_date_range_from_url_with_validation
 from process.mutations import validate_mutation
 from visualize.mutations import proportions_heatmap
 
@@ -146,8 +146,14 @@ def app():
 
     # Date range
     default_start, default_end, min_date, max_date = wiseLoculus.get_cached_date_range_with_bounds("coocurrences")
-    url_start = url_state.load_from_url("start_date", default_start, type(default_start))
-    url_end = url_state.load_from_url("end_date", default_end, type(default_end))
+    
+    url_start, url_end, was_adjusted = load_date_range_from_url_with_validation(
+        url_state, default_start, default_end, min_date, max_date
+    )
+    
+    if was_adjusted:
+        st.toast("⚠️ Date range adjusted to match available data.", icon="⚠️")
+        
     date_range_input = st.date_input("Select a date range:", [url_start, url_end], min_value=min_date, max_value=max_date)
     if len(date_range_input) != 2:
         st.error("Please select a valid date range.")

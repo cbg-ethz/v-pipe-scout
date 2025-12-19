@@ -15,8 +15,8 @@ import streamlit as st
 import json
 import base64
 from datetime import datetime, date
-from typing import Any, Dict, List, Optional, Union
-from urllib.parse import quote, unquote
+from typing import Any, List, Optional
+import pandas as pd
 
 
 class URLStateManager:
@@ -270,3 +270,56 @@ def load_frequency_thresholds_from_url(default_min: float = 0.01, default_max: f
     min_freq = manager.load_from_url("min_frequency", default_min, float)
     max_freq = manager.load_from_url("max_frequency", default_max, float)
     return min_freq, max_freq
+
+
+def load_date_range_from_url_with_validation(
+    url_state_manager: URLStateManager,
+    default_start: date,
+    default_end: date,
+    min_date: date,
+    max_date: date
+) -> tuple[date, date, bool]:
+    """
+    Load date range from URL and validate against min/max bounds.
+    Adjusts the range if it falls outside the bounds.
+    
+    Returns:
+        (start_date, end_date, was_adjusted)
+    """
+    
+    url_start = url_state_manager.load_from_url("start_date", default_start, date)
+    url_end = url_state_manager.load_from_url("end_date", default_end, date)
+    
+    # Convert all to datetime.date for consistent comparison
+    if isinstance(url_start, pd.Timestamp):
+        url_start = url_start.date()
+    if isinstance(url_end, pd.Timestamp):
+        url_end = url_end.date()
+    if isinstance(min_date, pd.Timestamp):
+        min_date = min_date.date()
+    if isinstance(max_date, pd.Timestamp):
+        max_date = max_date.date()
+        
+    was_adjusted = False
+    
+    # Ensure dates are within bounds
+    if url_start < min_date:
+        url_start = min_date
+        was_adjusted = True
+    if url_start > max_date:
+        url_start = max_date
+        was_adjusted = True
+        
+    if url_end > max_date:
+        url_end = max_date
+        was_adjusted = True
+    if url_end < min_date:
+        url_end = min_date
+        was_adjusted = True
+        
+    # Ensure start <= end
+    if url_start > url_end:
+        url_start, url_end = url_end, url_start
+        was_adjusted = True
+        
+    return url_start, url_end, was_adjusted
