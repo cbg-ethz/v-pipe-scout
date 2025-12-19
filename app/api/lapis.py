@@ -44,7 +44,7 @@ class Lapis:
         try:
             logging.info(f"Attempting to fetch locations from: {location_url}")
             st.toast("Attempting to fetch locations from API...", icon="🔄") # Temporary toast
-            response = requests.get(location_url, headers={'accept': 'application/json'}, timeout=5)
+            response = requests.get(location_url, headers={'accept': 'application/json'}, timeout=30)
             response.raise_for_status() # Raise an exception for bad status codes
             location_data = response.json()
             fetched_locations = [item['locationName'] for item in location_data.get('data', []) if 'locationName' in item]
