@@ -7,9 +7,10 @@ import streamlit as st
 
 class Lapis:
     """Base class for LAPIS API queries."""
-    
+
     def __init__(self, server_ip):
-        self.server_ip = server_ip
+        # Normalize URL by removing trailing slashes to prevent double-slash issues
+        self.server_ip = server_ip.rstrip("/")
 
     @staticmethod
     def parse_url_hostname(url_string):
@@ -40,7 +41,7 @@ class Lapis:
             locations = st.session_state.locations
             return locations
         # Use the full server_ip URL directly instead of parsing it
-        location_url = f'{self.server_ip.rstrip("/")}/sample/aggregated?fields=locationName&limit=100&orderBy=locationName&dataFormat=JSON&downloadAsFile=false'
+        location_url = f'{self.server_ip}/sample/aggregated?fields=locationName&limit=100&orderBy=locationName&dataFormat=JSON&downloadAsFile=false'
         try:
             logging.info(f"Attempting to fetch locations from: {location_url}")
             st.toast("Attempting to fetch locations from API...", icon="🔄") # Temporary toast
