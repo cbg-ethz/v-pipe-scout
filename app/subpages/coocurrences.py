@@ -116,7 +116,7 @@ def app():
             **Grouping:**
             - Use parentheses `(...)` to group operations
             
-            [Official Documentation](https://lapis.cov-spectrum.org/advanced-queries/)
+            [Official Documentation](https://lapis.cov-spectrum.org/open/v2/docs/concepts/advanced-query/)
             """)
             
         with st.expander("[▼] Example Queries", expanded=False):
