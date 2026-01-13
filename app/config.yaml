@@ -1,5 +1,5 @@
 server:
-  lapis_address: "https://lapis.wasap.genspectrum.org/"
+  lapis_address: "https://lapis.wasap.genspectrum.org/covid"
   cov_spectrum_api: "https://lapis.cov-spectrum.org"
 
 curated_variant_definitions:

@@ -13,7 +13,33 @@ import aiohttp
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from api.wiseloculus import WiseLoculusLapis
+from api.lapis import Lapis
 from interface import MutationType
+
+
+# Tests for URL normalization (trailing slash handling)
+def test_lapis_normalizes_trailing_slash():
+    """Test that Lapis base class strips trailing slashes from server_ip."""
+    lapis = Lapis("https://example.com/")
+    assert lapis.server_ip == "https://example.com", "Trailing slash should be stripped"
+
+
+def test_lapis_preserves_url_without_trailing_slash():
+    """Test that Lapis base class preserves URLs without trailing slashes."""
+    lapis = Lapis("https://example.com")
+    assert lapis.server_ip == "https://example.com", "URL without trailing slash should remain unchanged"
+
+
+def test_lapis_normalizes_multiple_trailing_slashes():
+    """Test that Lapis strips multiple trailing slashes."""
+    lapis = Lapis("https://example.com///")
+    assert lapis.server_ip == "https://example.com", "Multiple trailing slashes should be stripped"
+
+
+def test_wiseloculus_inherits_url_normalization():
+    """Test that WiseLoculusLapis inherits URL normalization from Lapis."""
+    api = WiseLoculusLapis("https://lapis.wasap.genspectrum.org/")
+    assert api.server_ip == "https://lapis.wasap.genspectrum.org", "WiseLoculusLapis should inherit URL normalization"
 
 
 def test_mutations_to_and_query_empty():
