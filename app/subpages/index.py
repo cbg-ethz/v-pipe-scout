@@ -162,6 +162,15 @@ def app():
             st.error(f"⚠️ Could not load LAPIS configuration: {str(e)}")
             st.info("Please check the configuration in `app/config.yaml` or contact administrators.")
 
+    # Funding and Acknowledgments Section
+    st.markdown("---")
+    st.write("#### Funding & Acknowledgments")
+    st.markdown("""
+    This project has been funded by the **CBG-FAIR Swiss Universities Research Grant**.
+
+    It was originally started at [BioHackathon Europe 2024](https://biohackathon-europe.org/) in Barcelona.
+    """)
+
     # Debug Information Section (Collapsible)
     st.markdown("---")
     with st.expander("🛠️ Debug Information", expanded=False):
