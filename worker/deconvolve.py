@@ -60,7 +60,8 @@ def devconvolve(
         if isinstance(mutation_counts_df.index, pd.MultiIndex):
             logger.debug("Detected MultiIndex in mutation_counts_df, resetting to columns")
             mutation_counts_df = mutation_counts_df.reset_index()
-        
+
+
         # Save the dataframes to CSV files in the input directory
         pd.DataFrame.to_csv(
             mutation_counts_df,
@@ -116,6 +117,7 @@ def devconvolve(
                 "regressor": regressor,
                 "regressor_params": regressor_params,
                 "deconv_params": deconv_params,
+                "remove_deletions": True,
             }
             yaml.dump(deconv_config, f)
 
@@ -158,8 +160,6 @@ def devconvolve(
         # Create output filename with descriptive suffix
         tallymut_file = output_dir / (mutation_counts.stem + "_tallymut.tsv")
 
-        # DEBUG: Print head of mutation_counts_fp
-        logger.debug(f"Mutation counts file: {mutation_counts_fp}")
         # do head in the terminal
         head_command = ["head", "-n", "5", str(mutation_counts_fp)]
         try:
@@ -347,6 +347,10 @@ def devconvolve(
             # Read and format the JSON file properly
             with open(output_json_fp, "r") as f:
                 deconvolved_data = json.loads(f.read())
+
+            # DEBUG
+            import shutil
+            shutil.copy(output_json_fp, "/tmp/abundance_deconvolved.json")
 
             # Write back with proper indentation
             with open(output_json_fp, "w") as f:

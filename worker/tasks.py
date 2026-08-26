@@ -8,6 +8,18 @@ import pickle
 import base64
 import pandas as pd
 from deconvolve import devconvolve
+import logging
+logger = logging.getLogger(__name__)
+
+from celery.signals import worker_process_init
+
+@worker_process_init.connect
+def preload_signatures(**kwargs):
+    """Pre-warm signature cache in each worker process at startup."""
+    from cooc import get_all_lineage_signatures, get_panel_parent_map
+    get_all_lineage_signatures()
+    get_panel_parent_map()
+    logger.info("Worker process: signatures pre-warmed")
 
 # Initialize Celery
 app = Celery(
@@ -104,7 +116,6 @@ def run_deconvolve(self, mutation_counts_df, mutation_variant_matrix_df,
         deconv_params (dict, optional): Parameters for deconvolution
         locationName (str, optional): Name of the location for proper result structuring
     """
-    
     task_id = self.request.id
     progress_key = f"task_progress:{task_id}"
     
@@ -207,6 +218,8 @@ def run_deconvolve(self, mutation_counts_df, mutation_variant_matrix_df,
         progress_data["status"] = "Completed"
         progress_data["partial_results"] = {"summary": "Deconvolution completed successfully"}
         redis_client.set(progress_key, json.dumps(progress_data), ex=3600)
+
+
         
         return deconvolved_data
     except Exception as e:
@@ -214,4 +227,196 @@ def run_deconvolve(self, mutation_counts_df, mutation_variant_matrix_df,
         error_message = str(e)
         progress_data["status"] = f"Error: {error_message}"
         redis_client.set(progress_key, json.dumps(progress_data), ex=3600)
+        raise
+
+@app.task(bind=True)
+def run_deconvolve_lapis(self, location: str, start_date: str, end_date: str,
+                         variants: list, bootstraps: int = 100, bandwidth: int = 10):
+    """
+    Celery task for LAPIS-sourced deconvolution.
+    Used by the Abundance & Co-occurrence tab.
+
+    Args:
+        location: Location name e.g. "Lugano (TI)"
+        start_date: ISO date string e.g. "2026-01-06"
+        end_date: ISO date string e.g. "2026-04-06"
+        variants: List of pango lineage names
+        bootstraps: Bootstrap iterations (default 100 = Standard)
+        bandwidth: Gaussian kernel bandwidth (default 10 = Narrow)
+    """
+    from datetime import datetime
+    from abundance_cooc import run_deconv_lapis
+
+    task_id = self.request.id
+    progress_key = f"task_progress:{task_id}"
+
+    try:
+        redis_client.set(progress_key, json.dumps({
+            "current": 1, "total": 4,
+            "status": f"Fetching mutation data from LAPIS for {location}..."
+        }), ex=3600)
+
+        result = run_deconv_lapis(
+            location=location,
+            start_date=datetime.fromisoformat(start_date),
+            end_date=datetime.fromisoformat(end_date),
+            variants=variants,
+            bootstraps=bootstraps,
+            bandwidth=bandwidth,
+            progress_callback=lambda step, msg: redis_client.set(
+                progress_key,
+                json.dumps({"current": step, "total": 4, "status": msg}),
+                ex=3600
+            )
+        )
+
+        redis_client.set(progress_key, json.dumps({
+            "current": 4, "total": 4,
+            "status": "Deconvolution complete."
+        }), ex=3600)
+
+
+        return result
+
+    except Exception as e:
+        redis_client.set(progress_key, json.dumps({
+            "current": 0, "total": 4,
+            "status": f"Error: {str(e)}"
+        }), ex=3600)
+        raise
+
+
+@app.task(bind=True)
+def run_cooc_completeness_lapis(self, location: str, start_date: str, end_date: str,
+                                variants: list):
+    """
+    Celery task for LAPIS-sourced panel completeness (cooc).
+    Used by the Abundance & Co-occurrence tab.
+
+    Args:
+        location: Location name e.g. "Lugano (TI)"
+        start_date, end_date: ISO date strings
+        variants: List of pango lineage names in the panel
+    """
+    from datetime import datetime
+    from cooc import run_cooc_panel_completeness
+
+    task_id = self.request.id
+    progress_key = f"task_progress:{task_id}"
+
+    try:
+        redis_client.set(progress_key, json.dumps({
+            "current": 1, "total": 4,
+            "status": f"Preparing panel positions for {location}..."
+        }), ex=3600)
+
+        result = run_cooc_panel_completeness(
+            location=location,
+            start_date=datetime.fromisoformat(start_date),
+            end_date=datetime.fromisoformat(end_date),
+            variants=variants,
+            progress_callback=lambda step, msg: redis_client.set(
+                progress_key,
+                json.dumps({"current": step, "total": 4, "status": msg}),
+                ex=3600,
+            ),
+        )
+
+        redis_client.set(progress_key, json.dumps({
+            "current": 4, "total": 4,
+            "status": "Panel completeness computed."
+        }), ex=3600)
+
+        return result
+
+    except Exception as e:
+        redis_client.set(progress_key, json.dumps({
+            "current": 0, "total": 4,
+            "status": f"Error: {str(e)}"
+        }), ex=3600)
+        raise
+
+@app.task(bind=True)
+def run_cooc_scanner_lapis(self, location: str, start_date: str, end_date: str,
+                           variants: list, unexplained_patterns: list):
+    """
+    Celery task for the co-occurrence panel scanner.
+
+    Takes the unexplained patterns from run_cooc_completeness_lapis and
+    classifies them into three buckets:
+      - missing_from_panel: cowwid tracked variants not in panel
+      - emerging_sublineage: pango descendants of panel variants
+      - possibly_new: no known lineage explains the pattern
+
+    Args:
+        location: Location name e.g. "Lugano (TI)"
+        start_date, end_date: ISO date strings
+        variants: Currently selected panel variants
+        unexplained_patterns: List of {date, count, confirmed_present} dicts
+            from run_cooc_completeness_lapis result["unexplained_patterns"]
+    """
+    import sys, re
+    import pandas as pd
+    sys.path.insert(0, "/app_shared")
+
+    from api.pango_loader import PangoLoader, get_pango_summary_path
+    from api.signatures import get_variant_list
+    from process.scanner import scan_unexplained_patterns
+
+    task_id = self.request.id
+    progress_key = f"task_progress:{task_id}"
+
+    try:
+        redis_client.set(progress_key, json.dumps({
+            "current": 1, "total": 3,
+            "status": f"Loading signatures for scanner..."
+        }), ex=3600)
+
+        # cowwid signatures — all surveillance variants
+        cowwid_variants = {
+            v.name: {m[1:] for m in v.signature_mutations if len(m) > 1}
+            for v in get_variant_list().variants
+        }
+
+        redis_client.set(progress_key, json.dumps({
+            "current": 2, "total": 3,
+            "status": "Loading all pango lineage signatures..."
+        }), ex=3600)
+
+        from cooc import get_all_lineage_signatures, get_panel_parent_map
+        all_sigs = get_all_lineage_signatures()
+        panel_parent_map = get_panel_parent_map()
+
+        redis_client.set(progress_key, json.dumps({
+            "current": 3, "total": 3,
+            "status": "Classifying unexplained patterns..."
+        }), ex=3600)
+
+        patterns_df = (
+            pd.DataFrame(unexplained_patterns)
+            if unexplained_patterns
+            else pd.DataFrame(columns=["date", "count", "confirmed_present"])
+        )
+
+        result = scan_unexplained_patterns(
+            unexplained_patterns=patterns_df,
+            panel_variants=variants,
+            cowwid_signatures=cowwid_variants,
+            all_lineage_signatures=all_sigs,
+            panel_parent_map=panel_parent_map,
+            min_read_count=2,
+        )
+
+        redis_client.set(progress_key, json.dumps({
+            "current": 3, "total": 3,
+            "status": "Scanner complete."
+        }), ex=3600)
+
+        return result
+
+    except Exception as e:
+        redis_client.set(progress_key, json.dumps({
+            "current": 0, "total": 3,
+            "status": f"Error: {str(e)}"
+        }), ex=3600)
         raise

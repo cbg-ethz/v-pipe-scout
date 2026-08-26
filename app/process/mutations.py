@@ -101,6 +101,30 @@ def extract_position(mutation_str: str) -> int:
     
     return 0  # Return 0 if position extraction fails
 
+def lapis_mutation_to_pos(mutation: str) -> Optional[str]:
+    """
+    Convert a LAPIS nucleotide mutation string to tallymut pos format.
+
+    LAPIS returns mutations as "C241T" (ref + position + alt).
+    Tallymut format used by LolliPop is "241T" (position + alt, no ref).
+
+    Args:
+        mutation: LAPIS mutation string e.g. "C241T", "T508-"
+
+    Returns:
+        str: tallymut pos format e.g. "241T", "508-"
+        None: if the mutation string is malformed or an insertion
+    """
+    if not mutation or len(mutation) < 3:
+        return None
+    match = re.match(r'^[A-Z](\d+)([A-Z\-])$', mutation)
+    if not match:
+        return None
+    position = match.group(1)
+    alt = match.group(2)
+    if alt == '-':
+        return f"{position}-"
+    return f"{position}{alt}"
 
 def sort_mutations_by_position(mutations: List[str]) -> List[str]:
     """Sort a list of mutations by their genomic position in ascending order.

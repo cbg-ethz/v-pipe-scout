@@ -1,0 +1,15 @@
+scope:
+  # Query only positions where the panel variants disagree. Positions where
+  # every panel variant carries the same mutation cannot change the
+  # matched/unexplained decision, so they are pure cost.
+  discriminating_positions_only: false
+
+  # Build the co-occurrence position set from all tracked (cowwid/OT) variant
+  # signatures rather than just the selected panel. This is what makes the
+  # scanner able to detect OT variants missing from the panel.
+  use_tracked_variants: true
+
+  # NOTE: `weeks` and `weekly_buckets` were removed 2026-08 — they were leftovers
+  # from the slow-LAPIS era and nothing reads them any more. The scan runs over
+  # the full date-picker range, enumerated per real sampling date. Bound the
+  # range in the UI date picker, not here.
