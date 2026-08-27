@@ -1013,6 +1013,7 @@ def app():
     st.caption("Reference: NC_045512.2 (Wuhan, 29,903 bp) — loaded automatically")
 
     # ── Primer/probe FASTA ─────────────────────────────────────────────
+    # ── Primer/probe FASTA ─────────────────────────────────────────────
     st.subheader("Upload primer/probe FASTA")
 
     # Check URL query params for demo auto-load
