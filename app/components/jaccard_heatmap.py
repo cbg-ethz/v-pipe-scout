@@ -196,3 +196,78 @@ document.getElementById('heatmap').appendChild(table);
 
     height = table_h + 100
     components.html(html, height=height, scrolling=False)
+
+def render_scanner_jaccard(
+    candidates: list[str],
+    panel_variants: list[str],
+    pango_loader,
+) -> None:
+    """
+    Render a rectangular Jaccard table: candidates (rows) x panel (cols).
+    Candidates are sorted by reads descending (caller should pre-sort).
+    Color: green=distinct, amber=moderate, red=similar.
+    """
+    import streamlit.components.v1 as _components
+
+    def _sig(v):
+        return {m for m in pango_loader.get_signature(v) if not m.endswith('-')}
+
+    def _jaccard(a, b):
+        sa, sb = _sig(a), _sig(b)
+        if not sa or not sb:
+            return 0.0
+        return len(sa & sb) / len(sa | sb)
+
+    def _color(j):
+        if j >= 0.85:
+            return ("#E24B4A", "#fff")
+        if j >= 0.70:
+            return ("#F09595", "#501313")
+        if j >= 0.55:
+            return ("#FAC775", "#633806")
+        if j >= 0.40:
+            return ("#C0DD97", "#27500A")
+        return ("#EAF3DE", "#3B6D11")
+
+    col_heads = "".join(
+        f"<th style='min-width:70px;text-align:center;font-size:10px;"
+        f"color:#888;font-weight:400;padding:3px 6px;border-bottom:0.5px solid #ddd'>"
+        f"vs {p}</th>"
+        for p in panel_variants
+    )
+
+    rows_html = ""
+    for cand in candidates:
+        cells = ""
+        for p in panel_variants:
+            j = _jaccard(cand, p)
+            bg, fg = _color(j)
+            cells += (
+                f"<td style='padding:3px 6px;text-align:center'>"
+                f"<span style='display:inline-block;padding:1px 8px;border-radius:8px;"
+                f"font-size:11px;font-weight:500;background:{bg};color:{fg}'>"
+                f"{j:.2f}</span></td>"
+            )
+        rows_html += (
+            f"<tr><td style='font-family:monospace;font-size:11px;padding:3px 6px;"
+            f"white-space:nowrap'>{cand}</td>{cells}</tr>"
+        )
+
+    html = f"""
+<table style='border-collapse:collapse;font-size:12px;width:100%'>
+  <thead>
+    <tr>
+      <th style='text-align:left;font-size:10px;color:#888;font-weight:400;
+          padding:3px 6px;border-bottom:0.5px solid #ddd;min-width:90px'>candidate</th>
+      {col_heads}
+    </tr>
+  </thead>
+  <tbody>{rows_html}</tbody>
+</table>
+<div style='font-size:10px;color:#aaa;margin-top:5px'>
+  Green = distinct from panel. Red = highly similar — may destabilize deconvolution.
+  Mutation signature overlap (pango centroid), not co-occurrence.
+</div>
+"""
+    height = max(120, 28 + len(candidates) * 26)
+    _components.html(html, height=height, scrolling=False)
