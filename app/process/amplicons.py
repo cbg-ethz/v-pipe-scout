@@ -150,11 +150,10 @@ def build_amp_dict_from_variants(
     amp_dict: Dict[int, set] = defaultdict(set)
 
     for variant in variants:
-        # Get signature (same fallback logic as elsewhere)
-        if variant in pango_loader._reconstructed_signatures and cowwid_variants and variant in cowwid_variants:
-            signature = cowwid_variants[variant]
-        else:
-            signature = pango_loader.get_signature(variant)
+        # Always use pango_summary.json as the single source of truth.
+        # pango_loader handles reconstructed nodes (e.g. BA.3.2) via
+        # _fill_empty_node_signatures — no cowwid yaml fallback needed.
+        signature = pango_loader.get_signature(variant)
 
         for mut in signature:
             # Parse "{pos}{alt}" — e.g. "241T"

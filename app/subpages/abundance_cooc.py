@@ -928,7 +928,7 @@ def app():
                                             mutations=_obs_muts,
                                             client=wiseLoculus,
                                             location=_hloc,
-                                            date_range=date_range,
+                                            date_range=(datetime.combine(start_date, datetime.min.time()), datetime.combine(end_date, datetime.min.time())),
                                             max_mutations=20,
                                             panel_variants=all_selected_variants,
                                             all_lineage_signatures=_all_sigs,

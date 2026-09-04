@@ -68,11 +68,8 @@ def _load_cowwid_variants() -> dict:
     try:
         from api.signatures import get_variant_list
         variant_list = get_variant_list()
-        result = {
-            v.name: {m[1:] for m in v.signature_mutations if len(m) > 1}
-            for v in variant_list.variants
-        }
-        logger.info(f"Loaded cowwid signatures for {len(result)} variants")
+        result = {v.name: set() for v in variant_list.variants}
+        logger.info(f"Loaded cowwid variant names: {len(result)}")
         return result
     except Exception as e:
         logger.warning(f"Could not load cowwid signatures: {e}")
@@ -143,10 +140,8 @@ def _build_variant_signatures(
     """
     sigs: Dict[str, set] = {}
     for variant in variants:
-        if variant in pango_loader._reconstructed_signatures and variant in cowwid_variants:
-            sig = cowwid_variants[variant]
-        else:
-            sig = pango_loader.get_signature(variant)
+        # Always use pango_summary.json — single source of truth.
+        sig = pango_loader.get_signature(variant)
         # Keep only substitution entries (skip deletions ending in "-")
         sigs[variant] = {m for m in sig if re.match(r"^\d+[ACGT]$", m)}
     return sigs

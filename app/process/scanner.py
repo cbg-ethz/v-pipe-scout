@@ -194,10 +194,12 @@ def scan_unexplained_patterns(
     )
 
     # ── Bucket 2: emerging sublineages ───────────────────────────────────────
-    # pre-compute panel union and private signatures once outside loops
+    # pre-compute panel + cowwid union once outside loops
     panel_union_sig = set().union(
         *(all_lineage_signatures.get(p, set()) for p in panel_set)
     )
+    cowwid_union_sig = set().union(*cowwid_signatures.values()) if cowwid_signatures else set()
+    combined_union_sig = panel_union_sig | cowwid_union_sig
     lineage_private_sigs: Dict[str, set] = {}
     emerging_hits: Dict[str, dict] = {}
 
@@ -214,10 +216,10 @@ def scan_unexplained_patterns(
             )
             if not is_desc:
                 continue
-            # private = mutations this lineage has that no panel variant has
-            # computed once per lineage, reused across patterns
+            # private = mutations unique vs ALL known variants (panel + cowwid)
+            # ensures observed_mutations are truly novel, not just private vs panel parent
             if lineage not in lineage_private_sigs:
-                lineage_private_sigs[lineage] = sig - panel_union_sig
+                lineage_private_sigs[lineage] = sig - combined_union_sig
             private_sig = lineage_private_sigs[lineage]
             private_observed = present & private_sig
             # require >=2 co-occurring private mutations

@@ -372,11 +372,10 @@ def run_cooc_scanner_lapis(self, location: str, start_date: str, end_date: str,
             "status": f"Loading signatures for scanner..."
         }), ex=3600)
 
-        # cowwid signatures — all surveillance variants
-        cowwid_variants = {
-            v.name: {m[1:] for m in v.signature_mutations if len(m) > 1}
-            for v in get_variant_list().variants
-        }
+        # cowwid surveillance variant names — sigs come from pango_summary.json
+        # (single source of truth). yaml sigs are partial and inconsistent
+        # with the pango centroid sigs used everywhere else.
+        cowwid_names = {v.name for v in get_variant_list().variants}
 
         redis_client.set(progress_key, json.dumps({
             "current": 2, "total": 3,
@@ -401,7 +400,9 @@ def run_cooc_scanner_lapis(self, location: str, start_date: str, end_date: str,
         result = scan_unexplained_patterns(
             unexplained_patterns=patterns_df,
             panel_variants=variants,
-            cowwid_signatures=cowwid_variants,
+            # use pango_summary sigs (full centroid) keyed by cowwid names.
+            # falls back to empty set for cowwid variants not yet in pango_summary.
+            cowwid_signatures={name: all_sigs.get(name, set()) for name in cowwid_names},
             all_lineage_signatures=all_sigs,
             panel_parent_map=panel_parent_map,
             min_read_count=500,

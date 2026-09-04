@@ -241,7 +241,7 @@ def render_scanner_heatmap(
 
     # classify mutations if signatures available
     mut_classes = {}
-    if all_lineage_signatures is not None and cowwid_signatures is not None and panel_variants:
+    if all_lineage_signatures is not None and panel_variants:
         mut_classes = _classify_mutations(
             shown, lineage_sig, panel_variants, all_lineage_signatures, cowwid_signatures
         )
@@ -306,7 +306,7 @@ def render_scanner_heatmap(
 
     st.caption(
         "Frequency = reads with mutation / reads covering that position. "
-        "Blue = mutations unique to this lineage (true signal). "
-        "Orange = shared with a known variant not in your panel. "
+        "Blue = mutations not in any of your panel variants (potential new signal). "
+        "Orange = shared with a panel variant. "
         "Only mutations observed in unexplained co-occurrence patterns are shown."
     )
