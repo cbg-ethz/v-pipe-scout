@@ -343,16 +343,26 @@ def _finalize_clade(s: dict, tree: "_Tree", all_sigs: Dict[str, Set[str]]) -> di
     """Build the clade finding, including per-member discriminating-mutation
     blocks for the drill-down heatmap.
 
-    members = candidates that are descendants of (or equal to) the clade node.
-    For each member we compute its discriminating muts = its sig minus what
-    the other members share, so the UI heatmap can show which member's block
-    lights up.
+    members = candidates that are descendants of the clade node, PLUS
+    recombinant candidates (no parent chain) that share the clade fingerprint —
+    e.g. XFG shares LF.7's spike mutations through recombination, so it's
+    consistent with an LF.7-clade signal even though it's not phylogenetically
+    under LF.7. These "associated" members matter: XFG is often the dominant
+    variant driving the signal.
+
+    For each member we compute its discriminating muts so the UI can show
+    which member's block lights up.
     """
     node = s["node"]
     candidates = sorted(s["candidates"])
-    # keep only members within the clade subtree (drop recombinant outliers)
-    members = [c for c in candidates
-               if c == node or tree.is_descendant(c, node)]
+    # phylogenetic members (descend from the clade node)
+    phylo = [c for c in candidates
+             if c == node or tree.is_descendant(c, node)]
+    # associated members: recombinants (no parent) sharing the fingerprint,
+    # e.g. XFG under an LF.7 clade. These are consistent with the signal.
+    associated = [c for c in candidates
+                  if c not in phylo and not tree.parent.get(c, "")]
+    members = phylo + associated
     if not members:
         members = candidates
 
@@ -360,9 +370,12 @@ def _finalize_clade(s: dict, tree: "_Tree", all_sigs: Dict[str, Set[str]]) -> di
     member_sigs = {m: all_sigs.get(m, set()) for m in members}
     shared = set.intersection(*member_sigs.values()) if member_sigs else set()
 
-    # discriminating block per member (unique vs other members), capped
+    # discriminating block per member (unique vs other members).
+    # prioritise associated recombinants (XFG etc.) — they're the ones the
+    # user most needs to see — then the largest phylo members.
+    ordered = associated + phylo
     blocks = []
-    for m in members[:8]:
+    for m in ordered[:8]:
         others = set().union(*(member_sigs[o] for o in members if o != m)) \
             if len(members) > 1 else set()
         disc = sorted(member_sigs[m] - others)
@@ -374,7 +387,8 @@ def _finalize_clade(s: dict, tree: "_Tree", all_sigs: Dict[str, Set[str]]) -> di
         "relationship": s["relationship"],
         "panel_ancestor": s["panel_ancestor"],
         "member_count": len(members),
-        "members": members[:30],
+        "members": (associated + phylo)[:30],  # show recombinants first
+        "associated_members": associated[:10],
         "total_reads": s["total_reads"],
         "pattern_count": s["pattern_count"],
         "observed_mutations": sorted(s["observed_mutations"]),

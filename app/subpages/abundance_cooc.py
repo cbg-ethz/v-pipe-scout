@@ -825,6 +825,9 @@ def app():
                             "designation": _c.get("designation", ""),
                             "panel_ancestor": _c.get("panel_ancestor", ""),
                             "muts": _c.get("observed_mutations", []),
+                            "member_blocks": _c.get("member_blocks", []),
+                            "shared_mutations": _c.get("shared_mutations", []),
+                            "associated": _c.get("associated_members", []),
                         })
                         _slot["reads"] += int(_c.get("total_reads", 0))
                         _slot["cities"].append(_loc)
@@ -865,6 +868,13 @@ def app():
                         f"{_chip_html(_slot['cities'])}{_member_txt}</div></div>",
                         unsafe_allow_html=True,
                     )
+                    _assoc = _slot.get("associated", [])
+                    if _assoc:
+                        st.caption(
+                            "⚠ includes recombinants sharing these mutations: "
+                            + ", ".join(_assoc[:6])
+                            + " — check the heatmap to see which is driving the signal."
+                        )
                     if _is_sub:
                         _anc = _slot.get("panel_ancestor", "")
                         st.caption(f"Descends from {_anc} — partly counted within its proportion.")
@@ -876,17 +886,14 @@ def app():
                     if _slot["muts"] and wiseLoculus and _slot["cities"]:
                         _hloc = _slot["cities"][0]
                         with st.expander(f"Signal over time — {_hloc} — {_label}", expanded=False):
-                            from components.scanner_heatmap import render_scanner_heatmap
-                            render_scanner_heatmap(
-                                variant=_slot["node"],
-                                mutations=_slot["muts"],
+                            from components.scanner_heatmap import render_clade_heatmap
+                            render_clade_heatmap(
+                                clade_node=_slot["node"],
+                                shared_mutations=_slot.get("shared_mutations", []),
+                                member_blocks=_slot.get("member_blocks", []),
                                 client=wiseLoculus,
                                 location=_hloc,
                                 date_range=(start_date, end_date),
-                                max_mutations=20,
-                                panel_variants=all_selected_variants,
-                                all_lineage_signatures=_all_sigs,
-                                lineage_sig=_all_sigs.get(_slot["node"], set()) if _all_sigs else None,
                             )
 
                 # ---- Not in panel (new-lineage clades) ----
