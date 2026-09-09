@@ -103,6 +103,7 @@ def scan_unexplained_patterns(
     all_lineage_signatures: Dict[str, Set[str]],
     panel_parent_map: Dict[str, str],
     min_read_count: int = 2,
+    truly_private_muts: Dict[str, Set[str]] | None = None,
 ) -> dict:
     """
     Classify unexplained co-occurrence patterns into three buckets.
@@ -164,7 +165,19 @@ def scan_unexplained_patterns(
         present = set(row["confirmed_present"])
         count = int(row["count"])
         for variant, sig in cowwid_not_in_panel.items():
-            if _sig_explains(present, sig):
+            if not _sig_explains(present, sig):
+                continue
+            # truly_private filter: require >=1 mut belonging exclusively to
+            # this variant vs all other cowwid variants.
+            # XBB: 0 private muts → always skipped (shares everything).
+            # NB.1.8.1: 24 private muts → robust vs only 2 nucSubstitutionsNew.
+            if truly_private_muts is not None:
+                tp = truly_private_muts.get(variant, set())
+                if not tp:
+                    continue   # no unique muts → can't distinguish from siblings
+                if not (present & tp):
+                    continue   # no unique mut observed in this pattern → skip
+            if True:
                 if variant not in missing_hits:
                     missing_hits[variant] = {
                         "total_reads": 0,
@@ -173,7 +186,10 @@ def scan_unexplained_patterns(
                     }
                 missing_hits[variant]["total_reads"] += count
                 missing_hits[variant]["pattern_count"] += 1
-                missing_hits[variant]["observed_mutations"].update(present & sig)
+                _tp = (truly_private_muts or {}).get(variant, set())
+                missing_hits[variant]["observed_mutations"].update(
+                    (present & _tp) if _tp else (present & sig)
+                )
 
     missing_from_panel = sorted(
         [{

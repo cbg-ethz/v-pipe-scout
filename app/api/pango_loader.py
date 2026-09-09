@@ -312,6 +312,8 @@ class PangoLoader:
         return self._signatures[lineage]
 
     def get_private_mutations(self, lineage: str) -> set[str]:
+        if lineage not in self._private_mutations and lineage in self.raw_data:
+            self._process_lineage(lineage)
         return self._private_mutations.get(lineage, set())
 
     def is_reconstructed(self, lineage: str) -> bool:
