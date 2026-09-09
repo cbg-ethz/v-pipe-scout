@@ -1,339 +1,424 @@
-"""Panel scanner: classify unexplained co-occurrence patterns.
+"""Panel scanner: classify unexplained co-occurrence patterns (Option C).
 
-Given the unexplained patterns from run_cooc_panel_completeness and
-a set of known lineage signatures, classifies each pattern into three buckets:
+Given the unexplained patterns from run_cooc_panel_completeness and the full
+pango tree, assigns each co-occurrence pattern to the tightest pango node its
+fingerprint supports, then categorizes by relationship to the user's panel.
 
-  missing_from_panel  — a cowwid surveillance variant not in the panel
-                        explains this pattern. Actionable: add it.
+Categories:
+  resolved_lineage  — fingerprint matches exactly one pango lineage.
+  resolved_clade    — fingerprint matches several lineages forming a tight
+                      clade; labelled by their common ancestor.
+  unresolved        — fingerprint matches many lineages across unrelated
+                      clades (common ancestor too ancient to be meaningful).
+  novel             — no pango lineage explains the fingerprint.
 
-  emerging_sublineage — a pango lineage (descendant of a panel variant,
-                        not in cowwid) explains this pattern. Worth watching.
+Within resolved_* each finding is tagged by panel relationship:
+  in_panel     — the assigned node is a panel variant (explained; dropped).
+  sublineage   — assigned node descends from a panel variant.
+  new_lineage  — assigned node unrelated to the panel.
 
-  possibly_new        — no known lineage explains this pattern. Could be
-                        a novel variant, recombinant, or sequencing artifact.
+Co-occurrence requires >= 2 fingerprint mutations by definition (a single
+mutation is allele frequency, not a haplotype), so patterns with fewer than
+2 mutations beyond the panel are excluded.
 
-Called by the worker Celery task (run_cooc_scanner_lapis) — no Streamlit,
-no I/O. Pure computation on DataFrames and signature sets.
+Called by the worker Celery task (run_cooc_scanner_lapis) — pure computation.
 """
 
 import logging
 import re
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+# A clade label is only meaningful if the common ancestor of the candidate
+# set is reasonably recent. If the common ancestor is at or above this depth
+# threshold from the root it's too broad (e.g. BA.2) -> unresolved.
+# Depth is measured as number of parent hops from the node to the tree root.
+MIN_CLADE_DEPTH = 6
+
+# Minimum fingerprint size for co-occurrence (2 = haplotype, 1 = allele freq).
+MIN_FINGERPRINT = 2
+
 
 def _sig_explains(present: Set[str], sig: Set[str]) -> bool:
-    """True if the signature explains the pattern — present is a subset of sig."""
     return bool(present) and present.issubset(sig)
 
 
-def _is_descendant_of_panel(
-    lineage: str,
+class _Tree:
+    """Lightweight pango tree helper built from a parent map."""
+
+    def __init__(self, parent_map: Dict[str, str]):
+        self.parent = parent_map
+        self.children: Dict[str, List[str]] = {}
+        for node, par in parent_map.items():
+            if par:
+                self.children.setdefault(par, []).append(node)
+        self._depth: Dict[str, int] = {}
+
+    def depth(self, node: str) -> int:
+        if node in self._depth:
+            return self._depth[node]
+        d, cur = 0, node
+        seen = set()
+        while True:
+            par = self.parent.get(cur, "")
+            if not par or par in seen:
+                break
+            seen.add(par)
+            d += 1
+            cur = par
+        self._depth[node] = d
+        return d
+
+    def ancestors(self, node: str) -> Set[str]:
+        a, cur, seen = set(), node, set()
+        while cur and cur not in seen:
+            a.add(cur)
+            seen.add(cur)
+            cur = self.parent.get(cur, "")
+        return a
+
+    def is_descendant(self, node: str, ancestor: str) -> bool:
+        cur, seen = node, set()
+        while cur and cur not in seen:
+            seen.add(cur)
+            cur = self.parent.get(cur, "")
+            if cur == ancestor:
+                return True
+        return False
+
+    def lca(self, nodes: List[str]) -> Optional[str]:
+        """Deepest common ancestor of all nodes (may be one of the nodes)."""
+        if not nodes:
+            return None
+        common: Optional[Set[str]] = None
+        for n in nodes:
+            a = self.ancestors(n)
+            common = a if common is None else (common & a)
+        if not common:
+            return None
+        return max(common, key=self.depth)
+
+    def dominant_clade(
+        self, nodes: List[str], min_fraction: float = 0.6
+    ) -> Optional[str]:
+        """Deepest node that is an ancestor of >= min_fraction of `nodes`.
+
+        Unlike strict LCA, this tolerates outliers — recombinants (which have
+        no parent chain) and convergent lineages that share the fingerprint
+        but sit outside the main clade don't drag the label up to the root.
+        Returns the tightest (deepest) clade covering the bulk of candidates.
+        """
+        if not nodes:
+            return None
+        # count how many candidates each ancestor covers
+        cover: Dict[str, int] = {}
+        for n in nodes:
+            for anc in self.ancestors(n):
+                cover[anc] = cover.get(anc, 0) + 1
+        threshold = max(2, int(len(nodes) * min_fraction))
+        qualifying = [a for a, c in cover.items() if c >= threshold]
+        if not qualifying:
+            return None
+        return max(qualifying, key=self.depth)
+
+
+def _assign(
+    fingerprint: Set[str],
+    all_sigs: Dict[str, Set[str]],
+    tree: _Tree,
+) -> Tuple[Optional[str], str, List[str]]:
+    """Assign a fingerprint to the tightest clade it supports.
+
+    Returns (label_node, kind, candidates).
+      kind: 'clade' | 'unresolved' | 'novel'
+      label_node: the clade root (clade), else None.
+      candidates: all lineages whose signature contains the fingerprint.
+
+    We deliberately do NOT claim a single "exact" lineage. A fingerprint
+    matching exactly one lineage is usually a coincidence of which lineages
+    happen to carry those muts (e.g. {1722T,1895A} intersecting at PY.1.1),
+    not evidence that lineage specifically is present. Co-occurrence resolves
+    to clades; which member drives the signal is shown in the drill-down
+    discriminating-mutation heatmap, not claimed as a label.
+    """
+    candidates = [l for l, s in all_sigs.items() if fingerprint.issubset(s)]
+    if not candidates:
+        return None, "novel", []
+    if len(candidates) == 1:
+        # single candidate: label it as a clade-of-one at that node, but only
+        # if it's deep enough to be meaningful; else unresolved.
+        node = candidates[0]
+        if tree.depth(node) >= MIN_CLADE_DEPTH:
+            return node, "clade", candidates
+        return None, "unresolved", candidates
+
+    clade = tree.dominant_clade(candidates)
+    if clade is None or tree.depth(clade) < MIN_CLADE_DEPTH:
+        return None, "unresolved", candidates
+    return clade, "clade", candidates
+
+
+def _panel_relationship(
+    node: str,
     panel_set: Set[str],
-    parent_map: Dict[str, str],
-    max_depth: int = 10,
-) -> Tuple[bool, str]:
+    tree: _Tree,
+) -> Tuple[str, Optional[str]]:
+    """Return (relationship, panel_ancestor).
+
+    relationship: 'in_panel' | 'sublineage' | 'new_lineage'.
     """
-    Walk the parent chain up to max_depth steps.
-    Returns (True, panel_ancestor) if a panel variant is found, else (False, "").
-    """
-    current = lineage
-    for _ in range(max_depth):
-        parent = parent_map.get(current, "")
-        if not parent:
-            break
-        if parent in panel_set:
-            return True, parent
-        current = parent
-    return False, ""
-
-
-def _cluster_missing_ot(
-    missing_from_panel: List[dict],
-    candidate_names,
-    parent_map: Dict[str, str],
-) -> List[dict]:
-    """Tag each missing OT variant with a stable cluster_key = its clade.
-
-    Siblings only: two missing variants group iff they share the SAME immediate
-    parent on the pango tree, and that shared parent is not itself a candidate
-    (so a broad ancestor never absorbs its own children). This keeps the clade
-    one step up from real lineages (e.g. XBB.1, never a basal catch-all like
-    BA.2), which is the only level where "add the clade" is a lineage worth
-    tracking in deconvolution. Cousins and ancestor/descendant pairs do NOT
-    group — their similarity, if any, is the Jaccard heatmap's job, not this.
-
-    Grouping is computed over the FULL candidate set (all cowwid-not-in-panel
-    variants), not just the ones that got hits here, so cluster_key is identical
-    across every city in a run (all cities share the panel -> same candidates).
-    The UI aggregates findings by cluster_key; a group of >= 2 renders as one
-    clade row headlined by the parent, a group of 1 renders as that lineage.
-
-    Mutates and returns missing_from_panel, adding 'cluster_key' to each item.
-    A variant with no qualifying sibling keys to its own name.
-    """
-    cand_set = set(candidate_names)
-
-    by_parent: Dict[str, List[str]] = {}
-    for v in cand_set:
-        p = parent_map.get(v)
-        if p:
-            by_parent.setdefault(p, []).append(v)
-
-    key_of: Dict[str, str] = {}
-    for p, siblings in by_parent.items():
-        # a real sibling group: >= 2 candidates sharing a parent that is not
-        # itself a candidate finding
-        if len(siblings) >= 2 and p not in cand_set:
-            for v in siblings:
-                key_of[v] = p
-
-    for item in missing_from_panel:
-        item["cluster_key"] = key_of.get(item["variant"], item["variant"])
-    return missing_from_panel
+    if node in panel_set:
+        return "in_panel", node
+    for pv in panel_set:
+        if tree.is_descendant(node, pv):
+            return "sublineage", pv
+    return "new_lineage", None
 
 
 def scan_unexplained_patterns(
     unexplained_patterns: pd.DataFrame,
     panel_variants: List[str],
-    cowwid_signatures: Dict[str, Set[str]],
     all_lineage_signatures: Dict[str, Set[str]],
     panel_parent_map: Dict[str, str],
     min_read_count: int = 2,
-    truly_private_muts: Dict[str, Set[str]] | None = None,
+    # kept for backwards-compat with the task signature; unused in Option C.
+    cowwid_signatures: Optional[Dict[str, Set[str]]] = None,
+    truly_private_muts: Optional[Dict[str, Set[str]]] = None,
 ) -> dict:
-    """
-    Classify unexplained co-occurrence patterns into three buckets.
+    """Classify unexplained co-occurrence patterns (Option C).
 
     Args:
-        unexplained_patterns: DataFrame with columns date, count, confirmed_present.
-            confirmed_present is a list of "{pos}{alt}" strings per row.
-            Produced by run_cooc_panel_completeness result["unexplained_patterns"].
-        panel_variants: Currently selected panel variant names.
-        cowwid_signatures: All cowwid surveillance variant signatures.
-            Format: {variant_name: set of "{pos}{alt}" strings}
-        all_lineage_signatures: All known pango lineage signatures.
-            Format: {lineage_name: set of "{pos}{alt}" strings}
-        panel_parent_map: lineage -> parent lineage, for descendant check.
-        min_read_count: Minimum read count for a pattern to be considered.
+        unexplained_patterns: DataFrame with columns date, count,
+            confirmed_present (list of "{pos}{alt}" per row).
+        panel_variants: currently selected panel variant names.
+        all_lineage_signatures: {lineage: set of "{pos}{alt}"} for all pango.
+        panel_parent_map: {lineage: parent} for the full pango tree.
+        min_read_count: minimum reads for a pattern to count.
 
-    Returns:
-        Dict with keys:
-            missing_from_panel:  list of {variant, total_reads, pattern_count,
-                                 observed_mutations, cluster_key}
-                                 cluster_key = the clade (shared immediate
-                                 parent) for sibling groups, else the variant's
-                                 own name. Identical across every location in a
-                                 run so the UI can aggregate then collapse each
-                                 2+-member clade to one row.
-            emerging_sublineage: list of {lineage, parent, total_reads, pattern_count}
-            possibly_new:        {total_reads, pattern_count, top_patterns}
-            total_unexplained_reads: int
-            summary: human-readable one-line summary
+    Returns dict with keys:
+        resolved_lineage:  [{node, relationship, panel_ancestor, total_reads,
+                             pattern_count, observed_mutations, designation}]
+        resolved_clade:    [{node, relationship, panel_ancestor, member_count,
+                             members, total_reads, pattern_count,
+                             observed_mutations, designation}]
+        unresolved:        [{fingerprint, candidate_count, common_ancestor,
+                             total_reads, pattern_count}]
+        novel:             {total_reads, pattern_count, top_patterns}
+        total_unexplained_reads: int
+        summary: str
     """
-    if unexplained_patterns.empty:
-        return _empty_result("No unexplained patterns to classify.")
-
     panel_set = set(panel_variants)
-    cowwid_set = set(cowwid_signatures.keys())
-    cowwid_not_in_panel = {
-        v: sig for v, sig in cowwid_signatures.items()
-        if v not in panel_set and sig
-    }
+    tree = _Tree(panel_parent_map)
 
-    total_unexplained = int(unexplained_patterns["count"].sum())
-    patterns = unexplained_patterns[
-        unexplained_patterns["count"] >= min_read_count
-    ].copy()
+    panel_union: Set[str] = set()
+    for pv in panel_set:
+        panel_union |= all_lineage_signatures.get(pv, set())
 
-    if patterns.empty:
-        return {
-            **_empty_result(
-                f"All {total_unexplained:,} unexplained reads are in singleton "
-                f"patterns (< {min_read_count} reads each)."
-            ),
-            "total_unexplained_reads": total_unexplained,
-        }
+    patterns = unexplained_patterns
+    if patterns is None or patterns.empty:
+        return _empty_result()
 
-    # ── Bucket 1: missing cowwid tracked variants ─────────────────────────────
-    missing_hits: Dict[str, dict] = {}
+    # aggregate per assigned clade
+    clade_hits: Dict[str, dict] = {}
+    unresolved_hits: Dict[frozenset, dict] = {}
+    novel_reads = 0
+    novel_patterns: List[dict] = []
+    total_unexplained = 0
 
-    for idx, row in patterns.iterrows():
+    for _, row in patterns.iterrows():
         present = set(row["confirmed_present"])
         count = int(row["count"])
-        for variant, sig in cowwid_not_in_panel.items():
-            if not _sig_explains(present, sig):
-                continue
-            # truly_private filter: require >=1 mut belonging exclusively to
-            # this variant vs all other cowwid variants.
-            # XBB: 0 private muts → always skipped (shares everything).
-            # NB.1.8.1: 24 private muts → robust vs only 2 nucSubstitutionsNew.
-            if truly_private_muts is not None:
-                tp = truly_private_muts.get(variant, set())
-                if not tp:
-                    continue   # no unique muts → can't distinguish from siblings
-                if not (present & tp):
-                    continue   # no unique mut observed in this pattern → skip
-            if True:
-                if variant not in missing_hits:
-                    missing_hits[variant] = {
-                        "total_reads": 0,
-                        "pattern_count": 0,
-                        "observed_mutations": set(),
-                    }
-                missing_hits[variant]["total_reads"] += count
-                missing_hits[variant]["pattern_count"] += 1
-                _tp = (truly_private_muts or {}).get(variant, set())
-                missing_hits[variant]["observed_mutations"].update(
-                    (present & _tp) if _tp else (present & sig)
-                )
-
-    missing_from_panel = sorted(
-        [{
-            "variant": v,
-            "total_reads": s["total_reads"],
-            "pattern_count": s["pattern_count"],
-            "observed_mutations": sorted(s["observed_mutations"]),
-        } for v, s in missing_hits.items()],
-        key=lambda x: -x["total_reads"],
-    )
-
-    # group missing variants by clade (siblings sharing an immediate parent):
-    # tag each with a cluster_key stable across all cities. The UI aggregates
-    # then collapses each 2+-member clade to a single row headlined by the
-    # parent (adding the clade, not an unresolvable leaf).
-    missing_from_panel = _cluster_missing_ot(
-        missing_from_panel, cowwid_not_in_panel.keys(), panel_parent_map
-    )
-
-    # ── Bucket 2: emerging sublineages ───────────────────────────────────────
-    # pre-compute panel + cowwid union once outside loops
-    panel_union_sig = set().union(
-        *(all_lineage_signatures.get(p, set()) for p in panel_set)
-    )
-    cowwid_union_sig = set().union(*cowwid_signatures.values()) if cowwid_signatures else set()
-    combined_union_sig = panel_union_sig | cowwid_union_sig
-    lineage_private_sigs: Dict[str, set] = {}
-    emerging_hits: Dict[str, dict] = {}
-
-    for idx, row in patterns.iterrows():
-        present = set(row["confirmed_present"])
-        count = int(row["count"])
-        for lineage, sig in all_lineage_signatures.items():
-            if lineage in cowwid_set or lineage in panel_set:
-                continue
-            if not _sig_explains(present, sig):
-                continue
-            is_desc, panel_parent = _is_descendant_of_panel(
-                lineage, panel_set, panel_parent_map
-            )
-            if not is_desc:
-                continue
-            # private = mutations unique vs ALL known variants (panel + cowwid)
-            # ensures observed_mutations are truly novel, not just private vs panel parent
-            if lineage not in lineage_private_sigs:
-                lineage_private_sigs[lineage] = sig - combined_union_sig
-            private_sig = lineage_private_sigs[lineage]
-            private_observed = present & private_sig
-            # require >=2 co-occurring private mutations
-            if len(private_observed) < 2:
-                continue
-            if lineage not in emerging_hits:
-                emerging_hits[lineage] = {
-                    "parent": panel_parent,
-                    "total_reads": 0,
-                    "pattern_count": 0,
-                    "observed_mutations": set(),
-                }
-            emerging_hits[lineage]["total_reads"] += count
-            emerging_hits[lineage]["pattern_count"] += 1
-            emerging_hits[lineage]["observed_mutations"].update(private_observed)
-
-    # deduplicate by observed-mutation fingerprint:
-    # sublineages matching the exact same private mutations are explaining
-    # the same reads (signature overlap). Keep the most specific lineage —
-    # deepest pango designation (most dots = most specific).
-    fingerprint_to_lineages: dict = {}
-    for l, s in emerging_hits.items():
-        fp = frozenset(s["observed_mutations"])
-        fingerprint_to_lineages.setdefault(fp, []).append(l)
-
-    deduped: dict = {}
-    for fp, lineages in fingerprint_to_lineages.items():
-        winner = max(lineages, key=lambda x: (len(x.split(".")), x))
-        deduped[winner] = emerging_hits[winner]
-
-    emerging_sublineage = sorted(
-        [{
-            "lineage": l,
-            "parent": s["parent"],
-            "total_reads": s["total_reads"],
-            "pattern_count": s["pattern_count"],
-            "observed_mutations": sorted(s["observed_mutations"]),
-        } for l, s in deduped.items()],
-        key=lambda x: -x["total_reads"],
-    )
-
-    # ── Bucket 3: possibly new ───────────────────────────────────────────────
-    possibly_new_reads = 0
-    possibly_new_patterns = []
-    all_lineage_sigs = list(all_lineage_signatures.values())
-
-    for idx, row in patterns.iterrows():
-        present = set(row["confirmed_present"])
-        count = int(row["count"])
-        if any(_sig_explains(present, sig) for sig in all_lineage_sigs):
+        if count < min_read_count:
             continue
-        possibly_new_reads += count
-        possibly_new_patterns.append({
-            "mutations": sorted(present),
-            "count": count,
-            "date": str(row["date"]),
-        })
+        total_unexplained += count
 
-    possibly_new_patterns.sort(key=lambda x: -x["count"])
+        fingerprint = present - panel_union
+        if len(fingerprint) < MIN_FINGERPRINT:
+            continue  # not co-occurrence beyond panel
 
-    # ── Summary ───────────────────────────────────────────────────────────────
-    parts = []
-    if missing_from_panel:
-        n = len(missing_from_panel)
-        top = missing_from_panel[0]["variant"]
-        parts.append(
-            f"{top} + {n-1} other tracked variant(s) missing from panel"
-            if n > 1 else f"{top} missing from panel"
+        node, kind, candidates = _assign(
+            fingerprint, all_lineage_signatures, tree
         )
-    if emerging_sublineage:
-        n = len(emerging_sublineage)
-        top = emerging_sublineage[0]["lineage"]
-        parts.append(
-            f"{top} + {n-1} other sublineage(s) rising"
-            if n > 1 else f"{top} sublineage rising"
-        )
-    if possibly_new_reads > 0:
-        parts.append(f"{possibly_new_reads:,} reads match no known lineage")
-    summary = "; ".join(parts) if parts else "All unexplained patterns are noise."
 
-    return {
-        "missing_from_panel": missing_from_panel,
-        "emerging_sublineage": emerging_sublineage,
-        "possibly_new": {
-            "total_reads": possibly_new_reads,
-            "pattern_count": len(possibly_new_patterns),
-            "top_patterns": possibly_new_patterns[:10],
-        },
+        if kind == "novel":
+            novel_reads += count
+            if len(novel_patterns) < 10:
+                novel_patterns.append(
+                    {"count": count, "date": row.get("date", ""),
+                     "mutations": sorted(fingerprint)[:8]}
+                )
+            continue
+
+        if kind == "unresolved":
+            lca = tree.dominant_clade(candidates, min_fraction=0.9) or ""
+            key = frozenset(fingerprint)
+            slot = unresolved_hits.get(key)
+            if slot is None:
+                slot = unresolved_hits[key] = {
+                    "fingerprint": sorted(fingerprint),
+                    "candidate_count": len(candidates),
+                    "common_ancestor": lca or "",
+                    "total_reads": 0, "pattern_count": 0,
+                }
+            slot["total_reads"] += count
+            slot["pattern_count"] += 1
+            continue
+
+        # clade (may still be in_panel -> explained, drop those)
+        rel, panel_anc = _panel_relationship(node, panel_set, tree)
+        if rel == "in_panel":
+            continue
+
+        slot = clade_hits.get(node)
+        if slot is None:
+            slot = clade_hits[node] = {
+                "node": node,
+                "relationship": rel,
+                "panel_ancestor": panel_anc,
+                "total_reads": 0, "pattern_count": 0,
+                "observed_mutations": set(),
+                "designation": "",
+                "candidates": set(),
+            }
+        slot["total_reads"] += count
+        slot["pattern_count"] += 1
+        slot["observed_mutations"].update(fingerprint)
+        slot["candidates"].update(candidates)
+
+    # ── build output lists ────────────────────────────────────────────────
+    resolved_clade = sorted(
+        [_finalize_clade(s, tree, all_lineage_signatures) for s in clade_hits.values()],
+        key=lambda x: -x["total_reads"],
+    )
+    unresolved = sorted(
+        unresolved_hits.values(), key=lambda x: -x["total_reads"]
+    )
+
+    novel = {
+        "total_reads": novel_reads,
+        "top_patterns": sorted(
+            novel_patterns, key=lambda x: -x["count"]
+        )[:10],
+    }
+    novel["pattern_count"] = _count_novel(
+        patterns, panel_union, all_lineage_signatures, tree, min_read_count
+    )
+
+    summary = _summary(resolved_clade, unresolved, novel)
+
+    result = {
+        "resolved_clade": resolved_clade,
+        "unresolved": unresolved,
+        "novel": novel,
         "total_unexplained_reads": total_unexplained,
         "summary": summary,
     }
+    # ── backward-compat shim ──────────────────────────────────────────────
+    # Map the new clade-only shape onto the legacy keys the current UI reads,
+    # so nothing crashes during the UI transition. Legacy consumers see:
+    #   missing_from_panel  <- new-lineage clades (not descended from panel)
+    #   emerging_sublineage <- sublineage clades (descend from panel)
+    #   possibly_new        <- novel
+    result["missing_from_panel"] = [
+        {"variant": c["node"], "total_reads": c["total_reads"],
+         "pattern_count": c["pattern_count"],
+         "observed_mutations": c["observed_mutations"],
+         "cluster_key": c["node"]}
+        for c in resolved_clade if c["relationship"] == "new_lineage"
+    ]
+    result["emerging_sublineage"] = [
+        {"lineage": c["node"], "parent": c["panel_ancestor"] or "",
+         "total_reads": c["total_reads"], "pattern_count": c["pattern_count"],
+         "observed_mutations": c["observed_mutations"]}
+        for c in resolved_clade if c["relationship"] == "sublineage"
+    ]
+    result["possibly_new"] = novel
+    return result
 
 
-def _empty_result(summary: str) -> dict:
+def _finalize_clade(s: dict, tree: "_Tree", all_sigs: Dict[str, Set[str]]) -> dict:
+    """Build the clade finding, including per-member discriminating-mutation
+    blocks for the drill-down heatmap.
+
+    members = candidates that are descendants of (or equal to) the clade node.
+    For each member we compute its discriminating muts = its sig minus what
+    the other members share, so the UI heatmap can show which member's block
+    lights up.
+    """
+    node = s["node"]
+    candidates = sorted(s["candidates"])
+    # keep only members within the clade subtree (drop recombinant outliers)
+    members = [c for c in candidates
+               if c == node or tree.is_descendant(c, node)]
+    if not members:
+        members = candidates
+
+    # shared muts = intersection of all member sigs (the clade fingerprint)
+    member_sigs = {m: all_sigs.get(m, set()) for m in members}
+    shared = set.intersection(*member_sigs.values()) if member_sigs else set()
+
+    # discriminating block per member (unique vs other members), capped
+    blocks = []
+    for m in members[:8]:
+        others = set().union(*(member_sigs[o] for o in members if o != m)) \
+            if len(members) > 1 else set()
+        disc = sorted(member_sigs[m] - others)
+        if disc:
+            blocks.append({"member": m, "discriminating": disc[:6]})
+
     return {
-        "missing_from_panel": [],
-        "emerging_sublineage": [],
-        "possibly_new": {"total_reads": 0, "pattern_count": 0, "top_patterns": []},
+        "node": node,
+        "relationship": s["relationship"],
+        "panel_ancestor": s["panel_ancestor"],
+        "member_count": len(members),
+        "members": members[:30],
+        "total_reads": s["total_reads"],
+        "pattern_count": s["pattern_count"],
+        "observed_mutations": sorted(s["observed_mutations"]),
+        "shared_mutations": sorted(shared)[:10],
+        "member_blocks": blocks,
+        "designation": s["designation"],
+    }
+
+
+def _count_novel(patterns, panel_union, all_sigs, tree, min_read_count) -> int:
+    n = 0
+    all_sig_list = list(all_sigs.values())
+    for _, row in patterns.iterrows():
+        count = int(row["count"])
+        if count < min_read_count:
+            continue
+        fp = set(row["confirmed_present"]) - panel_union
+        if len(fp) < MIN_FINGERPRINT:
+            continue
+        if not any(fp.issubset(s) for s in all_sig_list):
+            n += 1
+    return n
+
+
+def _summary(clade, unresolved, novel) -> str:
+    parts = []
+    if clade:
+        top = clade[0]
+        label = f"{top['node']} clade" if top["member_count"] > 1 else top["node"]
+        extra = len(clade) - 1
+        parts.append(label + (f" + {extra} more" if extra else ""))
+    if novel["total_reads"] > 0:
+        parts.append(f"{novel['pattern_count']} novel pattern(s)")
+    if unresolved:
+        parts.append(f"{len(unresolved)} unresolved")
+    if not parts:
+        return "No co-occurrence signal beyond the panel."
+    return "; ".join(parts) + " not explained by panel."
+
+
+def _empty_result() -> dict:
+    return {
+        "resolved_clade": [], "unresolved": [],
+        "novel": {"total_reads": 0, "pattern_count": 0, "top_patterns": []},
         "total_unexplained_reads": 0,
-        "summary": summary,
+        "summary": "No unexplained patterns.",
     }

@@ -323,7 +323,6 @@ def app():
         if end_date <= start_date:
             st.warning("End date must be after start date.")
 
-
         with st.expander("LolliPop parameters", expanded=False):
             bootstrap_options = {"Rapid": 50, "Standard": 100, "Reliable": 300}
             selected_bootstrap = st.radio(
@@ -601,7 +600,7 @@ def app():
                     _u = sum(_cooc_res2[loc].get("unexplained_counts",[]))
                     _t = _m + _u
                     _pct = int(_m/_t*100) if _t>0 else 0
-                _n_miss = len(_scan_res2.get(loc,{}).get("missing_from_panel",[])) if _scan_done else 0
+                _n_miss = len(_scan_res2.get(loc,{}).get("resolved_clade",[])) if _scan_done else 0
                 return _pct, _n_miss, _scan_done, _scan_running, _deconv_done, _cooc_done, _deconv_running, _cooc_running
 
             def _tid_running(tid):
@@ -760,60 +759,24 @@ def app():
             _scan_res_all = st.session_state.get("acooc_scanner_results", {})
             if _scan_res_all:
                 from collections import defaultdict as _ddict
-                from components.jaccard_heatmap import render_scanner_jaccard as _render_jac
-
                 st.markdown("---")
                 st.markdown("### Scanner")
-
-                # ── coverage banner ───────────────────────────────────────────
-                _ot_set = set(cached_get_variant_names())
-                _n_panel_ot = sum(1 for _v in all_selected_variants if _v in _ot_set)
-                _n_missing = len(_ot_set) - _n_panel_ot
-                st.markdown(
-                    f"<div style='border:0.5px solid #BFD9F2;background:#EFF6FF;"
-                    f"border-radius:8px;padding:8px 12px;margin:2px 0 10px;"
-                    f"font-size:12px;color:#1E3A5F;'>"
-                    f"<b>{_n_panel_ot} of {len(_ot_set)}</b> tracked variants in panel "
-                    f"— {_n_missing} missing. Scanner ranks them by co-occurrence signal "
-                    f"in your samples.</div>",
-                    unsafe_allow_html=True,
+                st.caption(
+                    "Diagnostic across all cities — expand a category to see findings "
+                    "and add variants. Adding applies to the whole panel; re-run to apply."
                 )
 
-                # ── filter bar ────────────────────────────────────────────────
-                _fcol1, _fcol2, _fcol3 = st.columns([2, 2, 3])
-                with _fcol1:
-                    _filter_min_reads = st.number_input(
-                        "Min reads",
-                        min_value=0, max_value=10_000_000,
-                        value=st.session_state.get("scanner_filter_min_reads", 0),
-                        step=100,
-                        help="Hide findings with fewer total reads.",
-                        key="scanner_filter_min_reads",
-                    )
-                with _fcol2:
-                    _filter_cities = st.multiselect(
-                        "Cities",
-                        options=sorted(_scan_res_all.keys()),
-                        default=st.session_state.get("scanner_filter_cities", []),
-                        format_func=lambda x: x.split("(")[0].strip(),
-                        help="Restrict to these cities. Empty = all.",
-                        key="scanner_filter_cities",
-                    )
-                with _fcol3:
-                    _filter_buckets = st.multiselect(
-                        "Show buckets",
-                        options=["Missing from panel", "Emerging sublineage", "Possibly new"],
-                        default=st.session_state.get(
-                            "scanner_filter_buckets",
-                            ["Missing from panel", "Emerging sublineage", "Possibly new"],
-                        ),
-                        key="scanner_filter_buckets",
-                    )
-
-                _locs_to_scan = _filter_cities if _filter_cities else list(_scan_res_all.keys())
-                _show_b1 = "Missing from panel" in _filter_buckets
-                _show_b2 = "Emerging sublineage" in _filter_buckets
-                _show_b3 = "Possibly new" in _filter_buckets
+                # coverage caption (instant, no scan needed): panel ∩ OT vs all OT
+                _ot_set = set(cached_get_variant_names())
+                _n_panel_ot = sum(1 for _v in all_selected_variants if _v in _ot_set)
+                st.markdown(
+                    f"<div style='border:0.5px solid #BFD9F2;background:#EFF6FF;border-radius:8px;"
+                    f"padding:8px 12px;margin:2px 0 10px;font-size:12px;color:#1E3A5F;'>"
+                    f"<b>Panel coverage:</b> {_n_panel_ot} of {len(_ot_set)} officially tracked "
+                    f"variants selected. The scanner ranks the missing ones by how much "
+                    f"co-occurrence signal they actually have in your samples.</div>",
+                    unsafe_allow_html=True,
+                )
 
                 def _chip_html(cities):
                     return "".join(
@@ -823,6 +786,20 @@ def app():
                         for c in cities
                     )
 
+                # ══ Option C scanner rendering ══════════════════════════════
+                # signatures for heatmap classification (lazy, cached in session)
+                _all_sigs = st.session_state.get("acooc_all_sigs_cache")
+                if _all_sigs is None:
+                    try:
+                        from api.pango_loader import PangoLoader, get_pango_summary_path
+                        _pl = PangoLoader(get_pango_summary_path())
+                        _all_sigs = {lin: _pl.get_signature(lin) for lin in _pl.raw_data}
+                        st.session_state["acooc_all_sigs_cache"] = _all_sigs
+                    except Exception:
+                        _all_sigs = {}
+                # Aggregate the new clade-based scanner output across cities.
+                # Categories: not-in-panel clades, sublineage clades,
+                # unresolved, novel. Honest clade labels, member counts.
                 def _human_reads(_n):
                     if _n >= 1_000_000:
                         return f"{_n/1_000_000:.1f}M".replace(".0M", "M")
@@ -830,276 +807,169 @@ def app():
                         return f"{_n/1_000:.0f}K"
                     return str(_n)
 
-                # ── Bucket 1: Missing variants with signal ────────────────────
-                _agg_miss = {}
-                for _loc, _res in _scan_res_all.items():
-                    if _loc not in _locs_to_scan:
-                        continue
-                    for _item in _res.get("missing_from_panel", []):
-                        _v = _item["variant"]
-                        if _v in all_selected_variants:
-                            continue
-                        _slot = _agg_miss.setdefault(_v, {
-                            "variant": _v, "reads": 0, "cities": [],
-                            "cluster_key": _item.get("cluster_key", _v),
-                        })
-                        _slot["reads"] += int(_item.get("total_reads", 0))
-                        _slot["cities"].append(_loc)
-
-                _by_cluster = _ddict(list)
-                for _rec in _agg_miss.values():
-                    _by_cluster[_rec["cluster_key"]].append(_rec)
-
-                _clusters = []
-                for _ckey, _members in _by_cluster.items():
-                    _cl_cities = []
-                    for _m in _members:
-                        for _c in _m["cities"]:
-                            if _c not in _cl_cities:
-                                _cl_cities.append(_c)
-                    _is_clade = len(_members) >= 2
-                    _head = _ckey if _is_clade else _members[0]["variant"]
-                    _clusters.append({
-                        "head": _head, "members": _members, "cities": _cl_cities,
-                        "reads": max(_m["reads"] for _m in _members),
-                        "size": len(_members), "is_clade": _is_clade,
-                    })
-                _clusters.sort(key=lambda c: -c["reads"])
-                _clusters = [c for c in _clusters if c["reads"] >= _filter_min_reads]
-
-                _b1_total = sum(c["reads"] for c in _clusters)
-                _b1_label = (
-                    f"🔴 Missing from panel — {len(_clusters)} variants"
-                    + (f" · {_human_reads(_b1_total)} reads" if _clusters else "")
-                )
-                with st.expander(_b1_label, expanded=False):
-                    if not _show_b1:
-                        st.caption("Hidden by bucket filter.")
-                    elif not _clusters:
-                        st.caption("No missing tracked variants with signal.")
-                    else:
-                        st.caption(
-                            "Tracked variants not in your panel with real co-occurrence signal. "
-                            "Ranked by supporting reads."
-                        )
-                        for _cl in _clusters:
-                            _head = _cl["head"]
-                            _badge = f"{_human_reads(_cl['reads'])} reads"
-                            if not _cl["is_clade"]:
-                                _m1, _m2 = st.columns([4, 1])
-                                with _m1:
-                                    st.markdown(
-                                        f"<div style='font-size:13px;font-weight:600;"
-                                        f"color:#dc2626;'>{_head} "
-                                        f"<span style='font-size:10px;font-weight:400;"
-                                        f"color:#92400E;'>· {_badge}</span></div>"
-                                        f"<div style='margin-top:2px;'>"
-                                        f"{_chip_html(_cl['cities'])}</div>",
-                                        unsafe_allow_html=True,
-                                    )
-                                with _m2:
-                                    if st.button("＋ Add", key=f"acooc_addmiss_{_head}",
-                                                 use_container_width=True):
-                                        st.session_state[
-                                            f"acooc_add_variant_pending_{_head}"] = _head
-                                        st.rerun()
-                            else:
-                                _open_key = f"acooc_cluster_open_{_head}"
-                                _n = _cl["size"]
-                                st.markdown(
-                                    f"<div style='border:0.5px solid #FCA5A5;"
-                                    f"background:#FEF2F2;border-radius:8px;"
-                                    f"padding:8px 11px;margin:6px 0;'>"
-                                    f"<div style='font-size:13px;font-weight:600;"
-                                    f"color:#991B1B;'>{_head} "
-                                    f"<span style='font-weight:400;color:#92400E;'>"
-                                    f"clade · {_n} sibling lineage"
-                                    f"{'s' if _n != 1 else ''}</span></div>"
-                                    f"<div style='font-size:11px;color:#6b7280;"
-                                    f"margin-top:1px;'>most-recent common ancestor"
-                                    f" · {_badge}</div>"
-                                    f"<div style='margin-top:3px;'>"
-                                    f"{_chip_html(_cl['cities'])}</div></div>",
-                                    unsafe_allow_html=True,
-                                )
-                                _a1, _a2 = st.columns([2, 3])
-                                with _a1:
-                                    if st.button(f"＋ Add {_head}",
-                                                 key=f"acooc_addclade_{_head}",
-                                                 use_container_width=True):
-                                        st.session_state[
-                                            f"acooc_add_variant_pending_{_head}"] = _head
-                                        st.rerun()
-                                with _a2:
-                                    _lbl = ("▾ hide siblings"
-                                            if st.session_state.get(_open_key)
-                                            else f"▸ show {_n} siblings")
-                                    if st.button(_lbl, key=f"acooc_cladebtn_{_head}",
-                                                 use_container_width=True):
-                                        st.session_state[_open_key] = not st.session_state.get(
-                                            _open_key, False)
-                                        st.rerun()
-                                if st.session_state.get(_open_key):
-                                    _rows = "".join(
-                                        f"<div style='padding:1px 0;'>• "
-                                        f"<b>{_m['variant']}</b> · "
-                                        f"{_human_reads(_m['reads'])} reads</div>"
-                                        for _m in sorted(_cl["members"],
-                                                         key=lambda r: -r["reads"])
-                                    )
-                                    st.markdown(
-                                        f"<div style='font-size:11px;color:#5F5E5A;"
-                                        f"margin:2px 0 6px 4px;'>{_rows}</div>",
-                                        unsafe_allow_html=True,
-                                    )
-
-                # ── Bucket 2: Emerging sublineages ────────────────────────────
+                # collect clade findings across cities, keyed by node
+                _agg_new = {}      # node -> {reads, cities, member_count, members, designation, muts}
                 _agg_sub = {}
-                for _loc, _res in _scan_res_all.items():
-                    if _loc not in _locs_to_scan:
-                        continue
-                    for _item in _res.get("emerging_sublineage", []):
-                        _lin = _item["lineage"]
-                        if _lin not in _agg_sub:
-                            _agg_sub[_lin] = {
-                                "parent": _item["parent"],
-                                "reads": _item["total_reads"],
-                                "cities": [],
-                                "obs": _item.get("observed_mutations", []),
-                            }
-                        _agg_sub[_lin]["cities"].append(_loc)
-                _sub_list = sorted(_agg_sub.items(), key=lambda x: -x[1]["reads"])
-                _sub_list = [(l, d) for l, d in _sub_list
-                             if d["reads"] >= _filter_min_reads]
+                _agg_unres = {}    # frozenset(fp) -> {reads, cand, anc}
+                _novel_total = 0
+                _novel_pats = 0
 
-                _b2_label = f"🟡 Emerging sublineages — {len(_sub_list)} found"
-                with st.expander(_b2_label, expanded=False):
-                    if not _show_b2:
-                        st.caption("Hidden by bucket filter.")
-                    elif not _sub_list:
-                        st.caption("No emerging sublineages detected.")
+                for _loc, _res in _scan_res_all.items():
+                    for _c in _res.get("resolved_clade", []):
+                        _bucket = _agg_new if _c.get("relationship") == "new_lineage" else _agg_sub
+                        _node = _c["node"]
+                        _slot = _bucket.setdefault(_node, {
+                            "node": _node, "reads": 0, "cities": [],
+                            "member_count": _c.get("member_count", 1),
+                            "members": _c.get("members", []),
+                            "designation": _c.get("designation", ""),
+                            "panel_ancestor": _c.get("panel_ancestor", ""),
+                            "muts": _c.get("observed_mutations", []),
+                        })
+                        _slot["reads"] += int(_c.get("total_reads", 0))
+                        _slot["cities"].append(_loc)
+                    for _u in _res.get("unresolved", []):
+                        _k = tuple(_u["fingerprint"])
+                        _s = _agg_unres.setdefault(_k, {
+                            "fp": _u["fingerprint"], "reads": 0,
+                            "cand": _u.get("candidate_count", 0),
+                            "anc": _u.get("common_ancestor", ""),
+                        })
+                        _s["reads"] += int(_u.get("total_reads", 0))
+                    _nv = _res.get("novel", {})
+                    _novel_total += int(_nv.get("total_reads", 0))
+                    _novel_pats += int(_nv.get("pattern_count", 0))
+
+                def _clade_label(_slot):
+                    return f"{_slot['node']} clade" if _slot["member_count"] > 1 else _slot["node"]
+
+                def _render_finding(_slot, _accent, _bg, _border, _is_sub=False):
+                    _label = _clade_label(_slot)
+                    _reads = _slot["reads"]
+                    _mc = _slot["member_count"]
+                    _desig = _slot["designation"]
+                    _members = _slot["members"]
+                    _member_txt = ""
+                    if _mc > 1:
+                        _samp = ", ".join(_members[:4])
+                        _more = f" +{_mc-4}" if _mc > 4 else ""
+                        _member_txt = f" · {_mc} members: {_samp}{_more}"
+                    _desig_txt = f" · designated {_desig}" if _desig else ""
+                    st.markdown(
+                        f"<div style='background:{_bg};border:1px solid {_border};"
+                        f"border-radius:6px;padding:8px 12px;margin:4px 0;'>"
+                        f"<span style='font-weight:600;color:{_accent};'>{_label}</span>"
+                        f"<span style='color:#6b7280;font-size:0.82rem;margin-left:8px;'>"
+                        f"{_reads:,} reads{_desig_txt}</span>"
+                        f"<div style='color:#9ca3af;font-size:0.72rem;margin-top:2px;'>"
+                        f"{_chip_html(_slot['cities'])}{_member_txt}</div></div>",
+                        unsafe_allow_html=True,
+                    )
+                    if _is_sub:
+                        _anc = _slot.get("panel_ancestor", "")
+                        st.caption(f"Descends from {_anc} — partly counted within its proportion.")
+                    else:
+                        _addkey = f"acooc_addc_{_slot['node']}"
+                        if st.button(f"+ Add {_slot['node']}", key=_addkey):
+                            st.session_state[f"acooc_add_variant_pending_{_slot['node']}"] = _slot["node"]
+                    # drill-down heatmap (first city with data)
+                    if _slot["muts"] and wiseLoculus and _slot["cities"]:
+                        _hloc = _slot["cities"][0]
+                        with st.expander(f"Signal over time — {_hloc} — {_label}", expanded=False):
+                            from components.scanner_heatmap import render_scanner_heatmap
+                            render_scanner_heatmap(
+                                variant=_slot["node"],
+                                mutations=_slot["muts"],
+                                client=wiseLoculus,
+                                location=_hloc,
+                                date_range=(start_date, end_date),
+                                max_mutations=20,
+                                panel_variants=all_selected_variants,
+                                all_lineage_signatures=_all_sigs,
+                                lineage_sig=_all_sigs.get(_slot["node"], set()) if _all_sigs else None,
+                            )
+
+                # ---- Not in panel (new-lineage clades) ----
+                _new_list = sorted(_agg_new.values(), key=lambda x: -x["reads"])
+                with st.expander(
+                    f"🔴 Not in your panel — {len(_new_list)} finding(s)",
+                    expanded=st.session_state.get("acooc_exp_missing", False),
+                ):
+                    if not _new_list:
+                        st.caption("Nothing circulating that your panel doesn't cover.")
                     else:
                         st.caption(
-                            "Descendants of panel variants with rising signal. "
-                            "Highly similar to their parent — see options."
+                            "Co-occurrence signal your panel doesn't explain, mapped "
+                            "to the tightest pango clade the mutations support."
                         )
-                        for _lin, _d in _sub_list:
-                            _parent = _d["parent"]
-                            _in_panel = _lin in all_selected_variants
+                        for _slot in _new_list:
+                            _render_finding(_slot, "#dc2626", "#fef2f2", "#fecaca")
+
+                # ---- Sublineages of your panel ----
+                _sub_list = sorted(_agg_sub.values(), key=lambda x: -x["reads"])
+                with st.expander(
+                    f"🟡 Sublineages of your panel — {len(_sub_list)} finding(s)",
+                    expanded=st.session_state.get("acooc_exp_sub", False),
+                ):
+                    if not _sub_list:
+                        st.caption("No sublineages of your panel variants detected.")
+                    else:
+                        st.caption(
+                            "Clades descending from a panel variant. Signal partly "
+                            "counted within the parent — see the heatmap to judge."
+                        )
+                        for _slot in _sub_list:
+                            _render_finding(_slot, "#92400e", "#fffbeb", "#fde68a", _is_sub=True)
+
+                # ---- Unresolved ----
+                _unres_list = sorted(_agg_unres.values(), key=lambda x: -x["reads"])
+                if _unres_list:
+                    _ur_reads = sum(u["reads"] for u in _unres_list)
+                    with st.expander(
+                        f"⚪ Unresolved — {len(_unres_list)} pattern(s) · {_ur_reads:,} reads",
+                        expanded=False,
+                    ):
+                        st.caption(
+                            "Co-occurring mutations match many lineages across "
+                            "unrelated clades — too broad to name."
+                        )
+                        for _u in _unres_list[:15]:
+                            _fp = ", ".join(_u["fp"][:5])
+                            _anc = f" · nearest ancestor {_u['anc']}" if _u["anc"] else ""
                             st.markdown(
-                                f"<div style='border:0.5px solid #FDE68A;"
-                                f"background:#FFFBEB;border-radius:8px;"
-                                f"padding:8px 11px;margin:6px 0;'>"
-                                f"<div style='font-size:13px;font-weight:600;"
-                                f"color:#92400E;'>{_lin}</div>"
-                                f"<div style='font-size:11px;color:#6b7280;"
-                                f"margin-top:1px;'>sublineage of <b>{_parent}</b>"
-                                f" · {_d['reads']:,} reads</div>"
-                                f"<div style='margin-top:3px;'>"
-                                f"{_chip_html(_d['cities'])}</div></div>",
+                                f"<div style='background:#f8f9fa;border:1px solid #e5e7eb;"
+                                f"border-radius:6px;padding:6px 10px;margin:3px 0;font-size:0.82rem;'>"
+                                f"<span style='font-family:monospace;color:#374151;'>{_fp}</span>"
+                                f"<span style='color:#6b7280;margin-left:8px;'>"
+                                f"{_u['cand']} lineages · {_u['reads']:,} reads{_anc}</span></div>",
                                 unsafe_allow_html=True,
                             )
-                            _parent_in = _parent in all_selected_variants
-                            if _in_panel:
-                                st.caption(f"✓ {_lin} already in panel.")
-                            else:
-                                st.caption(
-                                    f"⚠ Very similar to {_parent} — adding both may "
-                                    f"destabilize deconvolution."
-                                )
-                                _b1c, _b2c = st.columns([2, 2])
-                                with _b1c:
-                                    if (_parent_in and st.button(
-                                            f"⇄ Track instead of {_parent}",
-                                            key=f"acooc_swap_{_lin}",
-                                            use_container_width=True)):
-                                        st.session_state[
-                                            f"acooc_remove_variant_pending_{_parent}"
-                                        ] = _parent
-                                        st.session_state[
-                                            f"acooc_add_variant_pending_{_lin}"
-                                        ] = _lin
-                                        st.rerun()
-                                with _b2c:
-                                    if st.button("＋ Add anyway",
-                                                 key=f"acooc_addsub_{_lin}",
-                                                 use_container_width=True):
-                                        st.session_state[
-                                            f"acooc_add_variant_pending_{_lin}"] = _lin
-                                        st.rerun()
-                            _obs_muts = _d.get("obs", [])
-                            if _obs_muts and wiseLoculus:
-                                for _hloc in _d["cities"]:
-                                    with st.expander(
-                                        f"Signal over time — {_hloc} — {_lin}",
-                                        expanded=False,
-                                    ):
-                                        from components.scanner_heatmap import (
-                                            render_scanner_heatmap,
-                                        )
-                                        _pl = cached_get_pango_loader()
-                                        _all_sigs = {
-                                            lin: _pl.get_signature(lin)
-                                            for lin in _pl.raw_data
-                                        }
-                                        render_scanner_heatmap(
-                                            variant=_lin,
-                                            mutations=_obs_muts,
-                                            client=wiseLoculus,
-                                            location=_hloc,
-                                            date_range=date_range,
-                                            max_mutations=20,
-                                            panel_variants=all_selected_variants,
-                                            all_lineage_signatures=_all_sigs,
-                                            lineage_sig=(
-                                                _all_sigs.get(_lin, set())
-                                                if _all_sigs else None
-                                            ),
-                                        )
 
-                # ── Bucket 3: Possibly new ────────────────────────────────────
-                _pn_total = sum(
-                    _res.get("possibly_new", {}).get("total_reads", 0)
-                    for _loc, _res in _scan_res_all.items()
-                    if _loc in _locs_to_scan
-                )
-                _b3_label = f"🔵 Possibly new — {_pn_total:,} reads"
-                with st.expander(_b3_label, expanded=False):
-                    if not _show_b3:
-                        st.caption("Hidden by bucket filter.")
-                    elif _pn_total == 0:
-                        st.caption("No unexplained patterns without a known lineage.")
+                # ---- Novel ----
+                with st.expander(
+                    f"🔵 Novel — no pango match ({_novel_total:,} reads)",
+                    expanded=False,
+                ):
+                    if _novel_total == 0:
+                        st.caption("No unexplained patterns without a pango match.")
                     else:
                         st.caption(
-                            f"{_pn_total:,} reads match no known lineage across all cities. "
-                            "Could be novel, recombinant, or artifact. No action — monitor."
+                            f"{_novel_total:,} reads in {_novel_pats} pattern(s) match "
+                            "no known lineage. Could be novel, recombinant, or artifact."
                         )
                         for _loc, _res in _scan_res_all.items():
-                            if _loc not in _locs_to_scan:
-                                continue
-                            _pn = _res.get("possibly_new", {})
-                            if _pn.get("total_reads", 0) > 0:
+                            _pn = _res.get("novel", {}) or _res.get("possibly_new", {})
+                            for _pat in _pn.get("top_patterns", [])[:3]:
+                                _muts = ", ".join(_pat.get("mutations", []))
                                 st.markdown(
-                                    f"<span style='font-size:11px;'>"
-                                    f"<b>{_loc.split('(')[0].strip()}</b>: "
-                                    f"{_pn['total_reads']:,} reads, "
-                                    f"{_pn.get('pattern_count', 0)} pattern(s)</span>",
+                                    f"<div style='background:#eff6ff;border:1px solid #bfdbfe;"
+                                    f"border-radius:6px;padding:6px 10px;margin:3px 0;font-size:0.8rem;'>"
+                                    f"<span style='color:#1d4ed8;font-family:monospace;'>{_muts}</span>"
+                                    f"<span style='color:#6b7280;margin-left:8px;'>"
+                                    f"{_pat.get('count',0):,} · {_loc.split('(')[0].strip()}</span></div>",
                                     unsafe_allow_html=True,
                                 )
 
-                # ── Jaccard: candidates vs panel ──────────────────────────────
-                _b1_heads = [c["head"] for c in _clusters]
-                if _b1_heads and _show_b1:
-                    with st.expander("Similarity to panel (Jaccard)", expanded=False):
-                        st.caption(
-                            "Mutation signature overlap between each candidate and your "
-                            "panel variants. Green = distinct. Red = highly similar."
-                        )
-                        _render_jac(
-                            candidates=_b1_heads,
-                            panel_variants=list(all_selected_variants),
-                            pango_loader=cached_get_pango_loader(),
-                        )
 
             # ── Download report (triggered by button in progress header) ───────
             if st.session_state.get("acooc_show_report"):

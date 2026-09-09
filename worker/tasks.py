@@ -397,20 +397,21 @@ def run_cooc_scanner_lapis(self, location: str, start_date: str, end_date: str,
             else pd.DataFrame(columns=["date", "count", "confirmed_present"])
         )
 
-        _cowwid_sigs_for_tp = {name: all_sigs.get(name, set()) for name in cowwid_names}
-        _truly_private = {
-            name: sig - set().union(*(s for k,s in _cowwid_sigs_for_tp.items() if k != name))
-            for name, sig in _cowwid_sigs_for_tp.items()
-        }
         result = scan_unexplained_patterns(
             unexplained_patterns=patterns_df,
             panel_variants=variants,
-            cowwid_signatures={name: all_sigs.get(name, set()) for name in cowwid_names},
             all_lineage_signatures=all_sigs,
             panel_parent_map=panel_parent_map,
             min_read_count=500,
-            truly_private_muts=_truly_private,
         )
+        # fill designation dates on clade findings for the UI
+        try:
+            from api.pango_loader import PangoLoader, get_pango_summary_path as _gp
+            _raw = PangoLoader(_gp()).get_raw_data()
+            for _c in result.get("resolved_clade", []):
+                _c["designation"] = _raw.get(_c["node"], {}).get("designationDate", "")
+        except Exception:
+            pass
 
         redis_client.set(progress_key, json.dumps({
             "current": 3, "total": 3,

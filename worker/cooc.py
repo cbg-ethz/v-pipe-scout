@@ -245,9 +245,21 @@ def run_cooc_panel_completeness(
     # confirmed_absent set catches contradictions BED-based misses).
     # Cross-amplicon positions return N automatically — physics enforces
     # amplicon scoping, not the BED file. BED still used for UI labeling only.
-    batches = [("all", list(positions))]
+    # Chunk positions under LAPIS's per-query field limit (~700 measured).
+    # Reads span ~400bp so co-occurring positions are always genomically
+    # adjacent; contiguous chunks preserve every real co-occurrence.
+    _CHUNK = 500
+    _sorted_pos = sorted(positions)
+    if len(_sorted_pos) <= _CHUNK:
+        batches = [("all", _sorted_pos)]
+    else:
+        batches = [
+            (f"chunk{i//_CHUNK}", _sorted_pos[i:i + _CHUNK])
+            for i in range(0, len(_sorted_pos), _CHUNK)
+        ]
     logger.info(
-        f"[cooc][{location}] BED-free: 1 batch, {len(positions)} positions"
+        f"[cooc][{location}] BED-free: {len(batches)} batch(es), "
+        f"{len(positions)} positions"
     )
 
     _progress(3, f"Querying LAPIS for {len(batches)} batches")
@@ -276,10 +288,9 @@ def run_cooc_panel_completeness(
         timeout = aiohttp.ClientTimeout(total=120)
         sem = asyncio.Semaphore(BATCH_CONCURRENCY)
 
-        # Accumulate per-batch results keyed by batch index
-        # BED-free: one batch, process each date immediately to avoid
-        # accumulating all dates in memory before classification.
-        _, batch_positions = batches[0]
+        # Accumulate results. Multiple chunks per date are merged before
+        # classification (each chunk covers a genomic region; a read's
+        # confirmed_present spans only its own chunk since reads are short).
         per_date_results = []
         per_date_unexplained = []
 
@@ -310,7 +321,8 @@ def run_cooc_panel_completeness(
             timeout=timeout, connector=connector
         ) as session:
             tasks = [
-                _one_query(session, 0, batch_positions, d)
+                _one_query(session, bi, bpos, d)
+                for bi, (_, bpos) in enumerate(batches)
                 for d in dates
             ]
             done = await asyncio.gather(*tasks, return_exceptions=True)
