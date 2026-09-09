@@ -9,6 +9,16 @@ scope:
   # scanner able to detect OT variants missing from the panel.
   use_tracked_variants: true
 
+  # amp_dict_cutoff: build the co-occurrence position set from ALL pango
+  # lineages designated on/after this date, rather than just the 29 cowwid
+  # variants. This lets the scanner detect sublineages and emerging variants,
+  # not only the hand-curated tracked set.
+  #   null        -> use cowwid (via use_tracked_variants above)
+  #   "2024-01-01" -> ~1234 lineages, 2141 positions (~2x query time)
+  #   "2025-01-01" -> ~511 lineages, 1263 positions
+  # Positions are the cheap axis; date range and locations dominate run time.
+  amp_dict_cutoff: "2024-01-01"
+
   # NOTE: `weeks` and `weekly_buckets` were removed 2026-08 — they were leftovers
   # from the slow-LAPIS era and nothing reads them any more. The scan runs over
   # the full date-picker range, enumerated per real sampling date. Bound the

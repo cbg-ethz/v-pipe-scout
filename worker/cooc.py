@@ -189,6 +189,21 @@ def run_cooc_panel_completeness(
     pango_loader = PangoLoader(get_pango_summary_path())
     cowwid_variants = _COWWID_VARIANTS
     reference_variants = get_cooc_setting("scope.reference_variants", default=None)
+    # amp_dict_cutoff: build amp_dict from ALL lineages designated on/after
+    # this date (covers circulating variants + sublineages, not just cowwid).
+    # Positions are the cheap axis (benchmarked ~2x for 5.7x more positions).
+    amp_dict_cutoff = get_cooc_setting("scope.amp_dict_cutoff", default=None)
+    if reference_variants is None and amp_dict_cutoff:
+        _raw = pango_loader.get_raw_data()
+        reference_variants = sorted(
+            l for l, d in _raw.items()
+            if (d.get("designationDate", "") or "") >= amp_dict_cutoff
+            and pango_loader.get_signature(l)
+        )
+        logger.info(
+            f"[cooc][{location}] amp_dict_cutoff={amp_dict_cutoff}: "
+            f"{len(reference_variants)} lineages"
+        )
     if reference_variants is None and get_cooc_setting("scope.use_tracked_variants", default=False):
         reference_variants = sorted(cowwid_variants.keys())
     amp_dict = build_amp_dict_from_variants(

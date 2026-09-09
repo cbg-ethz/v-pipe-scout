@@ -322,45 +322,7 @@ def app():
             )
         if end_date <= start_date:
             st.warning("End date must be after start date.")
-        else:
-            # ── timing estimate ───────────────────────────────────────────────
-            _days = (end_date - start_date).days
-            _n_dates = max(1, int(_days * 2 / 7))   # ~2 wastewater samples/week
-            _n_locs  = max(1, len(selected_locations)) if selected_locations else 1
-            _t_cooc  = (96 / 8) * _n_dates * _n_locs * 0.084 / 60   # parallel ×8
-            _t_deconv = 1.5 * _n_locs
-            _t_total  = _t_cooc + _t_deconv
 
-            if _days <= 90:
-                _tier, _color = "fast", "success"
-                _msg = f"~{_t_total:.0f} min · standard range, no issues expected."
-            elif _days <= 180:
-                _tier, _color = "moderate", "warning"
-                _msg = (
-                    f"~{_t_total:.0f} min · {_days} days is on the longer side. "
-                    "The co-occurrence query may take a few extra minutes."
-                )
-            elif _days <= 365:
-                _tier, _color = "slow", "warning"
-                _msg = (
-                    f"~{_t_total:.0f} min · {_days} days ({_days//30} months) will be slow. "
-                    "Consider narrowing the range if you only need recent trends."
-                )
-            else:
-                _tier, _color = "very slow", "error"
-                _msg = (
-                    f"~{_t_total:.0f} min · {_days} days ({_days//365:.1f} years) is a very long range. "
-                    "LAPIS co-occurrence queries will be heavy. "
-                    "The run may time out or return partial results. "
-                    "We recommend ≤6 months for routine surveillance."
-                )
-
-            if _color == "success":
-                st.caption(f"⏱ Estimated run time: {_msg}")
-            elif _color == "warning":
-                st.warning(f"⏱ {_msg}")
-            else:
-                st.error(f"⏱ {_msg}")
 
         with st.expander("LolliPop parameters", expanded=False):
             bootstrap_options = {"Rapid": 50, "Standard": 100, "Reliable": 300}
@@ -420,6 +382,43 @@ def app():
             and end_date > start_date
             and not _busy
         )
+        # ── timing estimate (benchmarked model) ───────────────────────────
+        if end_date > start_date and selected_locations:
+            _days  = (end_date - start_date).days
+            # wastewater ~2 samples/week
+            _n_dates = max(1, int(_days * 2 / 7))
+            _n_locs  = len(selected_locations)
+            # amp_dict positions from cutoff (2024-01-01 default ≈ 2141)
+            _positions = 2141
+            _per_date  = 0.30 + 0.00022 * _positions      # s / date / location
+            _cooc_s    = _per_date * _n_dates * _n_locs * 1.2   # safety factor
+            _deconv_s  = 90 * _n_locs                       # ~1.5 min/loc deconv
+            _total_s   = _cooc_s + _deconv_s
+            _total_min = _total_s / 60
+
+            if _total_s <= 45:
+                st.caption(
+                    f"⏱ Estimated run time: ~{_total_s:.0f}s "
+                    f"({_n_dates} sampling dates × {_n_locs} location(s))"
+                )
+            elif _total_s <= 120:
+                st.info(
+                    f"⏱ ~{_total_min:.1f} min — {_n_dates} dates × {_n_locs} location(s). "
+                    "Runs in the background; you can keep working."
+                )
+            elif _total_s <= 300:
+                st.warning(
+                    f"⏱ ~{_total_min:.0f} min — this is a large query "
+                    f"({_n_dates} dates × {_n_locs} locations). "
+                    "Consider fewer locations or a shorter date range for faster results."
+                )
+            else:
+                st.error(
+                    f"⏱ ~{_total_min:.0f} min — very large query "
+                    f"({_n_dates} dates × {_n_locs} locations). "
+                    "Strongly consider narrowing the date range or selecting fewer locations."
+                )
+
         _step_label(5, "Run analysis", done=has_run, active=not has_run and can_run)
         if st.button(
             "▶ Run analysis",
